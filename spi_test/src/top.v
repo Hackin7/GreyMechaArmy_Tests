@@ -34,10 +34,20 @@ module top(
     end
 
     //assign led = 8'b11111111;
-    
+    assign led = {3'b000, ~btn};
 
     // Instantiate the spi_master module
-        
+    gc9a01 uut (
+        .clk(clk),
+        .rst_n(btn[0]),
+        .sclk(oled_scl),
+        .mosi(oled_sda),
+        .ncs(oled_cs),
+        .dc(oled_dc)
+        //.done(done)
+    );
+
+    /*
     spi_master dut (
         .clk(clk),
         .rst_n(~btn[0]),
@@ -49,7 +59,6 @@ module top(
         .ncs(oled_cs)
         //.lcd_dc         (oled_dc),
     );
-    assign oled_dc = 1; // permanently enable
-
+    */
 endmodule
 
