@@ -22,6 +22,10 @@ sim_spi:
 	iverilog -s spi_master_tb -o test.vvp src/spi_master.v test/tb_spi.v
 	vvp test.vvp
 
+sim_gc9a01: 
+	iverilog -s tb_gc9a01 -o test.vvp src/spi_master.v test/tb_spi.v src/gc9a01.v test/tb_gc9a01.v
+	vvp test.vvp
+
 clean:
 	rm -f *.svf *.bit *.config *.json tmp.v 
 

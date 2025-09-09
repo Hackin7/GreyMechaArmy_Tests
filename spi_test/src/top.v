@@ -33,36 +33,23 @@ module top(
         end
     end
 
-    assign led = 8'b11111111;
+    //assign led = 8'b11111111;
     
 
-    // Instantiate the gc9a01_driver module
-    spi_master #(
-        .CLK_FREQ       (CLK_FREQ),   // System clock frequency (e.g., 50 MHz)
-        .SPI_FREQ       (10_000_000),   // SPI clock frequency (e.g., 10 MHz)
-        .SCREEN_WIDTH   (240),          // Screen width
-        .SCREEN_HEIGHT  (240)           // Screen height
-    ) gc9a01_driver_inst (
-        .clk            (clk),
-        .reset_n        (1'b1),
-
-        .spi_clk        (oled_scl),
-        .spi_mosi       (oled_sda),
-        .spi_cs_n       (oled_cs),
-        .lcd_dc         (oled_dc),
-        .lcd_rst_n      (oled_rst),
-
-        .pixel_data     (16'hFFFF),
-        .pixel_valid    (1'b1),
-        //.pixel_ready    (o_pixel_ready),
-
-        .start_init     (1'b1),
-        .start_display  (1'b1),
-        //.init_done      (o_init_done),
-        //.display_busy   (o_display_busy),
-
-        //.pixel_count    (o_pixel_count)
+    // Instantiate the spi_master module
+        
+    spi_master dut (
+        .clk(clk),
+        .rst_n(~btn[0]),
+        .data_in(8'hFA),
+        .start_transfer(~btn[1]),
+        .transfer_done(led[0]),
+        .sclk(oled_scl),
+        .mosi(oled_sda),
+        .ncs(oled_cs)
+        //.lcd_dc         (oled_dc),
     );
+    assign oled_dc = 1; // permanently enable
 
 endmodule
 

@@ -40,9 +40,9 @@ module spi_master_tb;
     // Waveform file generation
     initial begin
         // Specify the output file name
-        $dumpfile("spi_master.vcd");
+        $dumpfile("test.vcd");
         // Dump all signals in the current module (and its hierarchy)
-        $dumpvars(0, spi_master_tb);
+        $dumpvars;
     end
 
     // Test sequence
