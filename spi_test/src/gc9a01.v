@@ -98,6 +98,7 @@ initial begin
     lcd_registers_mem[64] = 8'h00;
     lcd_registers_mem[65] = 8'h00;
     lcd_registers_mem[66] = 8'h00;
+    //
     lcd_registers_mem[67] = 8'h67;
     lcd_registers_mem[68] = 8'h0A;
     lcd_registers_mem[69] = 8'h00;
@@ -110,6 +111,7 @@ initial begin
     lcd_registers_mem[76] = 8'h10;
     lcd_registers_mem[77] = 8'h32;
     lcd_registers_mem[78] = 8'h98;
+    //
     lcd_registers_mem[79] = 8'h74;
     lcd_registers_mem[80] = 8'h07;
     lcd_registers_mem[81] = 8'h10;
@@ -119,6 +121,7 @@ initial begin
     lcd_registers_mem[85] = 8'h00;
     lcd_registers_mem[86] = 8'h4E;
     lcd_registers_mem[87] = 8'h00;
+    //
     lcd_registers_mem[88] = 8'h98;
     lcd_registers_mem[89] = 8'h02;
     lcd_registers_mem[90] = 8'h3E;
@@ -295,43 +298,42 @@ end
     function [7:0] spi_command;
         input [31:0] index;
         begin
-            if (index < 114) begin
-                spi_command = lcd_registers_mem[index];
-            end else begin
-                spi_command = 8'hFF; 
-                /*
-                case (index-114)
-                    // // to pass test cases
-                    // 0: begin spi_command = 8'hAA; end
-                    // 1: begin spi_command = 8'h55; end
-                    // 2: begin spi_command = 8'hF0; end
+            // if (index < 114) begin
+            //     spi_command = lcd_registers_mem[index];
+            // end else begin
+            //     spi_command = 8'hFF; 
+            // end
+            case (index)
+                // // to pass test cases
+                // 0: begin spi_command = 8'hAA; end
+                // 1: begin spi_command = 8'h55; end
+                // 2: begin spi_command = 8'hF0; end
 
-                    // Set width
-                    0: begin spi_command = 8'h2A; end
-                    1: begin spi_command = 8'h00; end
-                    2: begin spi_command = 8'h00; end
-                    3: begin spi_command = 8'h00; end
-                    4: begin spi_command = 8'hEF; end
-                    
-                    5+0: begin spi_command = 8'h2B; end
-                    5+1: begin spi_command = 8'h00; end
-                    5+2: begin spi_command = 8'h00; end
-                    5+3: begin spi_command = 8'h00; end
-                    5+4: begin spi_command = 8'hEF; end
+                // Set width
+                0: begin spi_command = 8'h2A; end
+                1: begin spi_command = 8'h00; end
+                2: begin spi_command = 8'h00; end
+                3: begin spi_command = 8'h00; end
+                4: begin spi_command = 8'hEF; end
+                
+                5+0: begin spi_command = 8'h2B; end
+                5+1: begin spi_command = 8'h00; end
+                5+2: begin spi_command = 8'h00; end
+                5+3: begin spi_command = 8'h00; end
+                5+4: begin spi_command = 8'hEF; end
 
-                    10: begin spi_command = 8'h2C; end
+                10: begin spi_command = 8'h2C; end
 
-                    default: begin spi_command = 8'hFF; end
-                endcase
-                */
-            end
+                default: begin spi_command = 8'hFF; end
+            endcase
         end
     endfunction
 
     function spi_is_command;
         input [31:0] index;
         begin
-            if (index < 114) begin
+            //if (index < 114) begin
+            if (index == 0 || index == 5 || index == 10) begin
                 spi_is_command = lcd_start_bits_mem[index];
             end else begin
                 spi_is_command = 1'b1;
