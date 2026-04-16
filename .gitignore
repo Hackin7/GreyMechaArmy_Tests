@@ -6,3 +6,10 @@ tmp.v
 *.vvp
 *.vcd
 log*
+
+# C Files
+*.o
+*.elf
+*.bin
+*.hex
+*.map
