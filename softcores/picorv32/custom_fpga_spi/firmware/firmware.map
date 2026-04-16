@@ -1,0 +1,142 @@
+Archive member included to satisfy reference by file (symbol)
+
+/home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                              print.o (__udivsi3)
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+rom              0x00000000         0x00002000         xr
+ram              0x00002000         0x00002000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+
+.text           0x00000000      0x880
+                0x00000000                        . = ALIGN (0x4)
+ *(.text.start)
+ .text.start    0x00000000       0xa8 start.o
+                0x00000000                reset_vec
+                0x00000000                start
+ *(.text*)
+ .text          0x000000a8        0x0 start.o
+ .text          0x000000a8       0x90 print.o
+                0x000000a8                print_chr
+                0x000000b0                print_str
+                0x000000c2                print_dec
+                0x00000112                print_hex
+ .text          0x00000138       0xc6 board_io.o
+                0x00000138                write_leds
+                0x00000140                spi_init
+                0x00000156                spi_oled_reset_pulse
+                0x00000198                spi_set_dc_command
+                0x000001ae                spi_set_dc_data
+                0x000001c4                spi_write_byte
+ .text          0x000001fe      0x558 gc9a01.o
+                0x0000025a                gc9a01_delay_ms
+                0x0000027e                gc9a01_init
+                0x00000680                gc9a01_fill_screen_rgb565
+                0x000006e0                gc9a01_fill_screen_rgb565_per_pixel_rgb
+ .text          0x00000756       0x1a main.o
+ .text.startup  0x00000770       0x5e main.o
+                0x00000770                main
+ *fill*         0x000007ce        0x2 
+ .text          0x000007d0       0x7e /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                0x000007d0                __divsi3
+                0x000007d8                __hidden___udivsi3
+                0x000007d8                __udivsi3
+                0x00000804                __umodsi3
+                0x00000828                __modsi3
+ *(.rodata*)
+ *fill*         0x0000084e        0x2 
+ .rodata.str1.4
+                0x00000850       0x2d print.o
+                                 0x11 (size before relaxing)
+ .rodata.str1.4
+                0x0000087d        0x0 main.o
+                                 0x19 (size before relaxing)
+                0x00000880                        . = ALIGN (0x4)
+ *fill*         0x0000087d        0x3 
+                0x00000880                        _etext = .
+                0x00000880                        _sidata = LOADADDR (.data)
+
+.rela.dyn       0x00000880        0x0
+ .rela.text.start
+                0x00000880        0x0 start.o
+
+.data           0x00002000        0x0 load address 0x00000880
+                0x00002000                        . = ALIGN (0x4)
+                0x00002000                        _sdata = .
+ *(.sdata*)
+ *(.data*)
+ .data          0x00002000        0x0 start.o
+ .data          0x00002000        0x0 print.o
+ .data          0x00002000        0x0 board_io.o
+ .data          0x00002000        0x0 gc9a01.o
+ .data          0x00002000        0x0 main.o
+ .data          0x00002000        0x0 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                0x00002000                        . = ALIGN (0x4)
+                0x00002000                        _edata = .
+
+.bss            0x00002000        0x4 load address 0x00000880
+                0x00002000                        . = ALIGN (0x4)
+                0x00002000                        _sbss = .
+ *(.sbss*)
+ .sbss          0x00002000        0x4 board_io.o
+ *(.bss*)
+ .bss           0x00002004        0x0 start.o
+ .bss           0x00002004        0x0 print.o
+ .bss           0x00002004        0x0 board_io.o
+ .bss           0x00002004        0x0 gc9a01.o
+ .bss           0x00002004        0x0 main.o
+ .bss           0x00002004        0x0 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+ *(COMMON)
+                0x00002004                        . = ALIGN (0x4)
+                0x00002004                        _ebss = .
+                0x00004000                        _stack_top = (ORIGIN (ram) + LENGTH (ram))
+LOAD start.o
+LOAD print.o
+LOAD board_io.o
+LOAD gc9a01.o
+LOAD main.o
+LOAD /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a
+OUTPUT(firmware/firmware.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x36
+ .riscv.attributes
+                0x00000000       0x2d start.o
+ .riscv.attributes
+                0x0000002d       0x21 print.o
+ .riscv.attributes
+                0x0000004e       0x21 board_io.o
+ .riscv.attributes
+                0x0000006f       0x28 gc9a01.o
+ .riscv.attributes
+                0x00000097       0x28 main.o
+ .riscv.attributes
+                0x000000bf       0x34 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+
+.comment        0x00000000       0x4b
+ .comment       0x00000000       0x4b print.o
+                                 0x19 (size before relaxing)
+ .comment       0x0000004b        0x0 board_io.o
+                                 0x19 (size before relaxing)
+ .comment       0x0000004b        0x0 gc9a01.o
+                                 0x34 (size before relaxing)
+ .comment       0x0000004b        0x0 main.o
+                                 0x34 (size before relaxing)
+
+.note.GNU-stack
+                0x00000000        0x0
+ .note.GNU-stack
+                0x00000000        0x0 print.o
+ .note.GNU-stack
+                0x00000000        0x0 board_io.o
+ .note.GNU-stack
+                0x00000000        0x0 gc9a01.o
+ .note.GNU-stack
+                0x00000000        0x0 main.o

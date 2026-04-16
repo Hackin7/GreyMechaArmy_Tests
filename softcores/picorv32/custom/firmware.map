@@ -1,0 +1,79 @@
+Archive member included to satisfy reference by file (symbol)
+
+/home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                              print.o (__udivsi3)
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+mem              0x00000000         0x00018000
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+
+.memory         0x00000000      0x350
+                0x00000000                        . = 0x0
+ start*(.text)
+ .text          0x00000000       0x60 start.o
+                0x00000000                reset_vec
+                0x00000000                start
+ *(.text)
+ .text          0x00000060       0x8a print.o
+                0x00000060                print_chr
+                0x00000068                print_str
+                0x0000007a                print_dec
+                0x000000c6                print_hex
+ .text          0x000000ea        0x0 main.o
+ *fill*         0x000000ea        0x2 
+ .text          0x000000ec       0x7e /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                0x000000ec                __divsi3
+                0x000000f4                __hidden___udivsi3
+                0x000000f4                __udivsi3
+                0x00000120                __umodsi3
+                0x00000144                __modsi3
+ *(*)
+ .data          0x0000016a        0x0 start.o
+ .bss           0x0000016a        0x0 start.o
+ .riscv.attributes
+                0x0000016a       0x2d start.o
+ .data          0x00000197        0x0 print.o
+ .bss           0x00000197        0x0 print.o
+ *fill*         0x00000197        0x1 
+ .rodata.str1.4
+                0x00000198       0xc3 print.o
+                                 0x11 (size before relaxing)
+ .comment       0x0000025b       0x4b print.o
+                                 0x19 (size before relaxing)
+ .note.GNU-stack
+                0x000002a6        0x0 print.o
+ .riscv.attributes
+                0x000002a6       0x21 print.o
+ .data          0x000002c7        0x0 main.o
+ .bss           0x000002c7        0x0 main.o
+ .rodata.str1.4
+                0x000002c7        0x0 main.o
+                                 0xaf (size before relaxing)
+ *fill*         0x000002c7        0x1 
+ .text.startup  0x000002c8       0x2a main.o
+                0x000002c8                main
+ .comment       0x000002f2        0x0 main.o
+                                 0x34 (size before relaxing)
+ .note.GNU-stack
+                0x000002f2        0x0 main.o
+ .riscv.attributes
+                0x000002f2       0x28 main.o
+ .data          0x0000031a        0x0 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+ .bss           0x0000031a        0x0 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+ .riscv.attributes
+                0x0000031a       0x34 /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a(div.o)
+                0x0000034e                        end = .
+                0x00000350                        . = ALIGN (0x4)
+ *fill*         0x0000034e        0x2 
+LOAD start.o
+LOAD print.o
+LOAD main.o
+LOAD /home/hacker/.local/xPacks/@xpack-dev-tools/riscv-none-elf-gcc/15.2.0-1.1/.content/bin/../lib/gcc/riscv-none-elf/15.2.0/rv32imc/ilp32/libgcc.a
+OUTPUT(firmware.elf elf32-littleriscv)

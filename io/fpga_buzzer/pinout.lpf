@@ -1,0 +1,2 @@
+LOCATE COMP "buzzer" SITE "F16";
+IOBUF PORT "buzzer" IO_TYPE=LVCMOS25;
