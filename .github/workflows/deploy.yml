@@ -2,7 +2,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+    paths:
+      - 'web-ui/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
