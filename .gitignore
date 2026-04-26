@@ -2,6 +2,7 @@
 *.bit
 *.config
 *.json
+!web-ui/*.json
 tmp.v
 *.vvp
 *.vcd
