@@ -63,6 +63,18 @@
         activeFile.set(filename);
     }
 
+    function addFile() {
+        const filename = prompt("Enter filename (e.g., helper.v):", "newfile.v");
+        if (filename && filename.trim() !== "") {
+            if ($files[filename]) {
+                alert("File already exists!");
+                return;
+            }
+            files.update(f => ({ ...f, [filename]: "" }));
+            activeFile.set(filename);
+        }
+    }
+
     function synthesize() {
         if (isSynthesizing) return;
         isSynthesizing = true;
@@ -207,7 +219,10 @@
 
 <div class="layout">
     <div class="sidebar">
-        <h2>Files</h2>
+        <div class="sidebar-header">
+            <h2>Files</h2>
+            <button class="add-file-btn" on:click={addFile} title="Add New File">+</button>
+        </div>
         <ul>
             {#each Object.keys($files) as filename}
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -276,7 +291,25 @@
         font-size: 14px;
         text-transform: uppercase;
         color: #858585;
+        margin: 0;
+    }
+    .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 10px;
+    }
+    .add-file-btn {
+        background: transparent;
+        color: #858585;
+        border: none;
+        font-size: 20px;
+        padding: 0 5px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .add-file-btn:hover {
+        color: #fff;
     }
     .sidebar ul {
         list-style: none;
