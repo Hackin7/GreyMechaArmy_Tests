@@ -1,0 +1,20 @@
+iverilog -o tb/build/sim_stream.vvp -I src tb/tb_oled_stream.v src/oled_stream.v
+cd tb && vvp build/sim_stream.vvp
+VCD info: dumpfile build/stream.vcd opened for output.
+[515000] PIX 0: 0x0000 (streamer.pixel_index=1)
+[835000] PIX 1: 0x0001 (streamer.pixel_index=2)
+[1155000] PIX 2: 0x0002 (streamer.pixel_index=3)
+[1475000] PIX 3: 0x0003 (streamer.pixel_index=4)
+[1795000] PIX 4: 0x0004 (streamer.pixel_index=5)
+[2115000] PIX 5: 0x0005 (streamer.pixel_index=6)
+[2435000] PIX 6: 0x0006 (streamer.pixel_index=7)
+[2755000] PIX 7: 0x0007 (streamer.pixel_index=8)
+[3075000] PIX 8: 0x0008 (streamer.pixel_index=9)
+[3395000] PIX 9: 0x0009 (streamer.pixel_index=10)
+[3715000] PIX 10: 0x000a (streamer.pixel_index=11)
+[4035000] PIX 11: 0x000b (streamer.pixel_index=12)
+[4355000] PIX 12: 0x000c (streamer.pixel_index=13)
+[4675000] PIX 13: 0x000d (streamer.pixel_index=14)
+[4995000] PIX 14: 0x000e (streamer.pixel_index=15)
+[5200000] === STOPPING (sniffed 15 pixels) ===
+tb/tb_oled_stream.v:69: $finish called at 5200000 (1ps)
