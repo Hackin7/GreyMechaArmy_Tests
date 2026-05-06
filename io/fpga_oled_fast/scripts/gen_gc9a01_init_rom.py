@@ -2,7 +2,7 @@
 """Generate gc9a01_init_rom.vh from the same sequence as custom_fpga_spi/firmware/gc9a01.c"""
 import os
 
-CLK_HZ = 50_000_000  # match src/top.v sys_clk (OSCG DIV=6, ~50 MHz)
+CLK_HZ = 75_000_000  # match src/top.v PLL output (OSCG/6 → PLL → 75 MHz)
 
 def ms_cycles(ms: int) -> int:
     return (CLK_HZ // 1000) * ms

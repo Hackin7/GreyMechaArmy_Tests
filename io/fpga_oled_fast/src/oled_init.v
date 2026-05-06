@@ -99,10 +99,14 @@ module oled_init #(
     reg [7:0]  rom_byte_r;
     reg        rom_dc_r;
     reg [23:0] rom_pause_r;
+    reg        rom_pause_nz_r;     // pre-registered (rom_pause_r != 0) to break the wide compare out of the critical path
+    reg        pause_cnt_nz_r;     // same for the in-pause decrement check
     always @(posedge clk) begin
-        rom_byte_r  <= gc9a01_init_byte(init_idx);
-        rom_dc_r    <= gc9a01_init_is_data(init_idx);
-        rom_pause_r <= gc9a01_init_pause(init_idx);
+        rom_byte_r     <= gc9a01_init_byte(init_idx);
+        rom_dc_r       <= gc9a01_init_is_data(init_idx);
+        rom_pause_r    <= gc9a01_init_pause(init_idx);
+        rom_pause_nz_r <= (gc9a01_init_pause(init_idx) != 24'd0);
+        pause_cnt_nz_r <= (pause_cnt != 24'd0);
     end
 
     always @(posedge clk) begin
@@ -157,7 +161,7 @@ module oled_init #(
                 end
                 S_INIT_WAIT: begin
                     if (spi_done) begin
-                        if (rom_pause_r != 0) begin
+                        if (rom_pause_nz_r) begin
                             pause_cnt <= rom_pause_r;
                             st        <= S_INIT_PAUSE;
                         end else begin
@@ -172,7 +176,7 @@ module oled_init #(
                     end
                 end
                 S_INIT_PAUSE: begin
-                    if (pause_cnt != 0)
+                    if (pause_cnt_nz_r)
                         pause_cnt <= pause_cnt - 1;
                     else begin
                         if (init_idx + 1 == GC9A01_INIT_LEN) begin

@@ -4,7 +4,7 @@ TARGET_FREQ_MHZ ?= 75
 SHELL = bash
 YOSYS_DEFS ?=
 
-RTL_ORDER = src/simple_spi_master.v src/btn_debounce.v src/ecp5_oled_pll.v src/oled_init.v src/oled_stream.v src/top.v
+RTL_ORDER = src/simple_spi_master.v src/btn_debounce.v src/ecp5_oled_pll.v src/oled_init.v src/oled_stream.v src/image_stretch.v src/top.v
 
 all: $(PROJ).bit
 

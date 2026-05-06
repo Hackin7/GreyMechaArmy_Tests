@@ -17,21 +17,25 @@ module top (
     output wire       oled_rst,
     inout  wire [4:0] s
 );
-    localparam integer CLK_HZ = 50000000;
+    localparam integer CLK_HZ = 75000000;
 
     localparam integer IMG_W = 96;
     localparam integer IMG_H = 64;
 
-    // ---- Clock: OSCG only, ~50 MHz (matches original fpga_oled clocking) ----
-    // OSCG DIV=6 → ~50 MHz, the same sys_clk the working original uses.
-    // Streaming SCLK = sys_clk / 2 = 25 MHz (still well within panel spec).
-    // Frame time = 240*240*32 / 50e6 ≈ 37 ms (~27 fps).
+    // ---- Clock: OSCG /6 (~50 MHz) → PLL → 75 MHz sys_clk ----
+    // Streaming SCLK = sys_clk / 2 = 37.5 MHz. Frame time = 240*240*32 /
+    // 75e6 ≈ 24.6 ms (~40 fps). To push further toward 80 fps, restore the
+    // ODDR-driven SCLK so it runs at full sys_clk rate (75 MHz).
     wire osc_clk;
     defparam OSCI1.DIV = "6";
     OSCG OSCI1 (.OSC(osc_clk));
 
-    wire sys_clk = osc_clk;
-    wire pll_locked = 1'b1;     // hard-true while PLL is bypassed
+    wire sys_clk, pll_locked;
+    ecp5_oled_pll u_pll (
+        .clki   (osc_clk),
+        .clko   (sys_clk),
+        .locked (pll_locked)
+    );
 
     wire unused_clk_ext = clk_ext;
 
@@ -61,23 +65,44 @@ module top (
     );
 
     // ---- Image BRAM (synchronous read) ----
-    // Size matches the source .mem file (96*64 = 6144). The OOB read when
-    // pixel_index > 6143 is intentional (preserved current behavior).
     reg [15:0] image_memory [0:IMG_W*IMG_H - 1];
     initial $readmemh("stonks.mem", image_memory);
 
     wire [15:0] stream_pixel_index;
-    reg  [15:0] image_pixel_data_r;
-    always @(posedge sys_clk)
-        image_pixel_data_r <= image_memory[stream_pixel_index];
+
+    // ---- Image stretcher (factored into image_stretch.v) ----
+    // mode_aspect = btn_press[2]: when held, use aspect-preserving stretch
+    // (240x160 image with 40px letterbox top/bottom). Otherwise btn[0] uses
+    // the full-stretch path (image fills 240x240).
+    wire [12:0] image_idx;
+    wire        valid_pixel;
+    image_stretch u_stretch (
+        .clk         (sys_clk),
+        .resetn      (resetn),
+        .pixel_index (stream_pixel_index),
+        .mode_aspect (btn_press[2]),
+        .image_idx   (image_idx),
+        .valid_pixel (valid_pixel)
+    );
+
+    // BRAM read; valid_pixel is pipelined to align with image_pixel_data_r.
+    reg [15:0] image_pixel_data_r;
+    reg        valid_pixel_r;
+    always @(posedge sys_clk) begin
+        image_pixel_data_r <= image_memory[image_idx];
+        valid_pixel_r      <= valid_pixel;
+    end
 
     // ---- Button-overlay mux (registered) ----
+    // btn[0]: full-stretch image (current behavior)
+    // btn[2]: aspect-correct image (was green; now image with letterbox)
+    // Other buttons unchanged.
     reg [15:0] pixel_to_stream;
     always @(posedge sys_clk) begin
         if      (grey_press)   pixel_to_stream <= 16'hFFE0;
         else if (btn_press[4]) pixel_to_stream <= 16'hFE19;
         else if (btn_press[3]) pixel_to_stream <= 16'h001F;
-        else if (btn_press[2]) pixel_to_stream <= 16'h07E0;
+        else if (btn_press[2]) pixel_to_stream <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
         else if (btn_press[1]) pixel_to_stream <= 16'hF800;
         else if (btn_press[0]) pixel_to_stream <= image_pixel_data_r;
         else                   pixel_to_stream <= 16'hFFFF;
