@@ -35,7 +35,8 @@ module oled_gc9a01 #(
 
     // Status (mostly for debug/LEDs)
     output wire        init_done,
-    output wire        streaming        // 1 while streaming pixel data
+    output wire        streaming,       // 1 while streaming pixel data
+    output wire        frame_done       // 1-cycle pulse at end of each OLED frame
 );
     // ---- Slow init path ----
     wire ramwr_pulse;
@@ -122,5 +123,9 @@ module oled_gc9a01 #(
     assign oled_dc  = stream_owns ? stream_dc   : init_dc;
     assign oled_rst = init_rst_n;
 
-    assign streaming = u_stream.streaming;
+    // Forward streaming status: take it from stream_enable (the sequencer's
+    // intent) rather than reaching into u_stream's internal `streaming` reg.
+    // Hierarchical references don't synthesize cleanly here.
+    assign streaming  = stream_enable;
+    assign frame_done = stream_frame_done;
 endmodule

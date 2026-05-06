@@ -5,6 +5,7 @@ SHELL = bash
 YOSYS_DEFS ?=
 
 RTL_ORDER = src/simple_spi_master.v src/btn_debounce.v src/ecp5_oled_pll.v \
+            src/ecp5_dual_pll.v src/frame_buffer.v \
             src/oled_init.v src/oled_stream.v src/oled_gc9a01.v src/image_stretch.v \
             src/ee2026/custom/clk_counter.v \
             src/ee2026/task_a/animation_timer.v src/ee2026/task_a/middle_square_timer.v \

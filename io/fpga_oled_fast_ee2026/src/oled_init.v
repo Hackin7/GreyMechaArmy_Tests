@@ -91,7 +91,8 @@ module oled_init #(
 
     reg [3:0]  st;
     reg [31:0] timer;
-    reg [15:0] init_idx;
+    reg [7:0]  init_idx;     // 0..181; 8 bits keeps the increment carry
+                             // chain short (was 16 bits, the f_max bottleneck).
     reg [23:0] pause_cnt;
     reg [4:0]  win_idx;
     reg [16:0] test_px_idx;

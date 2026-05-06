@@ -2,7 +2,9 @@
 """Generate gc9a01_init_rom.vh from the same sequence as custom_fpga_spi/firmware/gc9a01.c"""
 import os
 
-CLK_HZ = 12_900_000  # match src/top.v sys_clk (OSCG /24, PLL bypassed)
+CLK_HZ = 75_000_000  # match the fast domain that oled_init now runs in
+                     # (PLL output, drives oled_gc9a01). Slow domain is
+                     # separate and unaffected by this ROM.
 
 def ms_cycles(ms: int) -> int:
     return (CLK_HZ // 1000) * ms
