@@ -31,19 +31,21 @@ module adaptor_task_c(
     input [12:0] oled_pixel_index, output reg [15:0] oled_pixel_data
 );
     
-    // In terms of clock cycles
-    parameter RATE_MOVE_DOWN = 150_000_000 / 30;
-    parameter RATE_MOVE_RIGHT = 75_000_000 / 15;
-    parameter RATE_MOVE_LEFT = 100_000_000 / 10;
-    parameter RATE_MOVE_UP = 100_000_000 / 10;
+    // In terms of clock cycles. Greybadge port: clk = 12.9 MHz
+    // (1 second = 12_900_000 cycles). Original 100 MHz numerators preserved
+    // in comments.
+    parameter RATE_MOVE_DOWN  = 19_350_000 / 30; // was 150_000_000/30 (30 px/s)
+    parameter RATE_MOVE_RIGHT = 9_675_000  / 15; // was 75_000_000/15  (15 px/s)
+    parameter RATE_MOVE_LEFT  = 12_900_000 / 10; // was 100_000_000/10 (10 px/s)
+    parameter RATE_MOVE_UP    = 12_900_000 / 10; // was 100_000_000/10 (10 px/s)
 
-    parameter TIME_MOVE_DOWN = RATE_MOVE_DOWN * 30;    // 1.5s
-    parameter TIME_MOVE_RIGHT = RATE_MOVE_RIGHT * 15;  // 0.75s
-    parameter TIME_STAY_RED_DOWN = 50_000_000;         // 0.5s
-    parameter TIME_STAY_GREEN_DOWN = 50_000_000;       // 0.5s
-    parameter TIME_MOVE_LEFT = RATE_MOVE_LEFT * 15;    // 1.5s (15 pixels for 10pixels/s = 1.5s)
-    parameter TIME_MOVE_UP = RATE_MOVE_UP * 30;        // 3s
-    parameter TIME_STAY_GREEN_UP = 50_000_000;         // 0.5s
+    parameter TIME_MOVE_DOWN       = RATE_MOVE_DOWN * 30;   // 1.5 s
+    parameter TIME_MOVE_RIGHT      = RATE_MOVE_RIGHT * 15;  // 0.75 s
+    parameter TIME_STAY_RED_DOWN   = 6_450_000;             // 0.5 s (was 50_000_000)
+    parameter TIME_STAY_GREEN_DOWN = 6_450_000;             // 0.5 s (was 50_000_000)
+    parameter TIME_MOVE_LEFT       = RATE_MOVE_LEFT * 15;   // 1.5 s
+    parameter TIME_MOVE_UP         = RATE_MOVE_UP * 30;     // 3 s
+    parameter TIME_STAY_GREEN_UP   = 6_450_000;             // 0.5 s (was 50_000_000)
 
 
     // Ease of usage

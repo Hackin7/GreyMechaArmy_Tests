@@ -29,18 +29,24 @@ module Top_Student (
 
     //// Setup ///////////////////////////////////////////////////////////////////////////////////////////////////////
     //// Clocks /////////////////////////////////////////////
+    // Greybadge port: original design assumed clk = 100 MHz with these
+    // dividers producing 25 / 12.5 / 6.25 MHz and 1 Hz reference clocks.
+    // Our sys_clk runs at ~19.4 MHz (OSCG /16, slowed for task_a's
+    // combinational depth). 25 MHz isn't reachable by dividing 19.4 MHz, so
+    // clk_25mhz is just an alias of clk; the lower references keep the same
+    // 2× / 4× ratios, and slow_clk is recomputed for a 1 Hz tick at 19.4 MHz.
+    //
+    // clk_counter #(N, N, 32) toggles its output every N input cycles, so
+    // output frequency = f_clk / (2 * N).  At f_clk = 19.4 MHz:
+    //   N = 1        → ~6.45 MHz  (clk_12_5mhz)
+    //   N = 2        → ~3.22 MHz  (clk_6_25mhz)
+    //   N = 6_450_000 → 1 Hz      (slow_clk)
     wire clk_25mhz, clk_12_5mhz, clk_6_25mhz, slow_clk;
-    
-    assign clk25m = clk;
-    clk_counter #(1, 1, 32) clk12p5m (clk, clk_12_5mhz);
-    clk_counter #(2, 2, 32) clk6p25m (clk, clk_6_25mhz);
-    clk_counter #(19400000, 19400000, 32) clkslow (clk, slow_clk); // 1hz
 
-    /*clk_counter #(2, 2, 32) clk25m (clk, clk_25mhz);
-    clk_counter #(4, 4, 32) clk12p5m (clk, clk_12_5mhz);
-    clk_counter #(8, 8, 32) clk6p25m (clk, clk_6_25mhz);
-    clk_counter #(50_000_000, 50_000_000, 32) clkslow (clk, slow_clk); // 1hz
-    */
+    assign clk_25mhz = clk;                                   // ~12.9 MHz (was 25 MHz)
+    clk_counter #(1, 1, 32) clk12p5m (clk, clk_12_5mhz);      // ~6.45 MHz (was 12.5 MHz)
+    clk_counter #(2, 2, 32) clk6p25m (clk, clk_6_25mhz);      // ~3.22 MHz (was 6.25 MHz)
+    clk_counter #(6_450_000, 6_450_000, 32) clkslow (clk, slow_clk); // 1 Hz
 
     //// Mouse stubs (no PS/2 mouse on greybadge) ////////////
     wire [11:0] mouse_xpos         = 12'd40;

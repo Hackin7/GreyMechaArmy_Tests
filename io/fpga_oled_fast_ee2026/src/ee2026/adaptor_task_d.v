@@ -9,9 +9,11 @@ module adaptor_task_d(
     reg [7:0] square_xpos = 0, square_ypos = 0;
     reg [15:0] square_color = 16'h001F;
     reg [31:0] move_counter = 0;
-    parameter SPEED_45 = 2222222; //45 pixels per sec
-    parameter SPEED_30 = 3333333; //30 pixels per sec 
-    parameter SPEED_15 = 6666666; //15 pixels per sec
+    // Greybadge port: clk = 12.9 MHz (1 s = 12_900_000 cycles).
+    // SPEED_X = cycles between pixel updates, so X pixels/sec = clk_hz / X.
+    parameter SPEED_45 = 286_667; // 45 px/s (was 2_222_222 @ 100 MHz)
+    parameter SPEED_30 = 430_000; // 30 px/s (was 3_333_333 @ 100 MHz)
+    parameter SPEED_15 = 860_000; // 15 px/s (was 6_666_666 @ 100 MHz)
     reg [31:0] speed_threshold = SPEED_45;
 
     reg btnC_prev, btnU_prev, btnL_prev, btnR_prev, btnD_prev;

@@ -21,11 +21,12 @@
 
 
 module animation_timer (input clk, input enable, output reg [2:0] triggers);
-    // 1 second is 100_000_000;
-    parameter COUNT1 = 200_000_000; // 2 seconds
-    parameter COUNT2 = 150_000_000; // 1.5 seconds
-    parameter COUNT3 = 100_000_000; // 1 seconds
-    parameter COUNT4 = 100_000_000; // 1 seconds
+    // Greybadge port: clk = 12.9 MHz (1 second = 12_900_000 cycles).
+    // Original 100 MHz values shown in comments.
+    parameter COUNT1 = 25_800_000; // 2.0 s (was 200_000_000)
+    parameter COUNT2 = 19_350_000; // 1.5 s (was 150_000_000)
+    parameter COUNT3 = 12_900_000; // 1.0 s (was 100_000_000)
+    parameter COUNT4 = 12_900_000; // 1.0 s (was 100_000_000)
     parameter BITWIDTH = 32;
     
     

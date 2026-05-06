@@ -107,13 +107,16 @@ module adaptor_task_b(
         end
     endfunction
     
+    // Greybadge port: clk = 12.9 MHz. Scaled from 100 MHz original:
+    //   400_000_000 (4 s)  → 51_600_000
+    //   5_000_000  (50 ms) →    645_000
     always @ (posedge clk) begin
-        if (sw[0]) begin
-            counter <= counter <= 400_000_000 ? counter + 1 : counter;
-            if (counter >= 399_999_999) begin
+        if (1) begin
+            counter <= counter <= 51_600_000 ? counter + 1 : counter;
+            if (counter >= 51_599_999) begin
                 enable_task_counter <= 1;
             end
-        end 
+        end
         if (reset || ~sw[0]) begin
             shift_once <= 0;
             counter <= 0;
@@ -124,15 +127,15 @@ module adaptor_task_b(
                 shift_once <= 1;
                 green_box_pos <= 5;
             end
-            if (btnL && green_box_pos > 1) begin 
+            if (btnL && green_box_pos > 1) begin
                 move_counter <= move_counter + 1;
-                if (move_counter >= 5_000_000) begin
+                if (move_counter >= 645_000) begin
                     green_box_pos <= green_box_pos - 1;
                     move_counter <= 0;
                 end
-            end else if (btnR && green_box_pos < 5) begin 
+            end else if (btnR && green_box_pos < 5) begin
                 move_counter <= move_counter + 1;
-                if (move_counter >= 5_000_000) begin
+                if (move_counter >= 645_000) begin
                     green_box_pos <= green_box_pos + 1;
                     move_counter <= 0;
                 end

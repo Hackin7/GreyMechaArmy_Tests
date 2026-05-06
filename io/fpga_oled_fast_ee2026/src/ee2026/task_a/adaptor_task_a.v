@@ -148,7 +148,9 @@ module adaptor_task_a(
     
     animation_timer anim_timer(clk, orange_enable, element_state[4:2]);
     wire [2:0] middle_trigger_state;
-    middle_square_timer #(5_000_000, 20_000_000) mid_timer(clk, reset, orange_enable & btnD, middle_trigger_state);
+    // Greybadge port: 50 ms / 200 ms scaled to 12.9 MHz clock
+    // (was 5_000_000 / 20_000_000 at 100 MHz).
+    middle_square_timer #(645_000, 2_580_000) mid_timer(clk, reset, orange_enable & btnD, middle_trigger_state);
     /* trigger_state
     0: nothing  
     1: square, 2: circle, 3: triangle -> (loops back to 1) 

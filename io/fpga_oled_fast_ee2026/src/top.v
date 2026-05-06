@@ -27,12 +27,14 @@ module top (
     output wire       oled_rst,
     inout  wire [4:0] s
 );
-    localparam integer CLK_HZ = 19400000;
+    localparam integer CLK_HZ = 12900000;
 
-    // ---- Clock: OSCG /16 (~19.4 MHz). PLL bypassed; the EE2026 task_a
-    // is_in_circle math caps timing around 23 MHz. Frame ≈ 95 ms (~10 fps).
+    // ---- Clock: OSCG /24 (~12.9 MHz nominal, 14.85 MHz worst-case at +15%).
+    // /16 (~19.4 MHz) was tight before but tipped over after the
+    // adaptor_task_b is_green_border function got heavier. /24 gives room.
+    // Frame at 12.9 MHz / 2 SCLK / 32 cycles per pixel ≈ 143 ms (~7 fps).
     wire osc_clk;
-    defparam OSCI1.DIV = "16";
+    defparam OSCI1.DIV = "24";
     OSCG OSCI1 (.OSC(osc_clk));
 
     wire sys_clk = osc_clk;
@@ -103,7 +105,7 @@ module top (
                             (task_idx == 2'd3),
                             (task_idx == 2'd2),
                             (task_idx == 2'd1),
-                            (task_idx == 2'd0)};
+                            1};//(task_idx == 2'd0)};
 
     // ---- Stretcher (mode driven by aspect_idx) ----
     wire [15:0] gc9a01_pixel_index;

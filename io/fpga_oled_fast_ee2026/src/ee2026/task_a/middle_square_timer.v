@@ -21,9 +21,9 @@
 
 
 module middle_square_timer
-    #(parameter  // 1 second is 100_000_000;
-        COUNT_BUTTON = 5_000_000, // 50 milliseconds 
-        COUNT_DEBOUNCE = 20_000_000, // 200 milliseconds
+    #(parameter  // Greybadge port: clk = 12.9 MHz (1 s = 12_900_000 cycles)
+        COUNT_BUTTON   = 645_000,   // 50 ms  (was 5_000_000  @ 100 MHz)
+        COUNT_DEBOUNCE = 2_580_000, // 200 ms (was 20_000_000 @ 100 MHz)
         BITWIDTH=32,
         MAX_STATE=3,
         LOOP_STATE=1
