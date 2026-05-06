@@ -2,20 +2,22 @@
 // in oled_gc9a01.v; this top only handles board-level concerns: clock/PLL,
 // reset, buttons, image BRAM + stretcher, and the pixel-source mux.
 //
-// Image-button modes (priority high → low): grey > btn[4] > btn[3] >
-// btn[2] > btn[1] > btn[0]
-//   grey   → solid 16'hFFE0  (overrides others)
+// Mecha buttons:
+//   btn_mecha[0] (was btn_grey, D12) — press to cycle aspect mode
+//                                       (FULL → ASPECT → CIRCLE → FULL ...)
+//   btn_mecha[1] (was btn_rst,  C12) — held LOW = system reset
+//
+// Image / color buttons (priority high → low):
 //   btn[4] → solid pink
-//   btn[3] → image at 2× scale (192×128 centered, fits inside the GC9A01 circle)
-//   btn[2] → image aspect-correct (240×160 with 40px letterbox top/bottom)
+//   btn[3] → solid blue
+//   btn[2] → solid green
 //   btn[1] → solid red
-//   btn[0] → image full-stretch (240×240, distorts aspect)
+//   btn[0] → image (with current aspect mode)
 //   none   → solid white
 module top (
     input  wire       clk_ext,
     input  wire [4:0] btn,
-    input  wire       btn_grey_n,
-    input  wire       btn_rst_n,
+    input  wire [1:0] btn_mecha,        // [0]=grey (aspect cycle), [1]=rst
     output wire [7:0] led,
     inout  wire [7:0] interconnect,
     inout  wire [7:0] pmod_j1,
@@ -45,8 +47,8 @@ module top (
 
     wire unused_clk_ext = clk_ext;
 
-    // ---- Reset (button + sync, gated by PLL lock) ----
-    wire reset_button = ~btn_rst_n;
+    // ---- Reset (btn_mecha[1] held LOW; sync + counter; gated by PLL lock) ----
+    wire reset_button = ~btn_mecha[1];
     reg  [1:0] reset_sync = 2'b11;
     reg  [7:0] reset_counter = 0;
     wire reset_request = reset_sync[1];
@@ -67,17 +69,29 @@ module top (
         .clk(sys_clk), .resetn(resetn), .btn_n(btn), .btn_press(btn_press)
     );
     btn_debounce #(.WIDTH(1), .STABLE_CYCLES(4096)) u_grey (
-        .clk(sys_clk), .resetn(resetn), .btn_n(btn_grey_n), .btn_press(grey_press)
+        .clk(sys_clk), .resetn(resetn), .btn_n(btn_mecha[0]), .btn_press(grey_press)
     );
+
+    // ---- Aspect mode cycle on btn_mecha[0] press edge ----
+    // Detect rising edge of `grey_press` (debounced press signal).
+    reg  grey_press_d;
+    always @(posedge sys_clk) grey_press_d <= grey_press;
+    wire grey_press_edge = grey_press & ~grey_press_d;
+
+    reg [1:0] aspect_idx;
+    always @(posedge sys_clk) begin
+        if (!resetn)
+            aspect_idx <= 2'b00;
+        else if (grey_press_edge)
+            aspect_idx <= (aspect_idx == 2'b10) ? 2'b00 : aspect_idx + 2'b01;
+    end
 
     // ---- Image BRAM + stretcher ----
     reg [15:0] image_memory [0:IMG_W*IMG_H - 1];
     initial $readmemh("stonks.mem", image_memory);
 
     wire [15:0] pixel_index;
-    wire [1:0]  stretch_mode = btn_press[3] ? 2'b10 :    // CIRCLE
-                               btn_press[2] ? 2'b01 :    // ASPECT
-                                              2'b00;    // FULL
+    wire [1:0]  stretch_mode = aspect_idx;
     wire [12:0] image_idx;
     wire        valid_pixel;
     image_stretch u_stretch (
@@ -97,14 +111,14 @@ module top (
     end
 
     // ---- Pixel source mux (registered) ----
+    // btn[0] shows the image at current aspect mode (with letterbox if applicable).
     reg [15:0] pixel_data;
     always @(posedge sys_clk) begin
-        if      (grey_press)   pixel_data <= 16'hFFE0;
-        else if (btn_press[4]) pixel_data <= 16'hFE19;
-        else if (btn_press[3]) pixel_data <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
-        else if (btn_press[2]) pixel_data <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
+        if      (btn_press[4]) pixel_data <= 16'hFE19;
+        else if (btn_press[3]) pixel_data <= 16'h001F;
+        else if (btn_press[2]) pixel_data <= 16'h07E0;
         else if (btn_press[1]) pixel_data <= 16'hF800;
-        else if (btn_press[0]) pixel_data <= image_pixel_data_r;
+        else if (btn_press[0]) pixel_data <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
         else                   pixel_data <= 16'hFFFF;
     end
 
@@ -129,9 +143,9 @@ module top (
 
     // ---- Status LEDs ----
     // LED[7] init_done | [6] streaming | [5] oled_cs | [4] oled_dc
-    // LED[3] oled_rst  | [2] pll_locked | [1] grey_press | [0] btn[0]
+    // LED[3] oled_rst  | [2] pll_locked | [1] aspect_idx[1] | [0] aspect_idx[0]
     assign led = {init_done, streaming, oled_cs, oled_dc,
-                  oled_rst, pll_locked, grey_press, btn_press[0]};
+                  oled_rst, pll_locked, aspect_idx};
 
     // Non-OLED inout pins parked at high-Z.
     assign interconnect = 8'bz;
