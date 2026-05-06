@@ -92,6 +92,22 @@ module raycasting # (
             default:     div63 = 6'd3;
         endcase
     endfunction
+
+    // 24 / cf — used for the wall's green channel so the colour reads as
+    // ORANGE (R=31, G=24, B=0) per constants.v rather than YELLOW.
+    function automatic [5:0] div24(input [7:0] cf);
+        case (cf)
+            8'd0,  8'd1: div24 = 6'd24;
+            8'd2:        div24 = 6'd12;
+            8'd3:        div24 = 6'd8;
+            8'd4:        div24 = 6'd6;
+            8'd5:        div24 = 6'd5;
+            8'd6:        div24 = 6'd4;
+            8'd7:        div24 = 6'd3;
+            8'd8, 8'd9, 8'd10, 8'd11: div24 = 6'd2;
+            default:     div24 = 6'd1;
+        endcase
+    endfunction
     // 7-seg / text outputs are not used on the greybadge.
     assign seg         = 7'b1111111;
     assign dp          = 1'b1;
@@ -144,8 +160,10 @@ module raycasting # (
     // does not resolve cross-instance parameter references and silently
     // ties them to 0 (saw it as: "Identifier `\constant.CYAN' is
     // implicitly declared"), which made sky/ground display as black.
-    localparam [15:0] COLOR_CYAN  = 16'h07FF; // R=0,  G=63, B=31
-    localparam [15:0] COLOR_GREEN = 16'h07E0; // R=0,  G=63, B=0
+    // Values match constants.v (mirrored from the EE2026-Finance-Bros
+    // helpers/constants.v reference).
+    localparam [15:0] COLOR_CYAN  = 16'b00000_111111_11111; // 0x07FF
+    localparam [15:0] COLOR_GREEN = 16'b00000_101010_00000; // 0x0540 (dimmer)
 
     parameter BW_INT=8;
     parameter BW_DEC=8;
@@ -276,13 +294,16 @@ module raycasting # (
             angle[16:8] <= angle[16:8] == 360 ? 0 : angle[16:8]  + (1);
         end
 
+        // Movement step: shift right 3 so each tick advances ~1/8 of a
+        // grid cell instead of a full cell — at 25 Hz that's roughly
+        // 3 cells/sec instead of 25.
         if (btnU)  begin
-            x_precise <= x_precise + cos_at_angle_proc;
-            y_precise <= y_precise + sin_at_angle_proc;
+            x_precise <= x_precise + (cos_at_angle_proc >>> 3);
+            y_precise <= y_precise + (sin_at_angle_proc >>> 3);
         end
         if (btnD)  begin
-            x_precise <= x_precise - cos_at_angle_proc;
-            y_precise <= y_precise - sin_at_angle_proc;
+            x_precise <= x_precise - (cos_at_angle_proc >>> 3);
+            y_precise <= y_precise - (sin_at_angle_proc >>> 3);
         end
     end
 
@@ -295,7 +316,10 @@ module raycasting # (
     wire [7:0] colour_factor   = 8'd1 + (distance >> 2); // /4 reduced to >>2
     wire [7:0] inv_distance    = div64(distance[7:0]);   // 64/distance
     wire [4:0] shaded_r        = div31(colour_factor);   // 31/colour_factor
-    wire [5:0] shaded_g        = div63(colour_factor);   // 63/colour_factor
+    // Wall reads orange (R=31, G=24, B=0) at colour_factor=1, then dims
+    // with distance. Was div63 (yellow) — picked up the wrong palette
+    // from the original Vivado port.
+    wire [5:0] shaded_g        = div24(colour_factor);
     always @(*) begin
         pixel_data = 16'h0000;
         if (oled_ypos <= 32) begin
