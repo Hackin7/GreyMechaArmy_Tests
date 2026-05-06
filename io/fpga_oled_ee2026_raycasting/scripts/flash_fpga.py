@@ -22,7 +22,7 @@ BAUD = 115200
 
 # NEVER point this at fpga_oled.bit — that is the user's preserved
 # original-speed bitstream. Use the _fast slot for our optimized streamer.
-DEST_HOST = r"D:\\hackin7\\picorv32_test_spi\\fpga_oled_fast.bit"
+DEST_HOST = r"D:\hackin7\picorv32_test_spi\fpga_oled_fast.bit"
 DEST_DEVICE = "/hackin7/picorv32_test_spi/fpga_oled_fast.bit"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

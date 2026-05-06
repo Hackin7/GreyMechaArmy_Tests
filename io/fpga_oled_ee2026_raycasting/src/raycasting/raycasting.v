@@ -111,14 +111,42 @@ module raycasting # (
     // oled_xpos / oled_ypos now come in via ports (top.v counter), no
     // mod/div on oled_pixel_index needed.
 
-    /* Bills overlay removed for ECP5-25K — the 5 inlined display_bill task
-     * calls each forced an independent combinational read of money_bill_img,
-     * which yosys couldn't share across read ports. Costed too many LUTs.
-     */
+    /* Money animating -------------------------------------------*/
+    reg [15:0] money_bill_img[255:0];
+    initial begin
+            $readmemh("src/raycasting/bill.mem", money_bill_img);
+    end
+
+    wire clk_money;
+    clk_counter #(1_250_000, 1_250_000, 32) clkmoney (clk, clk_money);
+    reg [7:0] money_y = 0;
+
+    always @ (posedge clk_money) begin
+        money_y <= money_y == 64 ? -60 : money_y + 1;
+    end
+
+    task display_bill(input [7:0] x, input[7:0] y);
+    begin
+        if (
+            (x <= oled_xpos && oled_xpos < x+16 && y <= oled_ypos && oled_ypos < y + 16)
+        ) begin
+            if (!btnC && money_bill_img[(oled_ypos - y) * 16 + (oled_xpos-x)] != ~15'h0) begin
+                pixel_data = money_bill_img[(oled_ypos - y) * 16 + (oled_xpos-x)];
+            end
+        end
+    end
+    endtask
     /// Raycasting ////////////////////////////////////////////////
 
 
-    constants constant();
+    // RGB565 colour constants — defined as localparams instead of
+    // reaching into the `constants` module via `constant.CYAN`. yosys
+    // does not resolve cross-instance parameter references and silently
+    // ties them to 0 (saw it as: "Identifier `\constant.CYAN' is
+    // implicitly declared"), which made sky/ground display as black.
+    localparam [15:0] COLOR_CYAN  = 16'h07FF; // R=0,  G=63, B=31
+    localparam [15:0] COLOR_GREEN = 16'h07E0; // R=0,  G=63, B=0
+
     parameter BW_INT=8;
     parameter BW_DEC=8;
     parameter BW = BW_INT + BW_DEC;
@@ -271,13 +299,19 @@ module raycasting # (
     always @(*) begin
         pixel_data = 16'h0000;
         if (oled_ypos <= 32) begin
-            pixel_data = constant.CYAN;
+            pixel_data = COLOR_CYAN;
         end
         if (oled_ypos >= 32) begin
-            pixel_data = constant.GREEN;
+            pixel_data = COLOR_GREEN;
         end
         if (32 - inv_distance <= oled_ypos && oled_ypos <= 32 + inv_distance) begin
             pixel_data = {shaded_r, shaded_g, 5'b0};
         end
+
+        display_bill(0, money_y+30);
+        display_bill(17, money_y);
+        display_bill(36, money_y+20);
+        display_bill(53, money_y);
+        display_bill(70, money_y+30);
     end
 endmodule

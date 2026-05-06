@@ -18,7 +18,7 @@ tmp.v: $(RTL_ORDER) src/gc9a01_init_rom.vh
 	cat $(RTL_ORDER) > $@
 
 $(PROJ).json: tmp.v
-	bash -lc "set -o pipefail; yosys -p 'read_verilog -sv -Isrc $(YOSYS_DEFS) $<; synth_ecp5 -top top -json $@' 2>&1 | tee log/yosys.log"
+	bash -lc "set -o pipefail; yosys -p 'read_verilog -sv -Isrc $(YOSYS_DEFS) $<; synth_ecp5 -noabc9 -top top -json $@' 2>&1 | tee log/yosys.log"
 
 $(PROJ)_out.config: $(PROJ).json pinout.lpf
 	bash -lc "set -o pipefail; nextpnr-ecp5 --freq $(TARGET_FREQ_MHZ) --json $< --textcfg $@ --25k --package CABGA256 --lpf pinout.lpf 2>&1 | tee log/nextpnr-ecp5.log"
