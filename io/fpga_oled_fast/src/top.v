@@ -71,16 +71,20 @@ module top (
     wire [15:0] stream_pixel_index;
 
     // ---- Image stretcher (factored into image_stretch.v) ----
-    // mode_aspect = btn_press[2]: when held, use aspect-preserving stretch
-    // (240x160 image with 40px letterbox top/bottom). Otherwise btn[0] uses
-    // the full-stretch path (image fills 240x240).
+    // Mode chosen by which image-button is held (priority: btn[3] > btn[2] > btn[0]):
+    //   btn[3] → CIRCLE  (image at 2x scale 192x128, fits inside the GC9A01 bezel circle)
+    //   btn[2] → ASPECT  (image at 240x160 with 40px letterbox top/bottom)
+    //   btn[0] → FULL    (image stretched to fill the 240x240 panel)
+    wire [1:0] stretch_mode = btn_press[3] ? 2'b10 :
+                              btn_press[2] ? 2'b01 :
+                                             2'b00;
     wire [12:0] image_idx;
     wire        valid_pixel;
     image_stretch u_stretch (
         .clk         (sys_clk),
         .resetn      (resetn),
         .pixel_index (stream_pixel_index),
-        .mode_aspect (btn_press[2]),
+        .mode        (stretch_mode),
         .image_idx   (image_idx),
         .valid_pixel (valid_pixel)
     );
@@ -94,14 +98,16 @@ module top (
     end
 
     // ---- Button-overlay mux (registered) ----
-    // btn[0]: full-stretch image (current behavior)
-    // btn[2]: aspect-correct image (was green; now image with letterbox)
-    // Other buttons unchanged.
+    // btn[0]: full-stretch image (240x240 fill — distorts aspect ratio)
+    // btn[2]: aspect-correct image (240x160 with letterbox)
+    // btn[3]: circle-fit image (192x128 centered; entirely inside the GC9A01 circle)
+    //         (was blue solid color; repurposed)
+    // Letterbox in btn[2]/btn[3] uses 16'h0000 (black).
     reg [15:0] pixel_to_stream;
     always @(posedge sys_clk) begin
         if      (grey_press)   pixel_to_stream <= 16'hFFE0;
         else if (btn_press[4]) pixel_to_stream <= 16'hFE19;
-        else if (btn_press[3]) pixel_to_stream <= 16'h001F;
+        else if (btn_press[3]) pixel_to_stream <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
         else if (btn_press[2]) pixel_to_stream <= valid_pixel_r ? image_pixel_data_r : 16'h0000;
         else if (btn_press[1]) pixel_to_stream <= 16'hF800;
         else if (btn_press[0]) pixel_to_stream <= image_pixel_data_r;
