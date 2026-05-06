@@ -23,6 +23,24 @@ import hardware.fpga
 
 BITSTREAM_DIR = "/fpga/app_bitstreams"
 
+# At Group(scale=2) + terminalio.FONT (6x8) on the 240x240 OLED, each char
+# renders as 12x16 px → ~20 chars fit edge-to-edge. Wrap a bit shorter so
+# there's visible margin and centred text reads cleanly.
+_WRAP_WIDTH = 16
+
+
+def _wrap(text, width=_WRAP_WIDTH):
+    """Insert newlines so no line exceeds `width` characters."""
+    if len(text) <= width:
+        return text
+    lines = []
+    while len(text) > width:
+        lines.append(text[:width])
+        text = text[width:]
+    if text:
+        lines.append(text)
+    return "\n".join(lines)
+
 # Pending-load marker lives in microcontroller.nvm (NOT on the filesystem
 # — CircuitPython mounts the FS read-only from the Python side while USB
 # is plugged in). Layout:
@@ -83,7 +101,7 @@ def bitstream_loader(hw_state):
 
     if not files:
         # Empty / missing dir — show a message and wait for any action button.
-        _draw(hw_state, "No Bitstreams", BITSTREAM_DIR)
+        _draw(hw_state, "No Bitstreams", _wrap(BITSTREAM_DIR))
         while True:
             if hw_state["btn_action"][0].value is False:
                 break
@@ -94,7 +112,7 @@ def bitstream_loader(hw_state):
         return
 
     curr = 0
-    _draw(hw_state, "Load Bitstream", files[curr])
+    _draw(hw_state, "Load Bitstream", _wrap(files[curr]))
 
     fpga_buttons = hw_state["fpga_overlay"].set_mode_buttons()
 
@@ -108,7 +126,7 @@ def bitstream_loader(hw_state):
             moved = True
 
         if moved:
-            _draw(hw_state, "Load Bitstream", files[curr])
+            _draw(hw_state, "Load Bitstream", _wrap(files[curr]))
             time.sleep(0.3)
             continue
 
