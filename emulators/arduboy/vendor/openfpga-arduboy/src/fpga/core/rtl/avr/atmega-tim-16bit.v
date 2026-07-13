@@ -874,7 +874,9 @@ begin
 						{TCNTH, TCNTL} <= {TCNTH, TCNTL} + INCREMENT_VALUE;
 					end 
 				endcase
-			end		// Write registers
+			end
+		end
+		// Write registers
 		if(wr_i & addr_i == TIFR_ADDR)
 			TIFR <= TIFR & ~bus_i;
 		if(wr_i & addr_i == TIMSK_ADDR)
@@ -934,8 +936,6 @@ begin
 			TMP_REG_rd <= TCNTH;
 		//if(rd_dat & addr_dat == ICRL_ADDR)
 		//	TMP_REG_rd <= ICRH;
-
-		end
 	end
 end
 

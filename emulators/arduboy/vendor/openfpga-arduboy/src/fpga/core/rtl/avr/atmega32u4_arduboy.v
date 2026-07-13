@@ -88,11 +88,11 @@ module atmega32u4_arduboy # (
 	parameter USE_PLL = "TRUE",
 	parameter USE_PLL_HI_FREQ = "FALSE",
 	parameter USE_TIMER_0 = "TRUE",
-	parameter USE_REDUCED_TIM0 = "TRUE",
+	parameter USE_REDUCED_TIM0 = "FALSE",
 	parameter USE_TIMER_1 = "TRUE",
-	parameter USE_REDUCED_TIM1 = "TRUE",
+	parameter USE_REDUCED_TIM1 = "FALSE",
 	parameter USE_TIMER_3 = "TRUE",
-	parameter USE_REDUCED_TIM3 = "TRUE",
+	parameter USE_REDUCED_TIM3 = "FALSE",
 	parameter USE_TIMER_4 = "TRUE",
 	parameter USE_SPI_1 = "TRUE",
 	parameter USE_UART_1 = "TRUE",
@@ -115,7 +115,7 @@ module atmega32u4_arduboy # (
 	output sec_en,
     input [5:0] buttons,
     output [2:0] RGB,
-    output Buzzer1, Buzzer2, OledDC, OledCS, OledRST, spi_scl, spi_mosi, uSD_CS, ADC_CS,
+    output Buzzer1, Buzzer2, OledDC, OledCS, OledRST, spi_scl, spi_mosi, spi_cpol, uSD_CS, ADC_CS,
 	output VS_RST, VS_xCS, VS_xDCS,
 	input VS_DREQ,
 	input spi_miso,
@@ -584,6 +584,7 @@ atmega_spi_m # (
 	.io_conn_slave_o(io_conn_slave),
 
 	.scl_o(spi_scl),
+	.cpol_o(spi_cpol),
 	.miso_i(spi_miso),
 	.mosi_o(spi_mosi)
 	);
@@ -593,6 +594,7 @@ begin
 assign dat_spi_d_out = 0;
 assign int_spi_stc = 1'b0;
 assign spi_io_connect = 1'b0;
+assign spi_cpol = 1'b0;
 end
 endgenerate
 /* !SPI */

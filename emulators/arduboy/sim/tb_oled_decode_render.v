@@ -2,9 +2,10 @@
 
 module tb_oled_decode_render;
         reg clk = 1'b0;
-        reg resetn = 1'b0;
+        reg resetn = 1'b1;
         reg cs = 1'b1;
         reg sclk = 1'b0;
+	reg cpol = 1'b0;
         reg mosi = 1'b0;
         reg dc = 1'b0;
 
@@ -15,6 +16,7 @@ module tb_oled_decode_render;
         reg [7:0] fb_shadow [0:1023];
         integer i;
         integer mismatches;
+	integer total_mismatches = 0;
         integer out_fb;
         integer out_panel;
 
@@ -29,6 +31,7 @@ module tb_oled_decode_render;
                 .resetn(resetn),
                 .cs(cs),
                 .sclk(sclk),
+		.cpol(cpol),
                 .mosi(mosi),
                 .dc(dc),
                 .fb_we(fb_we),
@@ -82,9 +85,9 @@ module tb_oled_decode_render;
                         for (b = 7; b >= 0; b = b - 1) begin
                                 mosi = value[b];
                                 repeat (2) @(posedge clk);
-                                sclk = 1'b1;
+				sclk = !cpol;
                                 repeat (2) @(posedge clk);
-                                sclk = 1'b0;
+				sclk = cpol;
                         end
                         repeat (2) @(posedge clk);
                 end
@@ -157,6 +160,7 @@ module tb_oled_decode_render;
                                 end
                         end
                         $display("VERIFY %0s mismatches=%0d", label, mismatches);
+			total_mismatches = total_mismatches + mismatches;
                 end
         endtask
 
@@ -190,17 +194,21 @@ module tb_oled_decode_render;
 
         initial begin
                 clear_shadow();
-                #100;
+		#1;
+		resetn = 1'b0;
+		#99;
                 resetn = 1'b1;
                 repeat (10) @(posedge clk);
 
                 send_horizontal_pattern();
                 repeat (10) @(posedge clk);
-                verify_pattern("horizontal");
+                verify_pattern("horizontal-cpol0");
                 dump_fb_hex("sim/oled_decode_horizontal_fb.hex");
                 dump_panel_hex("sim/oled_decode_horizontal_panel.hex");
 
                 resetn = 1'b0;
+		cpol = 1'b1;
+		sclk = 1'b1;
                 clear_shadow();
                 repeat (10) @(posedge clk);
                 resetn = 1'b1;
@@ -208,12 +216,14 @@ module tb_oled_decode_render;
 
                 send_page_pattern();
                 repeat (10) @(posedge clk);
-                verify_pattern("page");
+                verify_pattern("page-cpol1");
                 dump_fb_hex("sim/oled_decode_page_fb.hex");
                 dump_panel_hex("sim/oled_decode_page_panel.hex");
 
-                if (mismatches == 0)
+                if (total_mismatches == 0)
                         $display("PASS: decoder patterns rendered");
+		else
+			$fatal(1, "FAIL: decoder pattern mismatches=%0d", total_mismatches);
                 $finish;
         end
 endmodule

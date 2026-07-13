@@ -33,6 +33,7 @@ module openfpga_arduboy_soc (
 	wire oled_rst;
 	wire spi_scl;
 	wire spi_mosi;
+	wire spi_cpol;
 	wire [2:0] rgb;
 	wire usd_cs;
 	wire adc_cs;
@@ -69,6 +70,13 @@ module openfpga_arduboy_soc (
 		.BUS_ADDR_DATA_LEN(12),
 		.RAM_ADDR_WIDTH(12),
 		.USE_UART_1("FALSE"),
+		// Use the register-accurate, single-core-clock timer paths. The
+		// reduced implementations keep their running counters in separate
+		// RTC blocks, so TCNT reads/writes and interrupt-flag clearing do not
+		// match the ATmega32U4 behavior expected by Arduino and audio code.
+		.USE_REDUCED_TIM0("FALSE"),
+		.USE_REDUCED_TIM1("FALSE"),
+		.USE_REDUCED_TIM3("FALSE"),
 		.USE_EEPROM("FALSE"),
 		.USE_TWI_1("FALSE")
 	) u_core (
@@ -90,6 +98,7 @@ module openfpga_arduboy_soc (
 		.OledRST(oled_rst),
 		.spi_scl(spi_scl),
 		.spi_mosi(spi_mosi),
+		.spi_cpol(spi_cpol),
 		.uSD_CS(usd_cs),
 		.ADC_CS(adc_cs),
 		.VS_RST(vs_rst),
@@ -127,6 +136,7 @@ module openfpga_arduboy_soc (
 		.resetn(resetn && oled_rst && !emulator_reset),
 		.cs(oled_cs),
 		.sclk(spi_scl),
+		.cpol(spi_cpol),
 		.mosi(spi_mosi),
 		.dc(oled_dc),
 		.fb_we(fb_we),

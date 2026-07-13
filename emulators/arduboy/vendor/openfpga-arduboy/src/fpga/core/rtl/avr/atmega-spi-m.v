@@ -61,6 +61,7 @@ module atmega_spi_m # (
 	output io_conn_slave_o,
 
 	output scl_o,
+	output cpol_o,
 	input miso_i,
 	output mosi_o
 	);
@@ -78,6 +79,7 @@ localparam PRESCALLER_SIZE = 8;
 
 reg stc_p;
 reg stc_n;
+reg status_clear_armed;
 
 reg [7:0]rx_shift_reg;
 reg [7:0]tx_shift_reg;
@@ -138,6 +140,7 @@ begin
 		bit_cnt <= WORD_LEN;
 		sckint <= 1'b0;
 		stc_p <= 1'b0;
+		status_clear_armed <= 1'b0;
 		spi_active <= 1'b0;
 		sck_active <= 1'b0;
 	end
@@ -197,30 +200,29 @@ begin
 				end
 			end
 		end
-		if(rd_i)
+		// On AVR, SPIF and WCOL are not cleared by reading SPSR alone.
+		// A read of SPSR while either flag is set arms the clear; the
+		// subsequent access to SPDR completes the clear sequence.
+		if(rd_i && addr_i == SPSR_ADDR &&
+			(SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] || SPSR[`ATMEGA_SPI_SPSR_WCOL_bp]))
+			status_clear_armed <= 1'b1;
+		if((rd_i || wr_i) && addr_i == SPDR_ADDR && status_clear_armed)
 		begin
-			case(addr_i)
-			SPSR_ADDR: 
-			begin
-				SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] <= 1'b0;
-				if(stc_p ^ stc_n)
-				begin
-					SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] <= 1'b1;
-					stc_n <= stc_p;
-					sck_active <= 1'b0;
-				end	
-			end
-			endcase
+			SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] <= 1'b0;
+			SPSR[`ATMEGA_SPI_SPSR_WCOL_bp] <= 1'b0;
+			status_clear_armed <= 1'b0;
 		end
 		if(stc_p ^ stc_n)
 		begin
 			SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] <= 1'b1;
+			status_clear_armed <= 1'b0;
 			stc_n <= stc_p;
 			sck_active <= 1'b0;
 		end	
 		if(int_ack_i)
 		begin
 			SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] <= 1'b0;
+			status_clear_armed <= 1'b0;
 		end
 		if(bit_cnt == WORD_LEN)
 		begin
@@ -255,6 +257,7 @@ end
 
 assign int_o = SPCR[`ATMEGA_SPI_SPCR_INT_EN_bp] ? SPSR[`ATMEGA_SPI_SPSR_SPIF_bp] : 1'b0;
 assign scl_o = SPCR[`ATMEGA_SPI_SPCR_EN_bp] ? ((SPCR[`ATMEGA_SPI_SPCR_CPOL_bp]) ? (sck_active ? ~sckint : 1'b1) : (sck_active ? sckint : 1'b0)) : 1'b1;
+assign cpol_o = SPCR[`ATMEGA_SPI_SPCR_CPOL_bp];
 assign mosi_o = (SPCR[`ATMEGA_SPI_SPCR_EN_bp] & sck_active) ? (SPCR[`ATMEGA_SPI_SPCR_DORD_bp] ? tx_shift_reg[0] : tx_shift_reg[WORD_LEN - 1]) : 1'b1;
 assign io_connect_o = SPCR[`ATMEGA_SPI_SPCR_EN_bp];
 assign io_conn_slave_o = ~SPCR[`ATMEGA_SPI_SPCR_MSTR_bp];
