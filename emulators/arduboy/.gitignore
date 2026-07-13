@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+
+# FPGA synthesis intermediates and logs. Keep arduboy_fx.bit as the usable build.
+log/
+tmp.v
+*.json
+*_out.config
+*.svf
+
+# Simulation products and rendered debug captures.
+sim/*.vvp
+sim/*.out
+sim/*.hex
+sim/*.ppm
+fw/*_words.mem
+real_titles/*_words.mem
+
+# Legacy scaffolding and reference snapshots are not part of this core build.
+refs/
+rtl/arduboy_soc_shell.v
+sim/tb_current_storage.v
+sim/tb_paddle_game_soc.v
+sim/tb_smoke_game_soc.v
+
+# Only the explicitly tracked AVR RTL is needed from the upstream checkout.
+vendor/openfpga-arduboy/
+vendor/softavrcore/
