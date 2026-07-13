@@ -10,7 +10,8 @@ badge's 240x240 GC9A01 panel.
 
 - ATmega32U4-compatible OpenFPGA AVR core and 32 KiB host-loadable program RAM.
 - SSD1306 SPI command/data decoder with horizontal and page addressing support.
-- Centred 128x64 monochrome viewport on the circular GC9A01 display.
+- Button-selectable centered 1x, 1.5x, and 2x monochrome viewports on the
+  circular GC9A01 display. The 2x mode is center-cropped horizontally to fit.
 - Seven debounced physical controls mapped to Arduboy directions, A, B, and reset.
 - Arduboy differential speaker output converted to the single-ended passive
   GreyMecha buzzer on FPGA pin `F16`.
@@ -24,12 +25,16 @@ EEPROM and Arduboy FX external-flash persistence are not implemented yet.
 ```text
 btn[0]       Left
 btn[1]       Up
-btn[2]       Reset
+btn[2]       Display scale (short press); board reset (hold for over 2 seconds)
 btn[3]       Down
 btn[4]       Right
 btn_grey_n   A
 btn_rst_n    B
 ```
+
+Display scale changes on release, so a long hold does not also change scale.
+The long-press reset restarts the emulated board from the already-loaded program
+flash; the flash contents and host-loader state are retained.
 
 ## Host SPI Commands
 

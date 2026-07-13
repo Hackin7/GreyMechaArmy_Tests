@@ -43,6 +43,7 @@ module tb_oled_decode_render;
                 .host_we(fb_we),
                 .host_addr(fb_addr),
                 .host_wdata(fb_wdata),
+		.scale_mode(2'd0),
                 .panel_pixel_index(panel_pixel_index),
                 .panel_rgb(panel_rgb)
         );

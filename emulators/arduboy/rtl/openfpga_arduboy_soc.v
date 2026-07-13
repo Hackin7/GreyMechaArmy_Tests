@@ -57,10 +57,10 @@ module openfpga_arduboy_soc (
 	wire usbn_io;
 
 	assign cpu_flash_word_addr = pgm_addr[13:0];
-	// Arduboy drives a piezo differentially on PC6/PC7. GreyMecha has a
-	// single-ended passive buzzer, so emit the differential activity as one
-	// square wave. OR would become a constant high for complementary outputs.
-	assign buzzer = buzzer1 ^ buzzer2;
+	// Arduboy drives its piezo differentially. Timer4 makes Buzzer1/Buzzer2
+	// complementary, so XOR would collapse a tone to a constant high level.
+	// Drive the GreyMecha single-ended passive buzzer from one differential leg.
+	assign buzzer = buzzer1;
 
 	atmega32u4_arduboy #(
 		.PLATFORM("XILINX"),

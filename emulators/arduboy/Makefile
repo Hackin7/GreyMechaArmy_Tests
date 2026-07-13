@@ -12,6 +12,7 @@ RTL_DIR = rtl
 
 RTL_ORDER = \
 	$(FAST_OLED_SRC)/btn_debounce.v \
+	$(RTL_DIR)/display_mode_reset_button.v \
 	$(FAST_OLED_SRC)/simple_spi_master.v \
 	$(FAST_OLED_SRC)/oled_init.v \
 	$(FAST_OLED_SRC)/oled_stream.v \

@@ -16,6 +16,9 @@ module top (
 	output wire       buzzer
 );
 	localparam integer OLED_CLK_HZ = 75000000;
+	// The 310 MHz internal oscillator divided by six and the PLL's /40 output
+	// produce the CPU clock used by nextpnr's derived timing constraint.
+	localparam integer CPU_CLK_HZ = 15500000;
 
 	wire osc_clk;
 	defparam OSCI1.DIV = "6";
@@ -34,24 +37,64 @@ module top (
 	wire clk = clk_cpu;
 	wire unused_clk_ext = clk_ext;
 
-        wire reset_button = ~btn[2];
-	reg [1:0] reset_sync = 2'b00;
+	wire board_reset;
+	wire display_mode_toggle;
+	display_mode_reset_button #(
+		.HOLD_CYCLES(2 * CPU_CLK_HZ),
+		.DEBOUNCE_CYCLES(4096)
+	) u_display_mode_button (
+		.clk(clk),
+		.resetn(pll_locked),
+		.btn_n(btn[2]),
+		.mode_cycle_toggle(display_mode_toggle),
+		.board_reset(board_reset)
+	);
+
 	reg [7:0] reset_counter = 0;
-	wire board_reset = reset_sync[1];
+	reg [7:0] loader_reset_counter = 0;
 	wire resetn = (&reset_counter) & pll_locked;
+	wire loader_resetn = (&loader_reset_counter) & pll_locked;
 	reg [1:0] oled_reset_sync = 2'b00;
 	wire resetn_oled = &oled_reset_sync;
 
 	always @(posedge clk) begin
-		reset_sync <= {reset_sync[0], reset_button};
 		if (board_reset || !pll_locked)
 			reset_counter <= 0;
 		else if (!resetn)
 			reset_counter <= reset_counter + 1'b1;
+
+		// The SPI loader and its control state are outside the emulated board.
+		// Keep them alive across a button reset so retained flash can restart.
+		if (!pll_locked)
+			loader_reset_counter <= 0;
+		else if (!loader_resetn)
+			loader_reset_counter <= loader_reset_counter + 1'b1;
 	end
 
 	always @(posedge clk_oled) begin
 		oled_reset_sync <= {oled_reset_sync[0], resetn};
+	end
+
+	reg [1:0] display_mode_toggle_sync = 2'b00;
+	reg display_mode_toggle_seen = 1'b0;
+	reg [1:0] display_scale_mode = 2'd0;
+	always @(posedge clk_oled) begin
+		if (!resetn_oled) begin
+			display_mode_toggle_sync <= 2'b00;
+			display_mode_toggle_seen <= 1'b0;
+			display_scale_mode <= 2'd0;
+		end else begin
+			display_mode_toggle_sync <= {
+				display_mode_toggle_sync[0], display_mode_toggle
+			};
+			if (display_mode_toggle_sync[1] != display_mode_toggle_seen) begin
+				display_mode_toggle_seen <= display_mode_toggle_sync[1];
+				if (display_scale_mode == 2'd2)
+					display_scale_mode <= 2'd0;
+				else
+					display_scale_mode <= display_scale_mode + 1'b1;
+			end
+		end
 	end
 
         wire [4:0] btn_press;
@@ -122,7 +165,7 @@ module top (
 
 	host_spi_byte_slave u_host_spi (
 		.clk(clk),
-		.resetn(resetn),
+		.resetn(loader_resetn),
 		.sck(host_sck),
 		.mosi(host_mosi),
 		.cs_n(host_cs_n),
@@ -135,7 +178,7 @@ module top (
 
 	arduboy_host_bridge u_host_bridge (
 		.clk(clk),
-		.resetn(resetn),
+		.resetn(loader_resetn),
 		.rx_byte(host_rx_byte),
 		.rx_strobe(host_rx_strobe),
 		.status(host_status),
@@ -219,6 +262,7 @@ module top (
 		.host_we(fb_we),
 		.host_addr(fb_addr),
 		.host_wdata(fb_wdata),
+		.scale_mode(display_scale_mode),
 		.panel_pixel_index(pixel_index),
 		.panel_rgb(pixel_rgb)
 	);
