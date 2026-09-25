@@ -12,6 +12,13 @@
   let diagramText = '';
   const diagramPlaceholder = '{\n  "version": 1,\n  "parts": [],\n  "connections": []\n}';
 
+  function invalidatePreview() {
+    selectionId += 1;
+    filename = '';
+    preview = null;
+    fileError = '';
+  }
+
   function previewPastedDiagram() {
     selectionId += 1;
     filename = '';
@@ -54,11 +61,11 @@
 <div class="importer">
   <h2>Import a Wokwi digital circuit</h2>
   <p>Choose a downloaded <code>diagram.json</code> or paste its contents below. Preview and validate the generated <code>top.v</code> before applying it.</p>
-  <p class="supported">Supported: GreyMecha chip or named buttons and LEDs; constants, NOT, AND, OR, XOR, NAND, 2:1 MUX, D/DSR flip-flops, and one clock generator.</p>
+  <p class="supported">Supported: GreyMecha chip, named buttons and LEDs, or Tiny Tapeout input/output blocks; constants, buffer, NOT, AND, OR, XOR, XNOR, NAND, 2:1 MUX, D/DSR flip-flops, and one clock generator.</p>
   <label class="picker">Diagram file <input type="file" accept=".json,application/json" on:change={chooseFile} /></label>
   {#if filename}<p class="filename">{filename}</p>{/if}
   <label class="paste-label" for="diagram-json">Or paste diagram.json</label>
-  <textarea id="diagram-json" bind:value={diagramText} placeholder={diagramPlaceholder}></textarea>
+  <textarea id="diagram-json" bind:value={diagramText} placeholder={diagramPlaceholder} on:input={invalidatePreview}></textarea>
   <button class="preview-button" on:click={previewPastedDiagram}>Preview pasted diagram</button>
   {#if fileError}<div class="error" role="alert">{fileError}</div>{/if}
   {#if preview}
@@ -68,6 +75,13 @@
         <ul>{#each preview.errors as error}<li>{error}</li>{/each}</ul>
       </div>
     {:else}
+      {#if preview.summary.format === 'Tiny Tapeout'}
+        <p class="summary"><strong>Tiny Tapeout diagram detected.</strong> Pressing badge buttons 0–4 drives IN0–IN4 high; OUT0–OUT7 drive badge LEDs 0–7. IN5–IN7 are ignored.</p>
+        <p class="clock">CLK uses the divided on-chip oscillator when needed. RST_N uses PMOD J1 pin 0 when needed.</p>
+        {#if preview.summary.resetUsed}
+          <p class="clock">Drive PMOD J1 pin 0 high normally and low to reset. This pin is configured for 2.5 V I/O; provide a defined level at all times.</p>
+        {/if}
+      {/if}
       <p class="summary">Detected {preview.summary.buttons} button inputs, {preview.summary.leds} LED outputs, {preview.summary.gates} gates, and {preview.summary.flipFlops} flip-flops.</p>
       {#if preview.summary.approximateClock}
         <p class="clock">Clock request: {preview.summary.clockHz} Hz. The badge frequency is approximate because the on-chip oscillator varies.</p>

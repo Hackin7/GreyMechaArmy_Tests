@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "verify:toolchain": "node scripts/verify-toolchain.mjs",
-    "verify:wokwi": "node scripts/verify-wokwi.mjs"
+    "verify:wokwi": "node scripts/verify-wokwi.mjs",
+    "verify:tinytapeout": "node scripts/verify-tinytapeout.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",

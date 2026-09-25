@@ -15,6 +15,7 @@ For a production build and a local toolchain smoke test:
 npm run build
 npm run verify:toolchain
 npm run verify:wokwi
+npm run verify:tinytapeout
 ```
 
 The production build contains the main editor. Vite bundles netlistsvg and ELK locally. `npm run prebuild` copies the netlist renderer bundles and licenses into the generated `public/vendor` directory.
@@ -27,7 +28,9 @@ If the source changes after synthesis, the views are marked **Outdated** and the
 
 ## Wokwi import
 
-The **Wokwi Import** tab accepts a downloaded `diagram.json` or pasted JSON text. It validates supported digital parts and wiring, previews structural Verilog, and can replace `top.v` or replace it and synthesize immediately. An invalid diagram leaves the editor untouched. Applying a valid diagram clears artifacts from the previous source. See [the example circuits](../wokwi/README.md) for supported parts and Wokwi usage.
+The **Wokwi Import** tab accepts a downloaded `diagram.json` or pasted JSON text. Paste edits clear the old preview; click **Preview pasted diagram** after each change. The importer validates supported digital parts and wiring, previews structural Verilog, and can replace `top.v` or replace it and synthesize immediately. An invalid diagram leaves the editor untouched. Applying a valid diagram clears artifacts from the previous source. See [the example circuits](../wokwi/README.md) for supported parts and Wokwi usage.
+
+For a Tiny Tapeout diagram, the importer recognizes the input and output blocks by type. Badge buttons 0–4 drive `IN0`–`IN4` high when pressed, and `OUT0`–`OUT7` drive LEDs 0–7. `IN5`–`IN7` are unavailable: direct connections to outputs become low, while a gate using one of those inputs produces an import error. The Wokwi switches, step/reset buttons, seven-segment display, and other simulation controls stay outside the FPGA circuit. Logic using `CLK` runs from the divided on-chip oscillator at an approximate rate. Logic using `RST_N` reads PMOD J1 pin 0; drive that 2.5 V input high normally and low to reset. The existing `pinout.lpf` remains in place.
 
 ## Badge programming
 
