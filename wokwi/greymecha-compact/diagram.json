@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "author": "GreyMechaArmy",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "chip-greymecha", "id": "badge", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-gate-not", "id": "not0", "top": 10, "left": 210, "attrs": {} },
+    { "type": "wokwi-gate-not", "id": "not1", "top": 100, "left": 210, "attrs": {} },
+    { "type": "wokwi-gate-and-2", "id": "and0", "top": 50, "left": 340, "attrs": {} },
+    { "type": "wokwi-gate-not", "id": "not2", "top": 210, "left": 210, "attrs": {} },
+    { "type": "wokwi-flip-flop-d", "id": "memory0", "top": 150, "left": 470, "attrs": {} },
+    { "type": "wokwi-flip-flop-dsr", "id": "memory1", "top": 280, "left": 470, "attrs": {} },
+    { "type": "wokwi-clock-generator", "id": "clock0", "top": 370, "left": 310, "attrs": { "frequency": "10k" } },
+    { "type": "wokwi-gnd", "id": "ground0", "top": 420, "left": 300, "attrs": {} }
+  ],
+  "connections": [
+    ["badge:BTN0_N", "not0:IN", "green", []],
+    ["badge:BTN1_N", "not1:IN", "green", []],
+    ["not0:OUT", "and0:A", "green", []],
+    ["not1:OUT", "and0:B", "green", []],
+    ["and0:OUT", "badge:LED0", "green", []],
+    ["and0:OUT", "memory0:D", "green", []],
+    ["and0:OUT", "memory1:D", "green", []],
+    ["clock0:CLK", "memory0:CLK", "yellow", []],
+    ["clock0:CLK", "memory1:CLK", "yellow", []],
+    ["memory0:Q", "badge:LED1", "green", []],
+    ["memory1:Q", "badge:LED2", "green", []],
+    ["badge:BTN2_N", "not2:IN", "green", []],
+    ["not2:OUT", "memory1:R", "green", []],
+    ["ground0:GND", "memory1:S", "black", []],
+    ["ground0:GND", "badge:LED3", "black", []],
+    ["ground0:GND", "badge:LED4", "black", []],
+    ["ground0:GND", "badge:LED5", "black", []],
+    ["ground0:GND", "badge:LED6", "black", []],
+    ["ground0:GND", "badge:LED7", "black", []]
+  ],
+  "dependencies": {}
+}

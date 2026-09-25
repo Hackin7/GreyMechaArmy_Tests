@@ -1,0 +1,13 @@
+{
+  "name": "GreyMecha buttons and LEDs",
+  "author": "GreyMechaArmy",
+  "pins": ["BTN0_N", "BTN1_N", "BTN2_N", "BTN3_N", "BTN4_N", "", "LED7", "LED6", "LED5", "LED4", "LED3", "LED2", "LED1", "LED0"],
+  "controls": [
+    { "id": "button0", "label": "Button 0", "type": "range", "min": 0, "max": 1, "step": 1 },
+    { "id": "button1", "label": "Button 1", "type": "range", "min": 0, "max": 1, "step": 1 },
+    { "id": "button2", "label": "Button 2", "type": "range", "min": 0, "max": 1, "step": 1 },
+    { "id": "button3", "label": "Button 3", "type": "range", "min": 0, "max": 1, "step": 1 },
+    { "id": "button4", "label": "Button 4", "type": "range", "min": 0, "max": 1, "step": 1 }
+  ],
+  "display": { "width": 160, "height": 44 }
+}

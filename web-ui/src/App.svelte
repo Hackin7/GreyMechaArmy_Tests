@@ -2,6 +2,7 @@
     import { files, activeFile, terminalLogs, buildArtifacts } from './lib/stores.js';
     import { uploadToDevice, rebootDevice } from './lib/filesystem.js';
     import NetlistView from './lib/NetlistView.svelte';
+    import WokwiImport from './lib/WokwiImport.svelte';
     import { onMount, onDestroy, afterUpdate } from 'svelte';
     import { basicSetup, EditorView } from 'codemirror';
 
@@ -18,6 +19,7 @@
     let panelSize = 42;
     let resizeStart = null;
     let isResizingPanel = false;
+    let syncingEditor = false;
 
     let savedDirHandle = null;
 
@@ -31,7 +33,7 @@
             parent: editorContainer,
             dispatch: (tr) => {
                 editorView.update([tr]);
-                if (tr.docChanged) {
+                if (tr.docChanged && !syncingEditor) {
                     sourceRevision += 1;
                     files.update((f) => ({ ...f, [$activeFile]: tr.state.doc.toString() }));
                 }
@@ -56,13 +58,41 @@
     });
 
     $: if (editorView && $activeFile && editorView.state.doc.toString() !== $files[$activeFile]) {
+        syncingEditor = true;
         editorView.dispatch({
             changes: { from: 0, to: editorView.state.doc.length, insert: $files[$activeFile] }
         });
+        syncingEditor = false;
     }
 
     function selectFile(filename) {
         activeFile.set(filename);
+    }
+
+    function applyWokwiDesign(verilog) {
+        if (isSynthesizing || !verilog) return false;
+        files.update((current) => ({ ...current, 'top.v': verilog }));
+        activeFile.set('top.v');
+        sourceRevision += 1;
+        buildArtifacts.set({
+            runId: 0,
+            status: 'idle',
+            sourceRevision,
+            logicalJson: null,
+            mappedJson: null,
+            placementJson: null,
+            reportJson: null,
+            bitstream: null,
+            stageErrors: {}
+        });
+        terminalLogs.update((logs) => logs + 'Wokwi design applied to top.v. Previous build artifacts cleared.\n');
+        return true;
+    }
+
+    async function applyWokwiAndSynthesize(verilog) {
+        if (!applyWokwiDesign(verilog)) return;
+        activePanel = 'terminal';
+        await synthesize();
     }
 
     function beginResize(event) {
@@ -318,11 +348,15 @@
                 <button class:active={activePanel === 'logical'} disabled={!$buildArtifacts.logicalJson} on:click={() => (activePanel = 'logical')}>Logical Netlist</button>
                 <button class:active={activePanel === 'mapped'} disabled={!$buildArtifacts.mappedJson} on:click={() => (activePanel = 'mapped')}>Mapped ECP5</button>
                 <button class:active={activePanel === 'pandr'} disabled={!$buildArtifacts.placementJson || !$buildArtifacts.reportJson} on:click={() => (activePanel = 'pandr')}>P&amp;R Export</button>
+                <button class:active={activePanel === 'wokwi'} on:click={() => (activePanel = 'wokwi')}>Wokwi Import</button>
                 {#if buildIsOutdated}<span class="outdated-label">Outdated</span>{/if}
             </nav>
             <div class="panel-content">
                 <div class:panel-hidden={activePanel !== 'terminal'} class="panel-layer terminal" bind:this={terminalContainer} aria-hidden={activePanel !== 'terminal'}>
                     <pre>{$terminalLogs}</pre>
+                </div>
+                <div class:panel-hidden={activePanel !== 'wokwi'} class="panel-layer" aria-hidden={activePanel !== 'wokwi'}>
+                    <WokwiImport onUseDesign={applyWokwiDesign} onUseAndSynthesize={applyWokwiAndSynthesize} disabled={isSynthesizing} />
                 </div>
                 {#if $buildArtifacts.logicalJson}
                     <div class:panel-hidden={activePanel !== 'logical'} class="panel-layer" aria-hidden={activePanel !== 'logical'}>

@@ -3,6 +3,7 @@
 *.config
 *.json
 !web-ui/*.json
+!wokwi/**/*.json
 tmp.v
 *.vvp
 *.vcd

@@ -1,0 +1,15 @@
+# GreyMecha Wokwi examples
+
+`greymecha-compact/` uses a custom simulation chip with five active-low button outputs and an eight-LED display. It is a **local Wokwi CLI / VS Code project**, not a ready-to-open Wokwi.com project. From that folder, compile the chip:
+
+```sh
+wokwi-cli chip compile greymecha.chip.c -o greymecha.chip.wasm
+```
+
+The included `wokwi.toml` loads that binary as `chip-greymecha`; the `.chip.json` file defines its pins and controls. Open the folder with the Wokwi VS Code extension or run it with Wokwi CLI. Set each Button slider to 1 to press it. The bundled `wokwi-api.h` contains only the API declarations used by this example. Wokwi’s custom-chip compiler and project configuration are described in its [custom chip build guide](https://docs.wokwi.com/guides/custom-chips-to-wasm).
+
+`greymecha-circuit/` uses standard Wokwi pushbuttons, LEDs, pull-ups, gates, and flip-flops. The buttons are `btn0` through `btn4`; LEDs are `led0` through `led7`. Pressing a button pulls its input low. The diagram uses the documented pushbutton contact pairs (`1.l` / `1.r` and `2.l` / `2.r`); each pair is internally connected, and pressing joins contacts 1 and 2. Both examples implement a two-button AND output and two stored outputs, one with reset.
+
+For the standard-parts example, create a Wokwi project and copy in `greymecha-circuit/diagram.json`. To run the compact custom-chip example, use the local workflow above; Wokwi.com cannot load a custom chip directly from this repository. Edit the circuit, download its `diagram.json`, then open the website's **Wokwi Import** tab. Choose the file, review any errors and generated `top.v`, and click **Use Design** or **Use Design & Synthesize**. The latter starts the normal Yosys → nextpnr → ecppack flow. Only `top.v` changes; the badge LPF remains in place.
+
+The importer recognizes the badge chip or the named standard buttons/LEDs, NOT/AND/OR/XOR/NAND gates, 2:1 MUXes, D and DSR flip-flops, one clock generator, and simulation power, ground, resistor, and text parts. A DSR flip-flop can use asynchronous set or reset; tie the other control to GND. ECP5 cannot implement both independent asynchronous controls in this flow, so that wiring is rejected. The importer emits structural Verilog from the diagram wires. The custom chip's C code only draws and drives the Wokwi simulation; it is not compiled for the FPGA. The on-chip oscillator makes requested clock rates approximate. Unsupported parts or invalid wiring produce errors before the editor is changed.
