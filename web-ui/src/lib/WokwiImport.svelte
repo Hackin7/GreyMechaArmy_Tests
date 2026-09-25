@@ -86,7 +86,7 @@
       </div>
     {:else}
       {#if preview.summary.format === 'Tiny Tapeout'}
-        <p class="summary"><strong>Tiny Tapeout diagram detected.</strong> Pressing badge buttons 0–4 drives IN0–IN4 high; OUT0–OUT7 drive badge LEDs 0–7. IN5–IN7 are ignored.</p>
+        <p class="summary"><strong>Tiny Tapeout diagram detected.</strong> Pressing badge buttons 0–4 drives IN0–IN4 high; Mecha buttons 0–1 drive IN5–IN6 high. OUT0–OUT7 drive badge LEDs 0–7. IN7 is ignored.</p>
         <p class="clock">CLK uses the divided on-chip oscillator when needed. RST_N uses PMOD J1 pin 0 when needed.</p>
         {#if preview.summary.resetUsed}
           <p class="clock">Drive PMOD J1 pin 0 high normally and low to reset. This pin is configured for 2.5 V I/O; provide a defined level at all times.</p>

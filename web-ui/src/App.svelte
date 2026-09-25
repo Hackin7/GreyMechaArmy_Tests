@@ -24,6 +24,7 @@
     let syncingEditor = false;
     let newFilename = '';
     let fileError = '';
+    let otherError = '';
     let isAddingFiles = false;
 
     let savedDirHandle = null;
@@ -127,7 +128,7 @@
     function addOledModules() {
         if (isSynthesizing || isAddingFiles) return;
         const result = addWorkspaceFiles($files, Object.entries(oledModules));
-        fileError = result.errors.join(' ');
+        otherError = result.errors.join(' ');
         if (!result.added.length) return;
         files.set(result.files);
         activeFile.set(result.added[0]);
@@ -139,7 +140,7 @@
         files.set({ ...oledDemo });
         activeFile.set('top.v');
         sourceRevision += 1;
-        fileError = '';
+        otherError = '';
     }
 
     function applyWokwiDesign(verilog) {
@@ -389,16 +390,11 @@
             <label class="upload-label">Upload files (.v, .vh, .mem)
                 <input type="file" multiple accept=".v,.vh,.mem" on:change={uploadSourceFiles} disabled={isSynthesizing || isAddingFiles} />
             </label>
-            <button on:click={addOledModules} disabled={isSynthesizing || isAddingFiles}>Add OLED Modules</button>
-            <button on:click={loadOledDemo} disabled={isSynthesizing || isAddingFiles}>Load OLED Demo</button>
             {#if fileError}<p class="file-error" role="alert">{fileError}</p>{/if}
         </div>
         <div class="actions">
             <button class="run-all-btn" on:click={runAll} disabled={isSynthesizing}>Run All (Synthesize → Program)</button>
             <button class="synth-btn" on:click={synthesize} disabled={isSynthesizing}>{isSynthesizing ? 'Building…' : 'Synthesize'}</button>
-            <button class="upload-btn" on:click={upload} disabled={!hasCurrentBitstream}>Upload to Badge</button>
-            <button class="reboot-btn" on:click={reboot} disabled={!hasCurrentBitstream}>Program via Serial</button>
-            <button class="download-btn" on:click={downloadBitstream} disabled={!$buildArtifacts.bitstream}>Download Bitstream</button>
         </div>
         {#if buildIsOutdated}
             <p class="outdated">Source changed after this build. Synthesize again before uploading or programming.</p>
@@ -440,6 +436,7 @@
                 <button class:active={activePanel === 'mapped'} disabled={!$buildArtifacts.mappedJson} on:click={() => (activePanel = 'mapped')}>Mapped ECP5</button>
                 <button class:active={activePanel === 'pandr'} disabled={!$buildArtifacts.placementJson || !$buildArtifacts.reportJson} on:click={() => (activePanel = 'pandr')}>P&amp;R Export</button>
                 <button class:active={activePanel === 'wokwi'} on:click={() => (activePanel = 'wokwi')}>Wokwi Import</button>
+                <button class:active={activePanel === 'other'} on:click={() => (activePanel = 'other')}>Other</button>
                 {#if buildIsOutdated}<span class="outdated-label">Outdated</span>{/if}
             </nav>
             <div class="panel-content">
@@ -448,6 +445,26 @@
                 </div>
                 <div class:panel-hidden={activePanel !== 'wokwi'} class="panel-layer" aria-hidden={activePanel !== 'wokwi'}>
                     <WokwiImport onUseDesign={applyWokwiDesign} onUseAndSynthesize={applyWokwiAndSynthesize} disabled={isSynthesizing} />
+                </div>
+                <div class:panel-hidden={activePanel !== 'other'} class="panel-layer other-panel" aria-hidden={activePanel !== 'other'}>
+                    <section>
+                        <h2>OLED presets</h2>
+                        <p>Add the supporting modules to the current design, or load the complete OLED demo as the current design.</p>
+                        <div class="other-actions">
+                            <button on:click={addOledModules} disabled={isSynthesizing || isAddingFiles}>Add OLED Modules</button>
+                            <button on:click={loadOledDemo} disabled={isSynthesizing || isAddingFiles}>Load OLED Demo</button>
+                        </div>
+                        {#if otherError}<p class="file-error" role="alert">{otherError}</p>{/if}
+                    </section>
+                    <section>
+                        <h2>Bitstream</h2>
+                        {#if buildIsOutdated}<p class="outdated">Source changed after this build. Synthesize again before uploading or programming.</p>{/if}
+                        <div class="other-actions">
+                            <button class="download-btn" on:click={downloadBitstream} disabled={!$buildArtifacts.bitstream}>Download Bitstream</button>
+                            <button class="upload-btn" on:click={upload} disabled={!hasCurrentBitstream}>Upload to Badge</button>
+                            <button class="reboot-btn" on:click={reboot} disabled={!hasCurrentBitstream}>Program via Serial</button>
+                        </div>
+                    </section>
                 </div>
                 {#if $buildArtifacts.logicalJson}
                     <div class:panel-hidden={activePanel !== 'logical'} class="panel-layer" aria-hidden={activePanel !== 'logical'}>
@@ -494,7 +511,7 @@
     .file-control-row { display: flex; gap: 4px; margin-top: 4px; }
     .file-control-row input { min-width: 0; flex: 1; padding: 6px; color: #ddd; background: #1e1e1e; border: 1px solid #555; border-radius: 4px; }
     .file-control-row button { padding: 6px 8px; }
-    .file-controls > button, .file-control-row button { color: white; background: #3b566a; }
+    .file-control-row button { color: white; background: #3b566a; }
     .upload-label input { display: block; width: 100%; margin-top: 4px; color: #ddd; font-size: 11px; }
     .file-error { margin: 0; padding: 6px; color: #f8aaa0; background: #4a2926; border-radius: 4px; overflow-wrap: anywhere; }
     .actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -537,6 +554,15 @@
     .artifact-export .export-help { color: #888; font-size: 12px; }
     .panel-layer { position: absolute; inset: 0; }
     .panel-hidden { display: none; }
+    .other-panel { overflow: auto; padding: 18px 24px; background: #1e1e1e; }
+    .other-panel section + section { margin-top: 22px; }
+    .other-panel h2 { margin: 0 0 6px; font-size: 16px; }
+    .other-panel p { margin: 0 0 12px; color: #bbb; font-size: 13px; }
+    .other-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .other-actions button { min-width: 150px; color: white; }
+    .other-actions button:not(.download-btn):not(.upload-btn):not(.reboot-btn) { background: #3b566a; }
+    .other-panel .file-error { margin-top: 10px; color: #f8aaa0; }
+    .other-panel .outdated { color: #ffd28a; }
     .terminal { overflow: auto; padding: 10px; color: #ccc; background: #1e1e1e; font: 12px monospace; }
     .terminal pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
     @media (max-width: 850px) {

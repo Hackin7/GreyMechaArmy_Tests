@@ -34,6 +34,11 @@ IOBUF PORT  "btn[3]" IO_TYPE=LVCMOS25;
 LOCATE COMP "btn[4]" SITE "B6";
 IOBUF PORT  "btn[4]" IO_TYPE=LVCMOS25;
 
+LOCATE COMP "btn_mecha[0]" SITE "D12";
+IOBUF PORT  "btn_mecha[0]" IO_TYPE=LVCMOS25;
+LOCATE COMP "btn_mecha[1]" SITE "C12";
+IOBUF PORT  "btn_mecha[1]" IO_TYPE=LVCMOS25;
+
 LOCATE COMP "interconnect[0]" SITE "A15";
 IOBUF PORT  "interconnect[0]" IO_TYPE=LVCMOS25;
 LOCATE COMP "interconnect[1]" SITE "B15";

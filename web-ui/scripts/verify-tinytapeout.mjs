@@ -12,18 +12,23 @@ assert.equal(original.summary.format, 'Tiny Tapeout');
 assert.equal(original.summary.gates, 4);
 const buttonNet = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~btn\[(\d)\];/g)]
   .map((match) => [Number(match[2]), match[1]]));
+const mechaNet = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~btn_mecha\[(\d)\];/g)]
+  .map((match) => [Number(match[2]), match[1]]));
 const inverters = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~(net_\d+);/g)]
   .map((match) => [match[1], match[2]]));
 const ledNet = new Map([...original.verilog.matchAll(/assign led\[(\d)\] = (net_\d+);/g)]
   .map((match) => [Number(match[1]), match[2]]));
 assert.equal(buttonNet.size, 5);
+assert.equal(mechaNet.size, 2);
+assert.equal(original.summary.buttons, 7);
 for (let index = 0; index < 4; index++) {
   assert.equal(inverters.get(ledNet.get(index)), buttonNet.get(index), `OUT${index} must invert IN${index}`);
 }
 assert.equal(ledNet.get(4), buttonNet.get(4), 'OUT4 must follow IN4');
-for (let index = 5; index < 8; index++) {
-  assert.match(original.verilog, new RegExp(`assign led\\[${index}\\] = 1'b0;`));
-}
+assert.equal(ledNet.get(5), mechaNet.get(0), 'OUT5 must follow Mecha button 0');
+assert.equal(ledNet.get(6), mechaNet.get(1), 'OUT6 must follow Mecha button 1');
+assert.match(original.verilog, /assign led\[7\] = 1'b0;/);
+assert.match(original.verilog, /input \[1:0\] btn_mecha/);
 assert.equal((original.verilog.match(/wokwi-gate-not/g) ?? []).length, 4);
 assert.doesNotMatch(original.verilog, /OSCG oscillator|pmod_j1/);
 
@@ -48,10 +53,10 @@ edited.parts.push(
 edited.connections = edited.connections.filter((connection) =>
   !['ttout:OUT0', 'ttout:OUT1', 'ttout:OUT2'].some((pin) => connection.includes(pin)));
 edited.connections.push(
-  ['ttin:IN0', 'testAnd:A', 'green', []],
+  ['ttin:IN5', 'testAnd:A', 'green', []],
   ['ttin:IN1', 'testAnd:B', 'green', []],
   ['testAnd:OUT', 'ttout:OUT0', 'green', []],
-  ['ttin:IN1', 'testBuffer:IN', 'green', []],
+  ['ttin:IN6', 'testBuffer:IN', 'green', []],
   ['testBuffer:OUT', 'ttout:OUT1', 'green', []],
   ['ttin:IN2', 'testXnor:A', 'green', []],
   ['ttin:IN3', 'testXnor:B', 'green', []],
@@ -93,8 +98,8 @@ assert.ok(convertWokwiDiagram(sequential, { clockHz: '' }).errors.some((error) =
 
 const ignored = structuredClone(fixture);
 ignored.connections = ignored.connections.filter((connection) => !connection.includes('not1:IN'));
-ignored.connections.push(['ttin:IN5', 'not1:IN', 'green', []]);
-assert.ok(convert(ignored).errors.some((error) => error.includes('ignored ttin:IN5')));
+ignored.connections.push(['ttin:IN7', 'not1:IN', 'green', []]);
+assert.ok(convert(ignored).errors.some((error) => error.includes('ignored ttin:IN7')));
 const disconnected = structuredClone(fixture);
 disconnected.connections = disconnected.connections.filter((connection) => !connection.includes('ttout:OUT0'));
 assert.match(convert(disconnected).verilog, /assign led\[0\] = 1'b0;/);
@@ -138,4 +143,4 @@ for (const [runId, label, converted] of [[40, 'template', original], [41, 'edite
   }
   console.log(`${label}: converted and built through Yosys, nextpnr, ecppack`);
 }
-console.log('Tiny Tapeout input validation: ignored input, unsupported part, missing input, multiple drivers, and cycle rejected');
+console.log('Tiny Tapeout input validation: ignored IN7, unsupported part, missing input, multiple drivers, and cycle rejected');
