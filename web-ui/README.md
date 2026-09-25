@@ -16,6 +16,7 @@ npm run build
 npm run verify:toolchain
 npm run verify:wokwi
 npm run verify:tinytapeout
+npm run verify:oled-preset
 ```
 
 The production build contains the main editor. Vite bundles netlistsvg and ELK locally. `npm run prebuild` copies the netlist renderer bundles and licenses into the generated `public/vendor` directory.
@@ -25,6 +26,12 @@ The production build contains the main editor. Vite bundles netlistsvg and ELK l
 Each synthesis run produces artifacts as they become available. The **Terminal** tab shows build output. The **Logical Netlist** tab shows the coarse ECP5 synthesis result before final cell mapping. **Mapped ECP5** shows the JSON from `synth_ecp5`; it can be much denser because logic has been lowered into device-specific cells. Both diagrams allow module selection, pan, zoom, fit, and reset. **P&R Export** provides `place.json` and `report.json` from nextpnr as separate downloads. To view them, open the [nextpnr-viewer](https://edacation.github.io/nextpnr-viewer/), choose **Family: ECP5** and **Device: 25K**, then upload `place.json` as the placement file and `report.json` as the report file. Use both files from the same build.
 
 If the source changes after synthesis, the views are marked **Outdated** and the old bitstream cannot be uploaded or programmed; synthesize again to refresh them.
+
+## Source files and OLED example
+
+Use the sidebar to create a blank `.v` file, upload local `.v`, `.vh`, or `.mem` files, and remove added files. `top.v` and `pinout.lpf` remain present. Duplicate filenames are skipped so existing edits are preserved. Source file changes mark the previous build outdated.
+
+**Add OLED Modules** adds the seven supporting Verilog modules and their ROM header from `io/fpga_oled_fast`, leaving your current `top.v` and pinout in place. **Load OLED Demo** replaces the in-memory design with that project's complete `top.v`, modules, ROM header, image memory, and pinout. The demo's pinout includes its two Mecha button inputs. To refresh the bundled copy after changing the source project, run `npm run sync:oled-preset` from `web-ui` and commit the updated preset files.
 
 ## Wokwi import
 

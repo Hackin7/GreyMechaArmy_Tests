@@ -3,6 +3,8 @@
     import { uploadToDevice, rebootDevice } from './lib/filesystem.js';
     import NetlistView from './lib/NetlistView.svelte';
     import WokwiImport from './lib/WokwiImport.svelte';
+    import { oledModules, oledDemo } from './lib/oledPreset.js';
+    import { addWorkspaceFiles, removeWorkspaceFile } from './lib/workspaceFiles.js';
     import { onMount, onDestroy, afterUpdate } from 'svelte';
     import { basicSetup, EditorView } from 'codemirror';
 
@@ -20,6 +22,9 @@
     let resizeStart = null;
     let isResizingPanel = false;
     let syncingEditor = false;
+    let newFilename = '';
+    let fileError = '';
+    let isAddingFiles = false;
 
     let savedDirHandle = null;
 
@@ -67,6 +72,74 @@
 
     function selectFile(filename) {
         activeFile.set(filename);
+    }
+
+    function createVerilogFile() {
+        if (isSynthesizing || isAddingFiles) return;
+        const name = newFilename.trim();
+        if (!name.endsWith('.v')) {
+            fileError = 'New source files must have a .v filename.';
+            return;
+        }
+        const result = addWorkspaceFiles($files, [[name, '']]);
+        fileError = result.errors.join(' ');
+        if (!result.added.length) return;
+        files.set(result.files);
+        activeFile.set(name);
+        sourceRevision += 1;
+        newFilename = '';
+    }
+
+    async function uploadSourceFiles(event) {
+        if (isSynthesizing || isAddingFiles) return;
+        const input = event.currentTarget;
+        const selected = [...(input.files ?? [])];
+        input.value = '';
+        if (!selected.length) return;
+        isAddingFiles = true;
+        fileError = '';
+        try {
+            const entries = await Promise.all(selected.map(async (file) => [file.name, await file.text()]));
+            const result = addWorkspaceFiles($files, entries);
+            fileError = result.errors.join(' ');
+            if (result.added.length) {
+                files.set(result.files);
+                activeFile.set(result.added[0]);
+                sourceRevision += 1;
+            }
+        } catch (error) {
+            fileError = `Could not read selected files: ${error.message}`;
+        } finally {
+            isAddingFiles = false;
+        }
+    }
+
+    function removeSourceFile(name) {
+        if (isSynthesizing || isAddingFiles) return;
+        const result = removeWorkspaceFile($files, name);
+        fileError = result.error ?? '';
+        if (result.error) return;
+        if ($activeFile === name) activeFile.set('top.v');
+        files.set(result.files);
+        sourceRevision += 1;
+    }
+
+    function addOledModules() {
+        if (isSynthesizing || isAddingFiles) return;
+        const result = addWorkspaceFiles($files, Object.entries(oledModules));
+        fileError = result.errors.join(' ');
+        if (!result.added.length) return;
+        files.set(result.files);
+        activeFile.set(result.added[0]);
+        sourceRevision += 1;
+    }
+
+    function loadOledDemo() {
+        if (isSynthesizing || isAddingFiles) return;
+        files.set({ ...oledDemo });
+        activeFile.set('top.v');
+        sourceRevision += 1;
+        fileError = '';
     }
 
     function applyWokwiDesign(verilog) {
@@ -297,11 +370,29 @@
         <h2>Files</h2>
         <ul class="file-list">
             {#each Object.keys($files) as filename}
-                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-                <li class:active={$activeFile === filename} on:click={() => selectFile(filename)}>{filename}</li>
+                <li class:active={$activeFile === filename}>
+                    <button class="file-select" on:click={() => selectFile(filename)} title={`Open ${filename}`}>{filename}</button>
+                    {#if filename !== 'top.v' && filename !== 'pinout.lpf'}
+                        <button class="file-remove" on:click={() => removeSourceFile(filename)} disabled={isSynthesizing || isAddingFiles} aria-label={`Remove ${filename}`} title={`Remove ${filename}`}>×</button>
+                    {/if}
+                </li>
             {/each}
         </ul>
+        <div class="file-controls">
+            <form on:submit|preventDefault={createVerilogFile}>
+                <label for="new-verilog-filename">New Verilog file</label>
+                <div class="file-control-row">
+                    <input id="new-verilog-filename" bind:value={newFilename} placeholder="module_name.v" disabled={isSynthesizing || isAddingFiles} />
+                    <button type="submit" disabled={isSynthesizing || isAddingFiles}>Add</button>
+                </div>
+            </form>
+            <label class="upload-label">Upload files (.v, .vh, .mem)
+                <input type="file" multiple accept=".v,.vh,.mem" on:change={uploadSourceFiles} disabled={isSynthesizing || isAddingFiles} />
+            </label>
+            <button on:click={addOledModules} disabled={isSynthesizing || isAddingFiles}>Add OLED Modules</button>
+            <button on:click={loadOledDemo} disabled={isSynthesizing || isAddingFiles}>Load OLED Demo</button>
+            {#if fileError}<p class="file-error" role="alert">{fileError}</p>{/if}
+        </div>
         <div class="actions">
             <button class="run-all-btn" on:click={runAll} disabled={isSynthesizing}>Run All (Synthesize → Program)</button>
             <button class="synth-btn" on:click={synthesize} disabled={isSynthesizing}>{isSynthesizing ? 'Building…' : 'Synthesize'}</button>
@@ -390,12 +481,22 @@
 
 <style>
     .layout { display: flex; width: 100vw; height: 100vh; background: #1e1e1e; color: #d4d4d4; }
-    .sidebar { display: flex; flex: 0 0 250px; flex-direction: column; padding: 10px; background: #252526; border-right: 1px solid #333; }
+    .sidebar { display: flex; flex: 0 0 250px; flex-direction: column; padding: 10px; overflow-y: auto; background: #252526; border-right: 1px solid #333; }
     .sidebar h2 { margin: 0 0 10px; color: #858585; font-size: 14px; text-transform: uppercase; }
     .file-list { flex: 1; min-height: 40px; overflow-y: auto; list-style: none; padding: 0; margin: 0 0 10px; }
-    .file-list li { padding: 8px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-family: monospace; }
+    .file-list li { display: flex; align-items: center; margin-bottom: 4px; border-radius: 4px; font-family: monospace; }
     .file-list li:hover { background: #2a2d2e; }
     .file-list li.active { background: #37373d; color: #fff; }
+    .file-list button { color: inherit; background: transparent; font: inherit; }
+    .file-select { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+    .file-remove { flex: 0 0 auto; padding: 6px 9px; color: #f48771 !important; }
+    .file-controls { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; font-size: 12px; }
+    .file-control-row { display: flex; gap: 4px; margin-top: 4px; }
+    .file-control-row input { min-width: 0; flex: 1; padding: 6px; color: #ddd; background: #1e1e1e; border: 1px solid #555; border-radius: 4px; }
+    .file-control-row button { padding: 6px 8px; }
+    .file-controls > button, .file-control-row button { color: white; background: #3b566a; }
+    .upload-label input { display: block; width: 100%; margin-top: 4px; color: #ddd; font-size: 11px; }
+    .file-error { margin: 0; padding: 6px; color: #f8aaa0; background: #4a2926; border-radius: 4px; overflow-wrap: anywhere; }
     .actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     button { padding: 9px; border: 0; border-radius: 4px; cursor: pointer; font-weight: 600; }
     button:disabled { opacity: .45; cursor: not-allowed; }

@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "verify:toolchain": "node scripts/verify-toolchain.mjs",
     "verify:wokwi": "node scripts/verify-wokwi.mjs",
-    "verify:tinytapeout": "node scripts/verify-tinytapeout.mjs"
+    "verify:tinytapeout": "node scripts/verify-tinytapeout.mjs",
+    "sync:oled-preset": "node scripts/sync-oled-preset.mjs",
+    "verify:oled-preset": "node scripts/verify-oled-preset.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
