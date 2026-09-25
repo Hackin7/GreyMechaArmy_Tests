@@ -43,10 +43,12 @@ if (failure) throw new Error(`${failure.stage}: ${failure.error}`);
 
 assert.ok(types.includes('MAPPED_READY'), 'mapped Yosys JSON should be emitted');
 assert.ok(types.includes('LOGICAL_READY'), 'logical Yosys JSON should be emitted');
+assert.ok(types.includes('ROUTED_READY'), 'nextpnr placement and report JSON should be emitted');
 assert.ok(types.includes('DONE'), 'ecppack bitstream should be emitted');
 
 const mapped = messages.find((message) => message.type === 'MAPPED_READY').json;
 const logical = messages.find((message) => message.type === 'LOGICAL_READY').json;
+const routed = messages.find((message) => message.type === 'ROUTED_READY');
 const done = messages.find((message) => message.type === 'DONE');
 const mappedDesign = JSON.parse(new TextDecoder().decode(mapped));
 const logicalDesign = JSON.parse(new TextDecoder().decode(logical));
@@ -63,5 +65,7 @@ for (const [label, design] of [['logical', logicalDesign], ['mapped', mappedDesi
   assert.ok(typeof svg === 'string' && svg.startsWith('<svg'), `${label} netlist should render as SVG`);
 }
 assert.ok(done.bitstream instanceof Uint8Array && done.bitstream.byteLength > 0, 'bitstream should be non-empty');
+assert.ok(JSON.parse(new TextDecoder().decode(routed.placementJson)), 'placement JSON should parse');
+assert.ok(JSON.parse(new TextDecoder().decode(routed.reportJson)), 'timing report JSON should parse');
 
 console.log(`Verified worker stages: ${types.filter((type) => type.endsWith('_READY')).join(', ')}, DONE`);

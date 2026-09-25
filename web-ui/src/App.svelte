@@ -111,6 +111,15 @@
             buildArtifacts.update((build) => ({ ...build, mappedJson: message.json, status: 'running' }));
             return;
         }
+        if (message.type === 'ROUTED_READY') {
+            buildArtifacts.update((build) => ({
+                ...build,
+                placementJson: message.placementJson,
+                reportJson: message.reportJson,
+                status: 'running'
+            }));
+            return;
+        }
         if (message.type === 'DONE') {
             const build = $buildArtifacts;
             buildArtifacts.set({ ...build, bitstream: message.bitstream, status: 'complete' });
@@ -149,6 +158,8 @@
             sourceRevision: snapshotRevision,
             logicalJson: null,
             mappedJson: null,
+            placementJson: null,
+            reportJson: null,
             bitstream: null,
             stageErrors: {}
         });
@@ -236,6 +247,19 @@
         anchor.remove();
         URL.revokeObjectURL(url);
     }
+
+    function downloadJsonArtifact(bytes, filename) {
+        if (!bytes) return;
+        const blob = new Blob([bytes], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    }
 </script>
 
 <div class:resizing={isResizingPanel} class="layout">
@@ -263,7 +287,7 @@
             <ol>
                 <li>Plug the badge into USB and wait for the CIRCUITPYTHON drive.</li>
                 <li>Click Run All and select the drive and serial port when prompted.</li>
-                <li>Use the views below to inspect the logical netlist and mapped ECP5 cells.</li>
+                <li>Use the views below to inspect netlists or export placement and timing JSON.</li>
             </ol>
             <p>Device permissions are remembered until you refresh the page.</p>
         </div>
@@ -293,6 +317,7 @@
                 <button class:active={activePanel === 'terminal'} on:click={() => (activePanel = 'terminal')}>Terminal</button>
                 <button class:active={activePanel === 'logical'} disabled={!$buildArtifacts.logicalJson} on:click={() => (activePanel = 'logical')}>Logical Netlist</button>
                 <button class:active={activePanel === 'mapped'} disabled={!$buildArtifacts.mappedJson} on:click={() => (activePanel = 'mapped')}>Mapped ECP5</button>
+                <button class:active={activePanel === 'pandr'} disabled={!$buildArtifacts.placementJson || !$buildArtifacts.reportJson} on:click={() => (activePanel = 'pandr')}>P&amp;R Export</button>
                 {#if buildIsOutdated}<span class="outdated-label">Outdated</span>{/if}
             </nav>
             <div class="panel-content">
@@ -307,6 +332,21 @@
                 {#if $buildArtifacts.mappedJson}
                     <div class:panel-hidden={activePanel !== 'mapped'} class="panel-layer" aria-hidden={activePanel !== 'mapped'}>
                         <NetlistView json={$buildArtifacts.mappedJson} runId={$buildArtifacts.runId} label="mapped ECP5" />
+                    </div>
+                {/if}
+                {#if $buildArtifacts.placementJson && $buildArtifacts.reportJson}
+                    <div class:panel-hidden={activePanel !== 'pandr'} class="panel-layer artifact-export" aria-hidden={activePanel !== 'pandr'}>
+                        <h2>Placement and timing artifacts</h2>
+                        <p>Download both files from this build, then open the <a href="https://edacation.github.io/nextpnr-viewer/" target="_blank" rel="noreferrer">nextpnr-viewer</a>.</p>
+                        <div class="export-actions">
+                            <button on:click={() => downloadJsonArtifact($buildArtifacts.placementJson, 'place.json')}>Download place.json</button>
+                            <button on:click={() => downloadJsonArtifact($buildArtifacts.reportJson, 'report.json')}>Download report.json</button>
+                        </div>
+                        <ol class="export-steps">
+                            <li>Choose <strong>Family: ECP5</strong> and <strong>Device: 25K</strong>.</li>
+                            <li>Upload <code>place.json</code> as the placement file and <code>report.json</code> as the report file.</li>
+                        </ol>
+                        <p class="export-help">Use both files from the same build. This project targets CABGA256.</p>
                     </div>
                 {/if}
             </div>
@@ -351,6 +391,15 @@
     .panel-tabs button:disabled { opacity: .4; }
     .outdated-label { margin-left: auto; padding: 4px 7px; color: #ffd28a; font: 11px monospace; }
     .panel-content { position: relative; flex: 1; min-height: 0; }
+    .artifact-export { overflow: auto; padding: 24px; background: #1e1e1e; }
+    .artifact-export h2 { margin: 0 0 8px; font-size: 17px; }
+    .artifact-export p { color: #bbb; font-size: 13px; }
+    .artifact-export a { color: #4fc1ff; }
+    .export-steps { padding-left: 20px; color: #bbb; font-size: 13px; }
+    .export-steps li { margin: 6px 0; }
+    .export-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+    .export-actions button { color: white; background: #007acc; }
+    .artifact-export .export-help { color: #888; font-size: 12px; }
     .panel-layer { position: absolute; inset: 0; }
     .panel-hidden { display: none; }
     .terminal { overflow: auto; padding: 10px; color: #ccc; background: #1e1e1e; font: 12px monospace; }

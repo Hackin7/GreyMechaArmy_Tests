@@ -62,6 +62,8 @@ export const buildArtifacts = writable({
   sourceRevision: 0,
   logicalJson: null,
   mappedJson: null,
+  placementJson: null,
+  reportJson: null,
   bitstream: null,
   stageErrors: {}
 });

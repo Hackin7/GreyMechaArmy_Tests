@@ -72,6 +72,8 @@ self.onmessage = async (event) => {
             routedFs = await runNextpnrEcp5([
                 '--json', 'out.json',
                 '--textcfg', 'out.config',
+                '--write', 'place.json',
+                '--report', 'report.json',
                 '--25k',
                 '--package', 'CABGA256',
                 '--lpf', 'pinout.lpf',
@@ -83,6 +85,9 @@ self.onmessage = async (event) => {
             throw Object.assign(new Error(`nextpnr failed: ${error.message}`), { stage: 'nextpnr' });
         }
         if (routedFs['nextpnr.log']) postLog(runId, asText(routedFs['nextpnr.log']));
+        const placementJson = artifact(routedFs, 'place.json').slice();
+        const reportJson = artifact(routedFs, 'report.json').slice();
+        self.postMessage({ type: 'ROUTED_READY', runId, placementJson, reportJson }, [placementJson.buffer, reportJson.buffer]);
         postLog(runId, 'Packing FPGA bitstream...');
         let packedFs;
         try {

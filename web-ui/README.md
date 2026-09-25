@@ -20,7 +20,7 @@ The production build contains the main editor. Vite bundles netlistsvg and ELK l
 
 ## Build views
 
-Each synthesis run produces artifacts as they become available. The **Terminal** tab shows build output. The **Logical Netlist** tab shows the coarse ECP5 synthesis result before final cell mapping. **Mapped ECP5** shows the JSON from `synth_ecp5`; it can be much denser because logic has been lowered into device-specific cells. Both diagrams allow module selection, pan, zoom, fit, and reset. The build also runs nextpnr for placement and routing before packing the bitstream; placement visualization is currently not included.
+Each synthesis run produces artifacts as they become available. The **Terminal** tab shows build output. The **Logical Netlist** tab shows the coarse ECP5 synthesis result before final cell mapping. **Mapped ECP5** shows the JSON from `synth_ecp5`; it can be much denser because logic has been lowered into device-specific cells. Both diagrams allow module selection, pan, zoom, fit, and reset. **P&R Export** provides `place.json` and `report.json` from nextpnr as separate downloads. To view them, open the [nextpnr-viewer](https://edacation.github.io/nextpnr-viewer/), choose **Family: ECP5** and **Device: 25K**, then upload `place.json` as the placement file and `report.json` as the report file. Use both files from the same build.
 
 If the source changes after synthesis, the views are marked **Outdated** and the old bitstream cannot be uploaded or programmed; synthesize again to refresh them.
 
