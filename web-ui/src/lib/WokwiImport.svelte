@@ -10,6 +10,7 @@
   let fileError = '';
   let selectionId = 0;
   let diagramText = '';
+  let clockSpeed = '10';
   const diagramPlaceholder = '{\n  "version": 1,\n  "parts": [],\n  "connections": []\n}';
 
   function invalidatePreview() {
@@ -17,6 +18,11 @@
     filename = '';
     preview = null;
     fileError = '';
+  }
+
+  function changeClockSpeed(event) {
+    clockSpeed = event.currentTarget.value;
+    invalidatePreview();
   }
 
   function previewPastedDiagram() {
@@ -32,7 +38,7 @@
       fileError = 'The diagram is larger than the 2 MB import limit.';
       return;
     }
-    preview = convertWokwiDiagram(diagramText);
+    preview = convertWokwiDiagram(diagramText, { clockHz: clockSpeed });
   }
 
   async function chooseFile(event) {
@@ -50,7 +56,7 @@
       const text = await file.text();
       if (currentSelection !== selectionId) return;
       diagramText = text;
-      preview = convertWokwiDiagram(text);
+      preview = convertWokwiDiagram(text, { clockHz: clockSpeed });
     } catch (error) {
       if (currentSelection !== selectionId) return;
       fileError = `Could not read diagram: ${error.message}`;
@@ -62,6 +68,10 @@
   <h2>Import a Wokwi digital circuit</h2>
   <p>Choose a downloaded <code>diagram.json</code> or paste its contents below. Preview and validate the generated <code>top.v</code> before applying it.</p>
   <p class="supported">Supported: GreyMecha chip, named buttons and LEDs, or Tiny Tapeout input/output blocks; constants, buffer, NOT, AND, OR, XOR, XNOR, NAND, 2:1 MUX, D/DSR flip-flops, and one clock generator.</p>
+  <label class="clock-speed">Badge clock speed (Hz)
+    <input type="number" min="1" max="100000" step="any" value={clockSpeed} on:input={changeClockSpeed} />
+  </label>
+  <p>This sets the generated badge clock when the circuit uses one; it overrides the Wokwi clock generator frequency. Default: 10 Hz.</p>
   <label class="picker">Diagram file <input type="file" accept=".json,application/json" on:change={chooseFile} /></label>
   {#if filename}<p class="filename">{filename}</p>{/if}
   <label class="paste-label" for="diagram-json">Or paste diagram.json</label>
@@ -104,6 +114,8 @@
   code { color: #9cdcfe; }
   .picker { display: block; margin-top: 15px; font-size: 13px; }
   input { display: block; margin-top: 7px; color: #ddd; }
+  .clock-speed { display: block; margin-top: 15px; font-size: 13px; }
+  .clock-speed input { width: 140px; box-sizing: border-box; padding: 6px 8px; border: 1px solid #444; border-radius: 3px; background: #171717; color: #ddd; }
   .filename { color: #9cdcfe; }
   .paste-label { display: block; margin-top: 14px; color: #ccc; font-size: 13px; }
   textarea { display: block; width: 100%; max-width: 900px; height: 150px; box-sizing: border-box; margin-top: 6px; padding: 10px; resize: vertical; border: 1px solid #444; border-radius: 3px; background: #171717; color: #ddd; font: 12px/1.5 monospace; }

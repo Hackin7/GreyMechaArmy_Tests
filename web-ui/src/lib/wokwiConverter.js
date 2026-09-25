@@ -38,14 +38,14 @@ function pinList(type) {
 }
 
 function parseFrequency(raw) {
-  const match = String(raw ?? '10k').trim().match(/^(\d+(?:\.\d+)?)\s*([kKmM]?)$/);
+  const match = String(raw ?? '').trim().match(/^(\d+(?:\.\d+)?)\s*([kKmM]?)$/);
   if (!match) return null;
   const value = Number(match[1]) * ({ '': 1, k: 1_000, m: 1_000_000 }[match[2].toLowerCase()]);
   return Number.isFinite(value) && value >= 1 && value <= 100_000 ? value : null;
 }
 
 /** Convert a restricted Wokwi digital diagram to a Yosys-readable top module. */
-export function convertWokwiDiagram(input) {
+export function convertWokwiDiagram(input, { clockHz: requestedClockHz = 10 } = {}) {
   const errors = [];
   let diagram;
   try {
@@ -56,8 +56,12 @@ export function convertWokwiDiagram(input) {
   if (!diagram || typeof diagram !== 'object' || diagram.version !== 1 || !Array.isArray(diagram.parts) || !Array.isArray(diagram.connections)) {
     return { verilog: null, errors: ['Expected Wokwi diagram.json version 1 with parts and connections arrays.'], summary: null };
   }
+  const clockHz = parseFrequency(requestedClockHz);
+  if (clockHz === null) {
+    return { verilog: null, errors: ['Badge clock speed must be from 1 Hz to 100 kHz.'], summary: null };
+  }
   if (diagram.parts.some((part) => part?.type === 'board-tt-block-input' || part?.type === 'board-tt-block-input-8' || part?.type === 'board-tt-block-output')) {
-    return convertTinyTapeoutDiagram(diagram);
+    return convertTinyTapeoutDiagram(diagram, clockHz);
   }
 
   const parts = new Map();
@@ -202,11 +206,6 @@ export function convertWokwiDiagram(input) {
   const clocks = [...parts.values()].filter((part) => part.type === 'wokwi-clock-generator');
   if (clocks.length > 1) errors.push('Only one Wokwi clock generator is supported.');
   if (flops.length && clocks.length !== 1) errors.push('Flip-flops require one Wokwi clock generator.');
-  let clockHz = null;
-  if (clocks.length === 1) {
-    clockHz = parseFrequency(clocks[0].attrs?.frequency);
-    if (clockHz === null) errors.push(`Clock "${clocks[0].id}" must have a frequency from 1 Hz to 100 kHz.`);
-  }
   for (const gate of gates) {
     for (const pin of GATES[gate.type].inputs) requireDriven(gate, pin);
   }
@@ -330,7 +329,7 @@ export function convertWokwiDiagram(input) {
       flipFlops: flops.length,
       buttons: compactBadges.length ? 5 : standardButtons.length,
       leds: compactBadges.length ? 8 : standardLeds.length,
-      clockHz,
+      clockHz: clocks.length ? clockHz : null,
       approximateClock: clocks.length > 0
     }
   };
@@ -359,7 +358,7 @@ function tinyTapeoutPins(type) {
   return pinList(type);
 }
 
-function convertTinyTapeoutDiagram(diagram) {
+function convertTinyTapeoutDiagram(diagram, clockHz) {
   const errors = [];
   const parts = new Map();
   for (const part of diagram.parts) {
@@ -551,14 +550,9 @@ function convertTinyTapeoutDiagram(diagram) {
 
   const clockUsed = [...activeRoots].some((root) => drivers.get(root)?.[0]?.kind === 'clock');
   const resetUsed = [...activeRoots].some((root) => drivers.get(root)?.[0]?.kind === 'reset');
-  let clockHz = null;
   if (clockUsed) {
     const generators = [...parts.values()].filter((part) => part.type === 'wokwi-clock-generator');
     if (generators.length !== 1) report('Badge clock logic requires exactly one Wokwi clock generator in the template.');
-    else {
-      clockHz = parseFrequency(generators[0].attrs?.frequency);
-      if (clockHz === null) report(`Clock "${generators[0].id}" must have a frequency from 1 Hz to 100 kHz.`);
-    }
   }
   if (errors.length) return { verilog: null, errors, summary: null };
 
@@ -640,7 +634,7 @@ function convertTinyTapeoutDiagram(diagram) {
       flipFlops: flops.length,
       buttons: 5,
       leds: 8,
-      clockHz,
+      clockHz: clockUsed ? clockHz : null,
       approximateClock: clockUsed,
       resetUsed,
       ignoredInputs: [5, 6, 7]

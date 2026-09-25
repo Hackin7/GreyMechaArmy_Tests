@@ -17,6 +17,12 @@ for (const [index, example] of examples.entries()) {
   assert.match(converted.verilog, /module top\(input \[4:0\] btn, output \[7:0\] led\)/);
   assert.match(converted.verilog, /OSCG oscillator/);
   assert.equal(converted.summary.flipFlops, 2);
+  assert.equal(converted.summary.clockHz, 10);
+  const fasterClock = convertWokwiDiagram(diagram, { clockHz: 25 });
+  assert.deepEqual(fasterClock.errors, []);
+  assert.equal(fasterClock.summary.clockHz, 25);
+  assert.notEqual(fasterClock.verilog, converted.verilog);
+  assert.ok(convertWokwiDiagram(diagram, { clockHz: 0 }).errors.some((error) => error.includes('clock speed')));
 
   const invalid = structuredClone(diagram);
   invalid.parts.push({ type: 'unknown', id: 'bad' });

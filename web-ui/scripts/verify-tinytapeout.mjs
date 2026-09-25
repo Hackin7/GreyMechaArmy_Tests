@@ -80,11 +80,16 @@ sequential.connections.push(
 );
 const clocked = convert(sequential);
 assert.deepEqual(clocked.errors, []);
-assert.equal(clocked.summary.clockHz, 10_000);
+assert.equal(clocked.summary.clockHz, 10);
 assert.equal(clocked.summary.resetUsed, true);
 assert.match(clocked.verilog, /OSCG oscillator/);
 assert.match(clocked.verilog, /pmod_j1\[0\]/);
 assert.match(clocked.verilog, /posedge board_clk/);
+const fasterClock = convertWokwiDiagram(sequential, { clockHz: 25 });
+assert.deepEqual(fasterClock.errors, []);
+assert.equal(fasterClock.summary.clockHz, 25);
+assert.notEqual(fasterClock.verilog, clocked.verilog);
+assert.ok(convertWokwiDiagram(sequential, { clockHz: '' }).errors.some((error) => error.includes('clock speed')));
 
 const ignored = structuredClone(fixture);
 ignored.connections = ignored.connections.filter((connection) => !connection.includes('not1:IN'));
