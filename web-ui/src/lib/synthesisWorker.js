@@ -1,82 +1,102 @@
-// src/lib/synthesisWorker.js
 import { runYosys } from '@yowasp/yosys';
 import { runNextpnrEcp5, runEcppack } from '@yowasp/nextpnr-ecp5';
 
-self.onmessage = async (e) => {
-    const { type, files } = e.data;
-    
-    if (type === 'SYNTHESIZE') {
-        const textEncoder = new TextEncoder();
-        let fs = {};
-        
-        // Populate virtual filesystem
-        for (const [filename, content] of Object.entries(files)) {
-            fs[filename] = textEncoder.encode(content);
-        }
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
-        const log = (msg) => self.postMessage({ type: 'LOG', message: msg });
-        const decode = (data) => typeof data === 'string' ? data : new TextDecoder().decode(data);
+function asText(value) {
+    return typeof value === 'string' ? value : decoder.decode(value);
+}
 
-        const readLog = (fsObj, filename) => {
-            if (!fsObj) return null;
-            if (fsObj[filename]) return decode(fsObj[filename]);
-            return null;
-        };
+function artifact(fs, filename) {
+    const value = fs?.[filename];
+    if (!(value instanceof Uint8Array) && typeof value !== 'string') {
+        throw new Error(`Expected output ${filename} was not created.`);
+    }
+    return typeof value === 'string' ? encoder.encode(value) : value;
+}
 
+function sendArtifact(type, runId, payload) {
+    const copy = payload.slice();
+    self.postMessage({ type, runId, json: copy }, [copy.buffer]);
+}
+
+function postLog(runId, message) {
+    self.postMessage({ type: 'LOG', runId, message });
+}
+
+self.onmessage = async (event) => {
+    const { type, runId, files } = event.data ?? {};
+    if (type !== 'SYNTHESIZE' || typeof runId !== 'number' || !files) return;
+
+    const inputFs = {};
+    for (const [filename, content] of Object.entries(files)) {
+        inputFs[filename] = encoder.encode(content);
+    }
+    const verilogFiles = Object.keys(files).filter((filename) => filename.endsWith('.v'));
+
+    try {
+        postLog(runId, 'Running ECP5 synthesis...');
+        let fs;
         try {
-            // 1. Yosys
-            log("Running Yosys...");
-            const vFiles = Object.keys(files).filter(f => f.endsWith('.v'));
-            let args = ["-p", "synth_ecp5 -top top -json out.json", "-l", "yosys.log", ...vFiles];
-            try {
-                fs = await runYosys(args, fs);
-                const logData = readLog(fs, 'yosys.log');
-                if (logData) log(logData);
-            } catch (err) {
-                const errFs = err.files || fs;
-                const logData = readLog(errFs, 'yosys.log');
-                if (logData) log(logData);
-                throw new Error("Yosys failed with status " + (err.code || err.exit_code || 1));
-            }
-            log("Yosys completed.");
-
-            // 2. NextPNR
-            log("Running NextPNR...");
-            args = ["--json", "out.json", "--textcfg", "out.config", "--25k", "--package", "CABGA256", "--lpf", "pinout.lpf", "--log", "nextpnr.log"];
-            try {
-                fs = await runNextpnrEcp5(args, fs);
-                const logData = readLog(fs, 'nextpnr.log');
-                if (logData) log(logData);
-            } catch (err) {
-                const errFs = err.files || fs;
-                const logData = readLog(errFs, 'nextpnr.log');
-                if (logData) log(logData);
-                throw new Error("NextPNR failed with status " + (err.code || err.exit_code || 1));
-            }
-            log("NextPNR completed.");
-
-            // 3. ecppack
-            log("Running ecppack...");
-            args = ["--input", "out.config", "--bit", "tmp.bit"];
-            try {
-                fs = await runEcppack(args, fs);
-                const logData = readLog(fs, 'ecppack.log');
-                if (logData) log(logData);
-            } catch (err) {
-                const errFs = err.files || fs;
-                const logData = readLog(errFs, 'ecppack.log');
-                if (logData) log(logData);
-                throw new Error("ecppack failed with status " + (err.code || err.exit_code || 1));
-            }
-            log("ecppack completed.");
-
-            // Output the bitstream
-            const bitstream = fs["tmp.bit"];
-            self.postMessage({ type: 'DONE', bitstream });
-
-        } catch (err) {
-            log("Error: " + err.message);
-            self.postMessage({ type: 'ERROR', error: err.message });
+            fs = await runYosys(
+                ['-p', 'synth_ecp5 -top top -json out.json', '-l', 'yosys.log', ...verilogFiles],
+                inputFs
+            );
+        } catch (error) {
+            const errFs = error.files || inputFs;
+            if (errFs['yosys.log']) postLog(runId, asText(errFs['yosys.log']));
+            throw Object.assign(new Error(`Yosys failed: ${error.message}`), { stage: 'yosys' });
         }
+        if (fs['yosys.log']) postLog(runId, asText(fs['yosys.log']));
+        const mappedJson = artifact(fs, 'out.json');
+        sendArtifact('MAPPED_READY', runId, mappedJson);
+
+        postLog(runId, 'Generating logical netlist...');
+        try {
+            const logicalFs = await runYosys(
+                ['-p', 'synth_ecp5 -top top -run begin:coarse; select *; proc; select top; write_json -selected logical.json', '-l', 'logical-yosys.log', ...verilogFiles],
+                { ...inputFs }
+            );
+            if (logicalFs['logical-yosys.log']) postLog(runId, asText(logicalFs['logical-yosys.log']));
+            sendArtifact('LOGICAL_READY', runId, artifact(logicalFs, 'logical.json'));
+        } catch (error) {
+            const errFs = error.files || {};
+            if (errFs['logical-yosys.log']) postLog(runId, asText(errFs['logical-yosys.log']));
+            postLog(runId, `Warning: logical schematic unavailable: ${error.message}`);
+        }
+
+        postLog(runId, 'Running nextpnr placement and routing...');
+        let routedFs;
+        try {
+            routedFs = await runNextpnrEcp5([
+                '--json', 'out.json',
+                '--textcfg', 'out.config',
+                '--25k',
+                '--package', 'CABGA256',
+                '--lpf', 'pinout.lpf',
+                '--log', 'nextpnr.log'
+            ], fs);
+        } catch (error) {
+            const errFs = error.files || fs;
+            if (errFs['nextpnr.log']) postLog(runId, asText(errFs['nextpnr.log']));
+            throw Object.assign(new Error(`nextpnr failed: ${error.message}`), { stage: 'nextpnr' });
+        }
+        if (routedFs['nextpnr.log']) postLog(runId, asText(routedFs['nextpnr.log']));
+        postLog(runId, 'Packing FPGA bitstream...');
+        let packedFs;
+        try {
+            packedFs = await runEcppack(['--input', 'out.config', '--bit', 'tmp.bit'], routedFs);
+        } catch (error) {
+            const errFs = error.files || routedFs;
+            if (errFs['ecppack.log']) postLog(runId, asText(errFs['ecppack.log']));
+            throw Object.assign(new Error(`ecppack failed: ${error.message}`), { stage: 'ecppack' });
+        }
+        if (packedFs['ecppack.log']) postLog(runId, asText(packedFs['ecppack.log']));
+        const bitstream = artifact(packedFs, 'tmp.bit').slice();
+        self.postMessage({ type: 'DONE', runId, bitstream }, [bitstream.buffer]);
+    } catch (error) {
+        const stage = error.stage || 'synthesis';
+        self.postMessage({ type: 'ERROR', runId, stage, error: error.message || String(error) });
     }
 };

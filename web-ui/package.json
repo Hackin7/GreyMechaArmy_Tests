@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-visualizer-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-visualizer-assets.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:toolchain": "node scripts/verify-toolchain.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -16,6 +19,9 @@
   "dependencies": {
     "@yowasp/nextpnr-ecp5": "^0.10.38-dev.709",
     "@yowasp/yosys": "^0.64.89-dev.1114",
-    "codemirror": "^6.0.2"
+    "codemirror": "^6.0.2",
+    "dompurify": "3.4.16",
+    "elkjs": "0.7.1",
+    "netlistsvg": "1.0.2"
   }
 }

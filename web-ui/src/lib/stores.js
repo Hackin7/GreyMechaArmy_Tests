@@ -55,3 +55,13 @@ endmodule
 
 export const activeFile = writable('top.v');
 export const terminalLogs = writable('');
+
+export const buildArtifacts = writable({
+  runId: 0,
+  status: 'idle',
+  sourceRevision: 0,
+  logicalJson: null,
+  mappedJson: null,
+  bitstream: null,
+  stageErrors: {}
+});
