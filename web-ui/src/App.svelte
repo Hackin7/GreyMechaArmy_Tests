@@ -6,6 +6,7 @@
     import { basicSetup, EditorView } from 'codemirror';
 
     let editorContainer;
+    let mainContainer;
     let editorView;
     let terminalContainer;
     let isSynthesizing = false;
@@ -14,6 +15,9 @@
     let nextRunId = 0;
     let sourceRevision = 0;
     let activePanel = 'terminal';
+    let panelSize = 42;
+    let resizeStart = null;
+    let isResizingPanel = false;
 
     let savedDirHandle = null;
 
@@ -59,6 +63,36 @@
 
     function selectFile(filename) {
         activeFile.set(filename);
+    }
+
+    function beginResize(event) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        const height = mainContainer?.getBoundingClientRect().height ?? 0;
+        if (!height) return;
+        resizeStart = { y: event.clientY, size: panelSize, height };
+        isResizingPanel = true;
+    }
+
+    function moveResize(event) {
+        if (!resizeStart) return;
+        const delta = ((event.clientY - resizeStart.y) / resizeStart.height) * 100;
+        panelSize = Math.min(80, Math.max(20, resizeStart.size - delta));
+    }
+
+    function endResize() {
+        resizeStart = null;
+        isResizingPanel = false;
+    }
+
+    function resizeByKeyboard(event) {
+        if (event.key === 'ArrowUp') panelSize = Math.min(80, panelSize + 2);
+        else if (event.key === 'ArrowDown') panelSize = Math.max(20, panelSize - 2);
+        else if (event.key === 'Home') panelSize = 20;
+        else if (event.key === 'End') panelSize = 80;
+        else return;
+        event.preventDefault();
     }
 
     function handleWorkerMessage(event) {
@@ -204,7 +238,7 @@
     }
 </script>
 
-<div class="layout">
+<div class:resizing={isResizingPanel} class="layout">
     <aside class="sidebar">
         <h2>Files</h2>
         <ul class="file-list">
@@ -235,9 +269,26 @@
         </div>
     </aside>
 
-    <main class="main">
+    <main class="main" bind:this={mainContainer}>
         <div class="editor" bind:this={editorContainer}></div>
-        <section class="lower-panel">
+        <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <div
+            class="resize-handle"
+            role="separator"
+            tabindex="0"
+            aria-label="Resize build panel"
+            aria-orientation="horizontal"
+            aria-valuemin="20"
+            aria-valuemax="80"
+            aria-valuenow={Math.round(panelSize)}
+            on:pointerdown={beginResize}
+            on:pointermove={moveResize}
+            on:pointerup={endResize}
+            on:pointercancel={endResize}
+            on:keydown={resizeByKeyboard}
+        ></div>
+        <section class="lower-panel" style={`flex-basis: ${panelSize}%`}>
             <nav class="panel-tabs" aria-label="Build output views">
                 <button class:active={activePanel === 'terminal'} on:click={() => (activePanel = 'terminal')}>Terminal</button>
                 <button class:active={activePanel === 'logical'} disabled={!$buildArtifacts.logicalJson} on:click={() => (activePanel = 'logical')}>Logical Netlist</button>
@@ -286,9 +337,14 @@
     .instructions p { margin: 7px 0 0; color: #858585; }
     .outdated { margin: 0 0 10px; padding: 8px; color: #ffd28a; background: #493b23; border-radius: 4px; font-size: 12px; }
     .main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
-    .editor { flex: 1 1 55%; min-height: 180px; overflow: hidden; }
+    .editor { flex: 1 1 0; min-height: 120px; overflow: hidden; }
     :global(.cm-editor) { height: 100%; }
-    .lower-panel { display: flex; flex: 1 1 45%; flex-direction: column; min-height: 180px; border-top: 1px solid #333; }
+    .resize-handle { z-index: 1; flex: 0 0 8px; position: relative; cursor: row-resize; touch-action: none; background: #252526; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+    .resize-handle::after { content: ''; position: absolute; width: 34px; height: 2px; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #666; border-radius: 2px; }
+    .resize-handle:hover::after, .resize-handle:focus-visible::after { width: 48px; background: #4fc1ff; }
+    .resize-handle:focus-visible { outline: 1px solid #4fc1ff; outline-offset: -1px; }
+    .layout.resizing { user-select: none; cursor: row-resize; }
+    .lower-panel { display: flex; flex: 0 0 auto; flex-direction: column; min-height: 120px; border-top: 1px solid #333; }
     .panel-tabs { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; min-height: 39px; padding: 4px 8px; background: #252526; }
     .panel-tabs button { padding: 7px 10px; color: #bbb; background: transparent; border-radius: 3px; font-size: 12px; }
     .panel-tabs button.active { color: #fff; background: #3b3b3b; }
