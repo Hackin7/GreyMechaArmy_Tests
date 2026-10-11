@@ -1,5 +1,5 @@
 // GBA board adaptation of ../arduboy/rtl/fast_oled/oled_init.v.
-// Same panel commands and SPI engine; compact distributed ROM and clock-scaled delays.
+// Same panel commands and SPI engine; synchronous block ROM and clock-scaled delays.
 // oled_init.v — GC9A01 init ROM walk + window setup + per-frame RAMWR.
 // Uses the proven simple_spi_master.v as the SPI driver (the inline byte
 // shifter we tried before had a hidden bug — confirmed empirically).
@@ -22,6 +22,8 @@ module gba_oled_init #(
 
     localparam integer RST_LO_CYCLES = CLK_HZ / 500;        // ~2 ms
     localparam integer WAIT10_CYCLES = (CLK_HZ / 1000) * 10;
+    localparam integer TIMER_MAX = RST_LO_CYCLES > WAIT10_CYCLES ? RST_LO_CYCLES : WAIT10_CYCLES;
+    localparam integer TIMER_BITS = TIMER_MAX > 0 ? $clog2(TIMER_MAX + 1) : 1;
 
     function automatic [7:0] win_byte(input integer k);
         case (k)
@@ -92,7 +94,7 @@ module gba_oled_init #(
     localparam [3:0] S_REARM_WAIT    = 4'd11;
 
     reg [3:0]  st;
-    reg [31:0] timer;
+    reg [TIMER_BITS-1:0] timer;
     reg [7:0]  init_idx;     // 0..181; 8 bits keeps the increment carry
                              // chain short (was 16 bits, the f_max bottleneck).
     reg [23:0] pause_cnt;
@@ -105,8 +107,8 @@ module gba_oled_init #(
     reg        rom_pause_nz_r;     // pre-registered (rom_pause_r != 0) to break the wide compare out of the critical path
     reg        pause_cnt_nz_r;     // same for the in-pause decrement check
     always @(posedge clk) begin
-        rom_byte_r     <= gc9a01_init_byte(init_idx);
-        rom_dc_r       <= gc9a01_init_is_data(init_idx);
+        rom_byte_r     <= panel_init_rom[init_idx][7:0];
+        rom_dc_r       <= panel_init_rom[init_idx][8];
         rom_pause_r    <= gc9a01_init_pause(init_idx);
         rom_pause_nz_r <= (gc9a01_init_pause(init_idx) != 24'd0);
         pause_cnt_nz_r <= (pause_cnt != 24'd0);
@@ -155,6 +157,9 @@ module gba_oled_init #(
                 S_INIT_FETCH: st <= S_INIT_ISSUE;
                 S_INIT_ISSUE: begin
                     if (!spi_busy) begin
+                        // synthesis translate_off
+                        if (init_idx >= GC9A01_INIT_LEN) $fatal(1,"Panel init ROM index out of range");
+                        // synthesis translate_on
                         spi_tx_data <= rom_byte_r;
                         spi_dc_in   <= rom_dc_r;
                         spi_keep_cs <= 1'b0;

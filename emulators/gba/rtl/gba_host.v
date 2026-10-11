@@ -17,7 +17,10 @@ module gba_host(
 );
     reg [3:0] state,exec_state;
     reg [7:0] opcode,seq,crc_low,active_op,active_seq;
-    reg [31:0] address,exec_address,remaining;
+    reg [31:0] address;
+    reg [22:0] exec_address;
+    // A validated fill can cover all 8 MiB, including the 0x800000 count.
+    reg [23:0] remaining;
     reg [23:0] packet_timeout;
     reg [8:0] length,count,index,read_length,response_length,response_index;
     reg [15:0] crc;
@@ -83,8 +86,8 @@ module gba_host(
                     end
                     exec_address<=exec_address+4;
                     index<=index+(active_op==8'h15 ? 9'd1:9'd4);
-                    remaining<=remaining-(active_op==8'h15 ? 32'd1:32'd4);
-                    if(remaining==(active_op==8'h15 ? 32'd1:32'd4)) begin exec_state<=0;last_sequence<=active_seq;end
+                    remaining<=remaining-(active_op==8'h15 ? 24'd1:24'd4);
+                    if(remaining==(active_op==8'h15 ? 24'd1:24'd4)) begin exec_state<=0;last_sequence<=active_seq;end
                     else exec_state<=1;
                 end
             endcase
@@ -122,17 +125,17 @@ module gba_host(
                             4: pause<=1;
                             5: pause<=0;
                             6: if(length==3) begin inject_enable<=params[0][0];injected<={params[2][1:0],params[1]};end else error<=5;
-                            8'h10: if(length!=0&&length[1:0]==0&&address[31:23]==0&&address[1:0]==0&&address+length<=32'h800000&&(!run||pause)) begin
-                                exec_address<=address;remaining<={23'd0,length};index<=0;exec_state<=1;last_sequence<=last_sequence;
+                            8'h10: if(length!=0&&length[1:0]==0&&address[31:23]==0&&address[1:0]==0&&{1'b0,address[22:0]}+{15'd0,length}<=24'h800000&&(!run||pause)) begin
+                                exec_address<=address[22:0];remaining<={15'd0,length};index<=0;exec_state<=1;last_sequence<=last_sequence;
                             end else error<=5;
                             8'h12,8'h15: if(length==2&&{params[1],params[0]}!=0&&{params[1],params[0]}<=256&&(!run||pause)) begin
                                 exec_address<=opcode==8'h15 ? 32'h80000+(address<<2):address;
-                                remaining<={16'd0,params[1],params[0]};read_length<={params[1][0],params[0]};index<=0;exec_state<=1;last_sequence<=last_sequence;
-                                if(opcode==8'h12&&(address[31:23]!=0||address[1:0]!=0||params[0][1:0]!=0||address+{params[1],params[0]}>32'h800000)) begin exec_state<=0;error<=5;end
-                                if(opcode==8'h15&&(address>=32'h20000||address+{params[1],params[0]}>32'h20000)) begin exec_state<=0;error<=5;end
+                                remaining<={8'd0,params[1],params[0]};read_length<={params[1][0],params[0]};index<=0;exec_state<=1;last_sequence<=last_sequence;
+                                if(opcode==8'h12&&(address[31:23]!=0||address[1:0]!=0||params[0][1:0]!=0||{1'b0,address[22:0]}+{15'd0,params[1][0],params[0]}>24'h800000)) begin exec_state<=0;error<=5;end
+                                if(opcode==8'h15&&(address>=32'h20000||{1'b0,address[16:0]}+{9'd0,params[1][0],params[0]}>18'h20000)) begin exec_state<=0;error<=5;end
                             end else error<=5;
-                            8'h14: if(length==5&&address[31:23]==0&&address[1:0]==0&&params[0][1:0]==0&&{params[3],params[2],params[1],params[0]}!=0&&{params[3],params[2],params[1],params[0]}<=32'h800000&&address+{params[3],params[2],params[1],params[0]}<=32'h800000&&(!run||pause)) begin
-                                exec_address<=address;remaining<={params[3],params[2],params[1],params[0]};index<=0;exec_state<=1;last_sequence<=last_sequence;
+                            8'h14: if(length==5&&address[31:23]==0&&address[1:0]==0&&params[0][1:0]==0&&{params[3],params[2],params[1],params[0]}!=0&&{params[3],params[2],params[1],params[0]}<=32'h800000&&{1'b0,address[22:0]}+{params[2],params[1],params[0]}<=24'h800000&&(!run||pause)) begin
+                                exec_address<=address[22:0];remaining<={params[2],params[1],params[0]};index<=0;exec_state<=1;last_sequence<=last_sequence;
                             end else error<=5;
                             default: error<=7;
                         endcase

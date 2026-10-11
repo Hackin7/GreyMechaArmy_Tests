@@ -10,7 +10,7 @@ module tb_gba_board_core;
     gba_core_wrapper dut(.clk_100(clk),.reset_n(reset_n),.pause(pause),.video_ready(1'b1),
         .key_a(keys[0]),.key_b(keys[1]),.key_select(keys[2]),.key_start(keys[3]),
         .key_right(keys[4]),.key_left(keys[5]),.key_up(keys[6]),.key_down(keys[7]),.key_r(keys[8]),.key_l(keys[9]),
-        .max_rom_addr(25'd4095),.flash_1m(1'b0),.rom_read(rr),.rom_addr(ra),.rom_done(rd),
+        .max_rom_addr(25'd16383),.flash_1m(1'b0),.rom_read(rr),.rom_addr(ra),.rom_done(rd),
         .rom_data(rdata),.rom_second_data(second),.ext_write_data(wd),.ext_read_data(edata),
         .ext_addr(ea),.ext_read_not_write(rnw),.ext_request(er),.ext_done(ed),
         .vram_request(vr),.vram_read(vread),.vram_addr(va),.vram_wdata(vw),.vram_be(vbe),
@@ -58,12 +58,13 @@ module tb_gba_board_core;
         end
         repeat(100)@(negedge clk);reset_n=1;
         wait(ram[18'h20010][7:0]==8'h0d&&ram[18'h20013][7:0]==8'h60);
-        if(ram[18'h2000c][7:0]!=255||ram[18'h2000d][7:0]!=3)
-            $fatal(1,"Diagnostic checks failed flags=%h:%h arithmetic case=%h shifter case=%h",ram[18'h2000d],ram[18'h2000c],ram[18'h20024],ram[18'h20028]);
+        if(ram[18'h2000c][7:0]!=255||ram[18'h2000d][7:0]!=7)
+            $fatal(1,"Diagnostic checks failed flags=%h:%h arithmetic case=%h shifter case=%h bank case=%h",ram[18'h2000d],ram[18'h2000c],ram[18'h20024],ram[18'h20028],ram[18'h2002c]);
+        if(dut.unused32e[12]) $fatal(1,"CPU general register write ports overlapped");
         wait(frames>=1);pause=1;repeat(1000)@(negedge clk);frozen=pc;repeat(1000)@(negedge clk);
         if(pc!==frozen)$fatal(1,"Pause changed PC");keys=10'h301;pause=0;
         wait(ram[18'h20014][7:0]==1&&ram[18'h20015][7:0]==3);
-        $display("PASS board core: BIOS boot, ROM pair prefetch, EWRAM/IWRAM/VRAM subword writes/mirroring, ignored OBJ byte writes, ARM arithmetic/shift flags, SRAM report, PPU, pause, KEYINPUT");$finish;
+        $display("PASS board core: BIOS boot, ROM pair prefetch, EWRAM/IWRAM/VRAM subword writes/mirroring, ignored OBJ byte writes, ARM arithmetic/shift flags, all register banks/SPSRs/user transfers, SRAM report, PPU, pause, KEYINPUT");$finish;
     end
     initial begin #3000000000;$fatal(1,"Core timeout pc=%h frames=%d report=%h",pc,frames,ram[18'h20010]);end
 endmodule

@@ -38,7 +38,7 @@ def split_args(s):
     return out + [s[start:].strip()]
 
 
-def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False):
+def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False, banked_registers=False, obj_window=False):
     files = list(src.glob('*.vhd'))
     filenames = {p.stem.lower(): p.name for p in files}
     sources = {p.stem.lower(): p.read_text() for p in files}
@@ -60,6 +60,12 @@ def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=
         from block_obj_metadata import block_obj_metadata, wait_obj_metadata
         sources['gba_drawer_obj'] = block_obj_metadata(sources['gba_drawer_obj'])
         sources['gba_gpu_drawer'] = wait_obj_metadata(sources['gba_gpu_drawer'])
+    if banked_registers:
+        from bank_cpu_registers import bank_cpu_registers
+        sources['gba_cpu'] = bank_cpu_registers(sources['gba_cpu'])
+    if obj_window:
+        from block_obj_window import block_obj_window
+        sources['gba_gpu_drawer'] = block_obj_window(sources['gba_gpu_drawer'])
     ports, buses = {}, {}
     for name, s in sources.items():
         ent = re.search(r'entity\s+\w+\s+is.*?port\s*\(', s, re.I | re.S)
@@ -183,5 +189,7 @@ if __name__ == '__main__':
     ap.add_argument('--shared-dma-arithmetic', action='store_true')
     ap.add_argument('--shared-cpu-arithmetic', action='store_true')
     ap.add_argument('--obj-metadata-ram', action='store_true')
+    ap.add_argument('--banked-register-ram', action='store_true')
+    ap.add_argument('--obj-window-ram', action='store_true')
     args = ap.parse_args()
-    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram)
+    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram, args.banked_register_ram, args.obj_window_ram)

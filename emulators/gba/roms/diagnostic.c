@@ -102,6 +102,8 @@ static unsigned shifter_check(void) {
     return 0;
 }
 
+extern unsigned banked_register_check(void);
+
 void diagnostic(void) {
     static const char signature[]="GBADIAG1";
     static const u16 bars[]={0x001f,0x03e0,0x7c00,0x03ff,0x7fe0,0x7c1f,0x7fff,0};
@@ -135,6 +137,9 @@ void diagnostic(void) {
     unsigned shifter_error=shifter_check();
     save32(40,shifter_error);
     if(!shifter_error) passed|=512;
+    unsigned banking_error=banked_register_check();
+    save32(44,banking_error);
+    if(!banking_error) passed|=1024;
     save32(12,passed);
     for(unsigned y=0;y<160;y++)
         for(unsigned x=0;x<240;x++) VIDEO[y*240+x]=bars[x/30];

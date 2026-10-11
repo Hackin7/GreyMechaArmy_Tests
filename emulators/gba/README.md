@@ -7,16 +7,19 @@ Hardware acceptance is pending; simulation passes alone do not establish a
 working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
-The latest area build on 2026-10-12 uses 40/56 block RAMs, 27/28 DSPs
-and 29,311/24,288 logic sites, down from the initial 40,436 sites. It therefore
+The latest measured area build on 2026-10-12 uses 42/56 block RAMs, 27/28 DSPs
+and 24,427/24,288 logic sites, down from the initial 40,436 sites. It therefore
 **does not fit yet**. The board shares DMA address adders and the CPU's
 ADD/ADC/SUB/SBC datapath and ARM barrel shifter. Their arithmetic behavior
 is exhaustively proved with Yosys SAT; the diagnostic also checks carry, borrow and
 overflow flags after booting the open BIOS. Sprite priority/coverage
-metadata now uses two block RAMs. This resource report predates the register
-ROR carry correction described below; the corrected build remains to be
-measured. Mapping without carry cells or wide LUTs reduces the same design
-to 28,766 logic sites but still fails placement on the 25K device.
+metadata now uses two block RAMs. The ARM general registers use distributed
+RAM with native bank selection instead of copying banks through flip-flops.
+The area mapping uses ABC's area objective without carry cells or wide LUTs.
+This includes the object-window RAM and block-RAM panel command ROM.
+Host transfer counters and bounds arithmetic now use the validated 8 MiB
+range; exhaustive SAT checks preserve the original packet validation and
+legal counter updates. Their combined resource measurement is pending.
 No GBA bitstream has been programmed on the board.
 
 Run the build commands in WSL from this directory. Required tools are GHDL,
@@ -35,7 +38,7 @@ make bit                 # Synthesis and place/route for the actual 25K FPGA
 
 `make verilog` retains the original experimental resolved-record conversion.
 The hardware path uses `tools/prepare_rtl.py` to lower those buses into explicit
-OR trees. It keeps the original CPU, DMA, timers, interrupt logic, audio
+OR trees. It retains ARM instruction execution, DMA, timers, interrupt logic, audio
 registers, all rendering modes, sprites, windows and compositor. The board
 serializes the four text-background engines and two affine-background engines,
 waiting at HBlank for rendering to finish. The wrapper disables savestates;
@@ -51,6 +54,8 @@ video clients share PSRAM with round-robin arbitration.
 The cartridge cache is 64 entries; cache, OAM, palettes and sprite
 priority/coverage metadata use block RAM. Sprite metadata clears one entry
 per clock between scanlines; the next line waits for the clear to finish.
+The object-window buffer also clears sequentially between lines and retains
+its original registered read latency.
 The renderer matches the original for 17,280 pixels with both on-chip and
 variable-latency external low VRAM, covering all six modes, layers, sprites,
 transforms, windows, mosaic and blending.
@@ -75,15 +80,18 @@ source pins, license and binary hash accompany the generated open BIOS.
 The default build omits its splash animation while retaining initialization
 and SWI implementations; `tools/build_bios.py --boot-logo` restores the splash.
 The diagnostic reports its checks and KEYINPUT values through SRAM.
-Its ten check flags must total `0x3ff`: EWRAM, IWRAM, their mirrors, SRAM,
+Its eleven check flags must total `0x7ff`: EWRAM, IWRAM, their mirrors, SRAM,
 lower VRAM, upper VRAM, ignored byte stores into sprite VRAM and ARM
-arithmetic flags and ARM shifts. VRAM checks include duplicated byte stores, halfword
+arithmetic flags, ARM shifts and register banking. VRAM checks include duplicated byte stores, halfword
 writes and mirrored reads. Fourteen boundary cases exercise ADDS, ADCS,
 SUBS and SBCS with NZCV readback. The word at report offset 36 identifies
 the first failed arithmetic case, or is zero when all cases pass. Another
 66 fixed vectors check LSL, LSR, ASR, ROR and RRX, including zero and amounts
 at and above 32 with both carry inputs. Offset 40 identifies their first
 failed case, or is zero when all pass.
+Offset 44 identifies the first failed banking case. The diagnostic executes
+mode changes through all six physical ARM banks, checks each saved status
+register, and exercises user-bank STM/LDM transfers while in FIQ mode.
 The current generated board core passes the open BIOS and this complete
 diagnostic in Verilator, including pause, KEYINPUT and frame output. This
 checks guest behavior with a variable-latency PSRAM model; physical SPI

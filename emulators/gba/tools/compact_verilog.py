@@ -51,6 +51,9 @@ def compact(source, folder, board_memory=False):
                                r'  (* ram_style = "block" *) \1', result)
         if count != 2:
             raise ValueError('Expected two sprite metadata RAM declarations')
+        # Optional object-window RAM uses the same registered read latency.
+        result = re.sub(r'(?m)^(  reg linebuffer_objwindow\[\d+:\d+\][^\n]*)',
+                        r'  (* ram_style = "block" *) \1', result)
     print('Compacted %d zero-initialized RAMs' % replaced)
     return result
 

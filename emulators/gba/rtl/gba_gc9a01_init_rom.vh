@@ -1,6 +1,6 @@
 // Commands copied from the proven Arduboy GC9A01 initializer.
 localparam integer GC9A01_INIT_LEN = 182;
-(* ram_style = "logic", rom_style = "logic" *) reg [8:0] panel_init_rom [0:181];
+(* ram_style = "block", rom_style = "block" *) reg [8:0] panel_init_rom [0:181];
 initial begin
 panel_init_rom[0] = 9'h0ef;
 panel_init_rom[1] = 9'h0eb;
