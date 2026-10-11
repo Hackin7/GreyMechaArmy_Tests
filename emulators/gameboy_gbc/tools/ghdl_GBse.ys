@@ -1,0 +1,2 @@
+ghdl --std=08 vendor/Gameboy_MiSTer/rtl/bus_savestates.vhd vendor/Gameboy_MiSTer/rtl/reg_savestates.vhd vendor/Gameboy_MiSTer/rtl/T80/T80_Pack.vhd vendor/Gameboy_MiSTer/rtl/T80/T80_Reg.vhd vendor/Gameboy_MiSTer/rtl/T80/T80_MCode.vhd vendor/Gameboy_MiSTer/rtl/T80/T80_ALU.vhd vendor/Gameboy_MiSTer/rtl/T80/T80.vhd vendor/Gameboy_MiSTer/rtl/T80/GBse.vhd -e GBse
+write_verilog -noattr build/generated/GBse.v

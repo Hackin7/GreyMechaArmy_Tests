@@ -1,0 +1,2 @@
+ghdl --std=08 vendor/Gameboy_MiSTer/rtl/bus_savestates.vhd vendor/Gameboy_MiSTer/rtl/reg_savestates.vhd vendor/Gameboy_MiSTer/rtl/gbc_snd.vhd -e gbc_snd
+write_verilog -noattr build/generated/gbc_snd.v

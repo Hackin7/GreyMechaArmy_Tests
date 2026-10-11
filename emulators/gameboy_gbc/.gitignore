@@ -1,0 +1,14 @@
+/build/
+*.bit
+*.svf
+*.json
+*.config
+*.vcd
+*.fst
+__pycache__/
+*.pyc
+/games/*
+!/games/game.gb
+installed_rom_header.bin
+installed_rom.txt
+

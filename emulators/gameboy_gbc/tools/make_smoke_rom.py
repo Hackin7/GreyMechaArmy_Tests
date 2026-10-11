@@ -1,0 +1,59 @@
+"""Create a legal, self-authored 32 KiB DMG display smoke ROM."""
+
+from pathlib import Path
+import sys
+
+LOGO = bytes((
+    0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83,
+    0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+    0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63,
+    0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
+))
+
+
+def build():
+    rom = bytearray(32768)
+    rom[0x100:0x104] = bytes((0xC3, 0x50, 0x01, 0x00))  # JP $0150
+    rom[0x104:0x134] = LOGO
+    rom[0x134:0x144] = b"GMGB SMOKE\0\0\0\0\0\0"
+    # Exercise the CGB boot path used by the badge integration. The program
+    # itself uses only DMG-compatible registers and pixels.
+    rom[0x143] = 0x80  # CGB-compatible
+    rom[0x147:0x14A] = bytes((0x00, 0x00, 0x00))  # ROM-only, 32 KiB, no RAM
+    checksum = 0
+    for value in rom[0x134:0x14D]:
+        checksum = (checksum - value - 1) & 0xFF
+    rom[0x14D] = checksum
+    global_sum = (sum(rom[:0x14E]) + sum(rom[0x150:])) & 0xFFFF
+    rom[0x14E] = (global_sum >> 8) & 0xFF
+    rom[0x14F] = global_sum & 0xFF
+
+    # Disable LCD, define an eight-line vertical-stripe tile, fill BG map,
+    # restore the LCD, then loop forever.
+    program = bytes((
+        0xF3,                    # DI
+        0x31, 0xFE, 0xFF,        # LD SP,$FFFE
+        0xAF, 0xE0, 0x40,        # XOR A; LDH ($40),A
+        0x21, 0x00, 0x80,        # LD HL,$8000
+        0x06, 0x08,              # LD B,8
+        0x3E, 0xFF, 0x22,        # LD A,$FF; LD (HL+),A
+        0xAF, 0x22, 0x05,        # XOR A; LD (HL+),A; DEC B
+        0x20, 0xF8,              # JR NZ,$015D
+        0x21, 0x00, 0x98,        # LD HL,$9800
+        0x06, 0x04,              # LD B,4
+        0x0E, 0x00,              # LD C,0 (256 iterations)
+        0xAF, 0x22, 0x0D,        # XOR A; LD (HL+),A; DEC C
+        0x20, 0xFB,              # JR NZ,$016C
+        0x05, 0x20, 0xF6,        # DEC B; JR NZ,$016A
+        0x3E, 0xE4, 0xE0, 0x47,  # LD A,$E4; LDH ($47),A
+        0x3E, 0x91, 0xE0, 0x40,  # LD A,$91; LDH ($40),A
+        0x18, 0xFE,              # JR $017C
+    ))
+    rom[0x150:0x150 + len(program)] = program
+    return rom
+
+
+if __name__ == "__main__":
+    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("build/smoke.gb")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(build())
