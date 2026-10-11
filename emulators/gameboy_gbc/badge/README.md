@@ -15,7 +15,7 @@ Copy the files to these destinations:
 | `badge/protocol.py` | `/apps/gameboy_gbc/protocol.py` |
 | `badge/install_status.py` | `/apps/gameboy_gbc/install_status.py` |
 | `badge/hardware/fpga/*.py` | `/hardware/fpga/` (merge into existing hardware package) |
-| ROM to install | `/apps/gameboy_gbc/games/game.gbc` |
+| ROM to install | `/apps/gameboy_gbc/games/game.gb` |
 | generated `build/gameboy_gbc_flash.bit` | `/apps/gameboy_gbc/gameboy_gbc_flash.bit` |
 
 The bitstream remains a generated artifact and is not committed.
@@ -66,7 +66,7 @@ From the Thonny REPL:
 import sys
 sys.path.append("/apps/gameboy_gbc")
 import main
-main.install_rom("/apps/gameboy_gbc/games/game.gbc")
+main.install_rom("/apps/gameboy_gbc/games/game.gb")
 main.app()
 ```
 
@@ -87,7 +87,7 @@ The CircuitPython-backed cache remains available with:
 
 ```python
 main.app(flash_mode=False, cache_mode=True,
-         rom_path="/apps/gameboy_gbc/games/game.gbc")
+         rom_path="/apps/gameboy_gbc/games/game.gb")
 ```
 
 The BRAM bitstream remains available with `flash_mode=False,
