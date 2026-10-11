@@ -1,0 +1,17 @@
+# Downloaded tools and generated simulation output.
+/.tools/
+/build/
+__pycache__/
+*.py[cod]
+*.log
+*.vcd
+*.fst
+*.vvp
+/debug_gbasim*.txt
+
+# Required source configuration and fixtures covered by parent ignore rules.
+!*.json
+!*.config
+!/sim/smoke_bios.hex
+!/vendor/openfpga-GBA/pkg/Platforms/_images/gba.bin
+!/vendor/openfpga-GBA/pkg/Cores/mincer_ray.GBA/icon.bin
