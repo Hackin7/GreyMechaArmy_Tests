@@ -26,13 +26,20 @@ module gba_host(
     reg [15:0] crc;
     reg [7:0] params[0:4],status_buffer[0:31];
     wire [31:0] payload_word;
+    // Keep word zero prefetched while receiving a packet. On completion of
+    // each PSRAM word, fetch the next word for the following issue cycle.
+    wire [5:0] payload_read_index=exec_state==0 ? 6'd0 :
+        index[7:2]+((exec_state==2 && mem_done) ? 6'd1 : 6'd0);
     genvar payload_lane;
     generate for(payload_lane=0;payload_lane<4;payload_lane=payload_lane+1) begin: payload_bytes
-        reg [7:0] bank[0:63];
-        always @(posedge clk)
+        (* ram_style="block" *) reg [7:0] bank[0:63];
+        reg [7:0] selected;
+        always @(posedge clk) begin
             if(!reset && rx_valid && state==10 && !busy && count[1:0]==payload_lane)
                 bank[count[7:2]]<=rx_data;
-        assign payload_word[payload_lane*8 +: 8]=bank[index[7:2]];
+            selected<=bank[payload_read_index];
+        end
+        assign payload_word[payload_lane*8 +: 8]=selected;
     end endgenerate
     reg [31:0] read_buffer[0:63];
     integer lane;

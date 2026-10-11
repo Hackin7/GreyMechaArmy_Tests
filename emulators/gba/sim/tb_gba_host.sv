@@ -61,6 +61,14 @@ module tb_gba_host;
         payload[0]=64;payload[1]=0;packet(8'h15,6,0,2,0);wait_seq(6);
         packet(8'h21,0,0,0,0);response(64);
         for(i=0;i<64;i=i+1)if(reply[i]!==i[7:0])$fatal(1,"Save byte packing %d",i);
+        for(i=0;i<256;i=i+1)payload[i]=i^8'ha5;
+        packet(8'h10,7,32'h123400,256,0);wait_seq(7);
+        payload[0]=0;payload[1]=1;packet(8'h12,8,32'h123400,2,0);wait_seq(8);
+        packet(8'h21,0,0,0,0);response(256);
+        for(i=0;i<256;i=i+1)if(reply[i] !== (i^8'ha5))$fatal(1,"Full payload readback %d",i);
+        for(i=0;i<4;i=i+1)payload[i]=i+1;
+        packet(8'h10,9,32'h7ffffc,4,0);wait_seq(9);
+        for(i=0;i<4;i=i+1)if(model.memory[32'h7ffffc+i]!==i+1)$fatal(1,"Short packet after full payload %d",i);
         if(fault)$fatal(1,"RAM arbitration fault");
         $display("PASS host: SPI framing, CRC, status during fill, upper-address PSRAM read/write, bounds");$finish;
     end

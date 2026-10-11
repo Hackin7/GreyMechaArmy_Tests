@@ -7,8 +7,8 @@ Hardware acceptance is pending; simulation passes alone do not establish a
 working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
-The latest mapped build on 2026-10-12 uses 43/56 block RAMs, 27/28 DSPs
-and 24,107/24,288 logic sites, down from the initial 40,436 sites. It is
+The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 27/28 DSPs
+and 23,887/24,288 logic sites, down from the initial 40,436 sites. It is
 within the resource budget; final routing and timing are pending.
 The board shares DMA address adders and the CPU's
 ADD/ADC/SUB/SBC datapath and ARM barrel shifter. Their arithmetic behavior
@@ -24,6 +24,11 @@ Host transfer counters and bounds arithmetic now use the validated 8 MiB
 range; exhaustive SAT checks preserve the original packet validation and
 legal counter updates. Sprite line settings also use block RAM, retaining
 their original registered read latency.
+The host's 256-byte write payload uses four block RAM byte banks instead
+of distributed RAM. Word zero is prefetched during packet reception and
+each subsequent word at PSRAM completion, preserving the issue cadence.
+SPI/CRC tests cover full payloads followed by short packets and upper-address
+readback. This change saves 220 logic sites in the complete mapped design.
 The 100 MHz core target placed but its estimated maximum was about 32 MHz.
 The board now targets a nominal 20 MHz core with unchanged 80 MHz panel
 and 50 MHz flash clocks. The internal oscillator makes these approximately
