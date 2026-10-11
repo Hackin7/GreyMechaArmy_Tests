@@ -161,10 +161,13 @@ def main():
             report = console.save(0, 64 if args.action == 'diagnostic' else 32)
             if args.action == 'diagnostic' and report[:8] == b'GBADIAG1':
                 version, passed, done, keys, counter = struct.unpack_from('<5I', report, 8)
-                log['diagnostic'] = dict(version=version, passed=passed, done=done, keys=keys, counter=counter)
+                arithmetic_error, shifter_error = struct.unpack_from('<2I', report, 36)
+                log['diagnostic'] = dict(version=version, passed=passed, done=done, keys=keys,
+                                         counter=counter, arithmetic_error=arithmetic_error,
+                                         shifter_error=shifter_error)
                 if done == 0x600d600d:
-                    if passed != 255:
-                        raise RuntimeError('Diagnostic memory checks failed: ' + repr(log['diagnostic']))
+                    if passed != 1023:
+                        raise RuntimeError('Diagnostic checks failed: ' + repr(log['diagnostic']))
                     for mask in (1,2,4,8,16,32,64,128,256,512,0x300,0):
                         console.execute('_gba_host.keys(%d)\n' % mask)
                         time.sleep(0.5)

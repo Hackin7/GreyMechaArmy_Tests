@@ -20,6 +20,88 @@ static unsigned ram_check(volatile u32 *p) {
     return 1;
 }
 
+// Check the executed ARM instructions and the following MRS, including the
+// pipeline that carries their flags. Expected values are fixed test vectors.
+#define ALU_TEST(name, opcode) \
+static unsigned name(u32 a,u32 b,u32 carry,u32 expected,u32 nzcv) { \
+    u32 result,flags; \
+    __asm__ volatile("msr cpsr_f,%2\n\t" opcode " %0,%3,%4\n\tmrs %1,cpsr" \
+        : "=&r"(result),"=&r"(flags) : "r"(carry<<29),"r"(a),"r"(b) : "cc"); \
+    return result==expected&&(flags&0xf0000000u)==nzcv; \
+}
+ALU_TEST(test_add,"adds")
+ALU_TEST(test_adc,"adcs")
+ALU_TEST(test_sub,"subs")
+ALU_TEST(test_sbc,"sbcs")
+
+static unsigned arithmetic_check(void) {
+    if(!test_add(0xffffffff,1,0,0,0x60000000)) return 1;
+    if(!test_add(0x7fffffff,1,0,0x80000000,0x90000000)) return 2;
+    if(!test_add(0x80000000,0x80000000,0,0,0x70000000)) return 3;
+    if(!test_adc(0xffffffff,0,1,0,0x60000000)) return 4;
+    if(!test_adc(0x7fffffff,0,1,0x80000000,0x90000000)) return 5;
+    if(!test_adc(0xffffffff,0,0,0xffffffff,0x80000000)) return 6;
+    if(!test_sub(0,1,0,0xffffffff,0x80000000)) return 7;
+    if(!test_sub(0x80000000,1,1,0x7fffffff,0x30000000)) return 8;
+    if(!test_sbc(0,0,0,0xffffffff,0x80000000)) return 9;
+    if(!test_sbc(0,0xffffffff,0,0,0x40000000)) return 10;
+    if(!test_sbc(0x80000000,0x7fffffff,0,0,0x70000000)) return 11;
+    if(!test_sbc(0xffffffff,0xffffffff,0,0xffffffff,0x80000000)) return 12;
+    if(!test_sbc(0xffffffff,0,0,0xfffffffe,0xa0000000)) return 13;
+    if(!test_sbc(0,0xffffffff,1,1,0)) return 14;
+    return 0;
+}
+
+// Fixed expected values for 0x81234567, including register amounts beyond 32.
+#define SHIFT_TEST(name, opcode) \
+static unsigned name(u32 amount,u32 carry,u32 expected,u32 nzcv) { \
+    u32 result,flags; \
+    __asm__ volatile("msr cpsr_f,%2\n\tmovs %0,%3," opcode " %4\n\tmrs %1,cpsr" \
+        : "=&r"(result),"=&r"(flags) : "r"(0x10000000u|(carry<<29)), \
+          "r"(0x81234567u),"r"(amount) : "cc"); \
+    return result==expected&&(flags&0xf0000000u)==nzcv; \
+}
+SHIFT_TEST(test_lsl,"lsl")
+SHIFT_TEST(test_lsr,"lsr")
+SHIFT_TEST(test_asr,"asr")
+SHIFT_TEST(test_ror,"ror")
+
+static unsigned shifter_check(void) {
+    static const u8 amounts[]={0,1,4,31,32,33,64,255};
+    static const struct {u32 result,flags;} cases[8][4]={
+        {{0x81234567u,0x90000000u},{0x81234567u,0x90000000u},{0x81234567u,0x90000000u},{0x81234567u,0x90000000u}}, // shift 0
+        {{0x02468aceu,0x30000000u},{0x4091a2b3u,0x30000000u},{0xc091a2b3u,0xb0000000u},{0xc091a2b3u,0xb0000000u}}, // shift 1
+        {{0x12345670u,0x10000000u},{0x08123456u,0x10000000u},{0xf8123456u,0x90000000u},{0x78123456u,0x10000000u}}, // shift 4
+        {{0x80000000u,0xb0000000u},{0x00000001u,0x10000000u},{0xffffffffu,0x90000000u},{0x02468acfu,0x10000000u}}, // shift 31
+        {{0x00000000u,0x70000000u},{0x00000000u,0x70000000u},{0xffffffffu,0xb0000000u},{0x81234567u,0xb0000000u}}, // shift 32
+        {{0x00000000u,0x50000000u},{0x00000000u,0x50000000u},{0xffffffffu,0xb0000000u},{0xc091a2b3u,0xb0000000u}}, // shift 33
+        {{0x00000000u,0x50000000u},{0x00000000u,0x50000000u},{0xffffffffu,0xb0000000u},{0x81234567u,0xb0000000u}}, // shift 64
+        {{0x00000000u,0x50000000u},{0x00000000u,0x50000000u},{0xffffffffu,0xb0000000u},{0x02468acfu,0x10000000u}}, // shift 255
+    };
+    for(unsigned i=0;i<8;i++) for(unsigned carry=0;carry<2;carry++)
+        for(unsigned mode=0;mode<4;mode++) {
+            u32 flags=cases[i][mode].flags;
+            if(!amounts[i]) flags|=carry<<29;
+            unsigned ok;
+            switch(mode) {
+                case 0: ok=test_lsl(amounts[i],carry,cases[i][mode].result,flags); break;
+                case 1: ok=test_lsr(amounts[i],carry,cases[i][mode].result,flags); break;
+                case 2: ok=test_asr(amounts[i],carry,cases[i][mode].result,flags); break;
+                default: ok=test_ror(amounts[i],carry,cases[i][mode].result,flags); break;
+            }
+            if(!ok) return 1+i*8+carry*4+mode;
+        }
+    for(unsigned carry=0;carry<2;carry++) {
+        u32 result,flags;
+        __asm__ volatile("msr cpsr_f,%2\n\tmovs %0,%3,rrx\n\tmrs %1,cpsr"
+            : "=&r"(result),"=&r"(flags) : "r"(0x10000000u|(carry<<29)),
+              "r"(0x81234567u) : "cc");
+        if(result!=(0x4091a2b3u|(carry<<31))||
+           (flags&0xf0000000u)!=(0x30000000u|(carry<<31))) return 65+carry;
+    }
+    return 0;
+}
+
 void diagnostic(void) {
     static const char signature[]="GBADIAG1";
     static const u16 bars[]={0x001f,0x03e0,0x7c00,0x03ff,0x7fe0,0x7c1f,0x7fff,0};
@@ -47,6 +129,12 @@ void diagnostic(void) {
     *object=0x55667788;
     ((volatile u8 *)object)[0]=0x99; // Byte stores into sprite VRAM are ignored.
     if(*object==0x55667788u) passed|=128;
+    unsigned arithmetic_error=arithmetic_check();
+    save32(36,arithmetic_error);
+    if(!arithmetic_error) passed|=256;
+    unsigned shifter_error=shifter_check();
+    save32(40,shifter_error);
+    if(!shifter_error) passed|=512;
     save32(12,passed);
     for(unsigned y=0;y<160;y++)
         for(unsigned x=0;x<240;x++) VIDEO[y*240+x]=bars[x/30];

@@ -1,6 +1,6 @@
 # Keep expensive GHDL output on Linux's filesystem until complete.
 BOARD_WORK ?= /tmp/greymecha_gba_board
-PORTABLE := $(BUILD)/portable
+PORTABLE ?= $(BOARD_WORK)/portable
 BOARD_VHDL := $(patsubst $(VENDOR)/%,$(PORTABLE)/%,$(GBA_VHDL))
 PYTHON ?= python3
 YOSYS ?= yosys
@@ -12,9 +12,9 @@ RAM_RTL := ../../io/fpga_psram_j1/src
 OLED_RTL := ../arduboy/rtl/fast_oled
 BOARD_RTL := rtl/top.v rtl/gba_pll.v rtl/gba_core_wrapper.sv rtl/gba_host.v rtl/gba_psram.v rtl/gba_flash.v rtl/gba_buttons.v rtl/gba_lines.v rtl/gba_display.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(GB_RTL)/gb_spi_phy.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
 
-.PHONY: portable board-core bit test-board test-flash test-renderer test-vram test-psram test-dma-arithmetic test-board-core diagnostic bios suite
+.PHONY: portable board-core bit test-board test-flash test-renderer test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-board-core diagnostic bios suite
 portable:
-	$(PYTHON) tools/prepare_rtl.py $(VENDOR) $(PORTABLE) --shared-backgrounds --no-savestates --shared-dma-arithmetic
+	$(PYTHON) tools/prepare_rtl.py $(VENDOR) $(PORTABLE) --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram
 
 board-core: portable
 	mkdir -p $(BOARD_WORK)/mem $(BOARD_WORK)/work $(GEN)
@@ -29,7 +29,7 @@ bit: board-core
 	$(NEXTPNR) --25k --package CABGA256 --speed 8 --json $(BOARD_WORK)/top.json --lpf pinout.lpf --textcfg $(BOARD_WORK)/top.config --seed 1 > $(BUILD)/board-nextpnr.log 2>&1
 	$(ECPPACK) --compress $(BOARD_WORK)/top.config $(BUILD)/gba.bit
 
-test-board: test-flash test-vram test-psram test-dma-arithmetic
+test-board: test-flash test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter
 	mkdir -p $(BUILD)
 	$(IVERILOG) -g2012 -s tb_gba_host -o $(BUILD)/host.vvp sim/tb_gba_host.sv rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v ../../io/fpga_psram_j1/sim/aps6404_model.v
 	$(VVP) $(BUILD)/host.vvp
@@ -55,6 +55,12 @@ test-psram:
 test-dma-arithmetic:
 	$(PYTHON) tools/prove_dma_arithmetic.py
 
+test-cpu-arithmetic:
+	$(PYTHON) tools/prove_cpu_arithmetic.py
+
+test-cpu-shifter:
+	$(PYTHON) tools/prove_cpu_shifter.py
+
 diagnostic:
 	mkdir -p $(BUILD)/roms
 	arm-none-eabi-gcc -mcpu=arm7tdmi -marm -O2 -ffreestanding -nostdlib -fno-builtin -T roms/diagnostic.ld roms/diagnostic_start.S roms/diagnostic.c -o $(BUILD)/roms/diagnostic.elf
@@ -74,7 +80,7 @@ test-board-core: diagnostic
 
 test-renderer: board-core
 	$(PYTHON) tools/renderer_reference.py $(VENDOR) $(BOARD_WORK)/reference
-	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_gpu_drawer_reference.vhd sim/tb_gba_renderer.vhd
+	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_drawer_obj_reference.vhd $(BOARD_WORK)/reference/gba_gpu_drawer_reference.vhd sim/tb_gba_renderer.vhd
 	$(GHDL) -r --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work tb_gba_renderer --assert-level=error --ieee-asserts=disable-at-0
 	$(GHDL) -r --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work tb_gba_renderer -gExternalMemory=true --assert-level=error --ieee-asserts=disable-at-0
 	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_savestates_reference.vhd sim/tb_gba_board_reset.vhd

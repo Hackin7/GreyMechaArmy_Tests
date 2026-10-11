@@ -58,11 +58,12 @@ module tb_gba_board_core;
         end
         repeat(100)@(negedge clk);reset_n=1;
         wait(ram[18'h20010][7:0]==8'h0d&&ram[18'h20013][7:0]==8'h60);
-        if(ram[18'h2000c][7:0]!=255)$fatal(1,"Diagnostic RAM/VRAM checks failed %h",ram[18'h2000c]);
+        if(ram[18'h2000c][7:0]!=255||ram[18'h2000d][7:0]!=3)
+            $fatal(1,"Diagnostic checks failed flags=%h:%h arithmetic case=%h shifter case=%h",ram[18'h2000d],ram[18'h2000c],ram[18'h20024],ram[18'h20028]);
         wait(frames>=1);pause=1;repeat(1000)@(negedge clk);frozen=pc;repeat(1000)@(negedge clk);
         if(pc!==frozen)$fatal(1,"Pause changed PC");keys=10'h301;pause=0;
         wait(ram[18'h20014][7:0]==1&&ram[18'h20015][7:0]==3);
-        $display("PASS board core: BIOS boot, ROM pair prefetch, EWRAM/IWRAM/VRAM subword writes/mirroring, ignored OBJ byte writes, SRAM report, PPU, pause, KEYINPUT");$finish;
+        $display("PASS board core: BIOS boot, ROM pair prefetch, EWRAM/IWRAM/VRAM subword writes/mirroring, ignored OBJ byte writes, ARM arithmetic/shift flags, SRAM report, PPU, pause, KEYINPUT");$finish;
     end
     initial begin #3000000000;$fatal(1,"Core timeout pc=%h frames=%d report=%h",pc,frames,ram[18'h20010]);end
 endmodule

@@ -38,8 +38,10 @@ def split_args(s):
     return out + [s[start:].strip()]
 
 
-def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False):
-    sources = {p.stem.lower(): p.read_text() for p in src.glob('*.vhd')}
+def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False):
+    files = list(src.glob('*.vhd'))
+    filenames = {p.stem.lower(): p.name for p in files}
+    sources = {p.stem.lower(): p.read_text() for p in files}
     if shared_backgrounds:
         from share_backgrounds import share_backgrounds
         sources['gba_gpu_drawer'] = share_backgrounds(sources['gba_gpu_drawer'])
@@ -49,6 +51,15 @@ def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=
     if shared_dma:
         from share_dma_arithmetic import share_dma_arithmetic
         sources['gba_dma_module'] = share_dma_arithmetic(sources['gba_dma_module'])
+    if shared_cpu:
+        from share_cpu_arithmetic import share_cpu_arithmetic
+        from share_cpu_shifter import share_cpu_shifter
+        sources['gba_cpu'] = share_cpu_arithmetic(sources['gba_cpu'])
+        sources['gba_cpu'] = share_cpu_shifter(sources['gba_cpu'])
+    if obj_ram:
+        from block_obj_metadata import block_obj_metadata, wait_obj_metadata
+        sources['gba_drawer_obj'] = block_obj_metadata(sources['gba_drawer_obj'])
+        sources['gba_gpu_drawer'] = wait_obj_metadata(sources['gba_gpu_drawer'])
     ports, buses = {}, {}
     for name, s in sources.items():
         ent = re.search(r'entity\s+\w+\s+is.*?port\s*\(', s, re.I | re.S)
@@ -160,7 +171,7 @@ def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=
                     assignments.append(f'  {target}.{field} <= ' + ' or '.join(d+'.'+field for d in drivers) + ';')
             s = s[:pos] + '\n' + '\n'.join(assignments) + '\n' + s[pos:]
         dst.mkdir(parents=True, exist_ok=True)
-        (dst / (name + '.vhd')).write_text(s)
+        (dst / filenames[name]).write_text(s)
 
 
 if __name__ == '__main__':
@@ -170,5 +181,7 @@ if __name__ == '__main__':
     ap.add_argument('--shared-backgrounds', action='store_true')
     ap.add_argument('--no-savestates', action='store_true')
     ap.add_argument('--shared-dma-arithmetic', action='store_true')
+    ap.add_argument('--shared-cpu-arithmetic', action='store_true')
+    ap.add_argument('--obj-metadata-ram', action='store_true')
     args = ap.parse_args()
-    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic)
+    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram)

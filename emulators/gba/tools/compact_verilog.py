@@ -45,6 +45,12 @@ def compact(source, folder, board_memory=False):
             result, count = re.subn(pattern, r'\1(* ram_style = "block" *) \2', result, flags=re.S)
             if count != 1:
                 raise ValueError('Expected one RAM declaration in ' + module)
+        # Sprite metadata now clears one entry per cycle between scanlines.
+        # GHDL splits its priority and coverage write enables into two arrays.
+        result, count = re.subn(r'(?m)^(  reg (?:\[[^\n]+?\] )?pixelarray_n\d+\[[^\n]+)',
+                               r'  (* ram_style = "block" *) \1', result)
+        if count != 2:
+            raise ValueError('Expected two sprite metadata RAM declarations')
     print('Compacted %d zero-initialized RAMs' % replaced)
     return result
 

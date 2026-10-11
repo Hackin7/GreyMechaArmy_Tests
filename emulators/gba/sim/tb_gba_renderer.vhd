@@ -179,6 +179,7 @@ gb_bus_drive => responses(1)
     end;
     variable value : unsigned(31 downto 0);
     variable timeout : natural;
+    variable attr0, attr1, attr2, affine : natural;
   begin
     bus_in.rst<='1'; step(2); bus_in.rst<='0'; step(2);
     low_we<='1'; high_we<='1';
@@ -198,11 +199,31 @@ gb_bus_drive => responses(1)
       oam_addr<=i;
       if i mod 2=0 then data<=x"00000200"; else data<=x"00000000"; end if; step;
     end loop;
-    -- Two visible sprites with different priorities, tile/palette selection.
-    oam_addr<=0; data<=x"00000000"; step;
-    oam_addr<=1; data<=x"00000402"; step;
-    oam_addr<=2; data<=x"00180000"; step;
-    oam_addr<=3; data<=x"00001804"; step; oam_we<="0000";
+    -- Overlap twelve sprites to exercise priority/coverage read-after-write,
+    -- transparent texels, affine transforms, flips, mosaic and OBJ windows.
+    for obj in 0 to 11 loop
+      attr0 := (obj*3) mod 14 + (obj mod 3)*1024;
+      attr1 := (obj*5) mod 40 + 3*16384; -- 64x64, spanning later test rows
+      if obj mod 4=0 then
+        attr0 := attr0 + 256; -- affine matrix 0
+      else
+        attr1 := attr1 + (obj mod 2)*4096 + ((obj/2) mod 2)*8192;
+      end if;
+      if obj mod 2=1 then attr0 := attr0 + 4096; end if;
+      attr2 := 16#200# + obj*4 + (obj mod 4)*1024 + (obj mod 16)*4096;
+      -- Matrix 0 occupies attr3 of objects 0..3 (dx, dmx, dy, dmy).
+      case obj is
+        when 0 | 3 => affine := 16#0100#;
+        when 1 => affine := 16#0040#;
+        when 2 => affine := 16#FFC0#;
+        when others => affine := 0;
+      end case;
+      oam_addr<=obj*2;
+      data<=std_logic_vector(to_unsigned(attr1,16)) & std_logic_vector(to_unsigned(attr0,16)); step;
+      oam_addr<=obj*2+1;
+      data<=std_logic_vector(to_unsigned(affine,16)) & std_logic_vector(to_unsigned(attr2,16)); step;
+    end loop;
+    oam_we<="0000";
     for scene in 0 to 11 loop
       vb<='1'; step; vb<='0'; step(4);
       -- Same modes with an additional mosaic/window/blend configuration.
@@ -222,7 +243,7 @@ gb_bus_drive => responses(1)
         regwrite(16#0400004C#, x"00000000"); regwrite(16#04000050#, x"00000000");
       end if;
       value:=to_unsigned(16#1F00#+scene mod 6,32);
-      if scene>=6 then value:=value or to_unsigned(16#2000#,32); end if;
+      if scene>=6 then value:=value or to_unsigned(16#E000#,32); end if;
       regwrite(16#04000000#,std_logic_vector(value));
       for i in 0 to 1 loop
         assert responses(i).Dout(15 downto 0)=std_logic_vector(value(15 downto 0))
