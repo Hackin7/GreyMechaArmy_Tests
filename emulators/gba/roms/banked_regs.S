@@ -118,6 +118,42 @@ banked_register_check:
     check sp, 0x133
     check lr, 0x144
     common
+
+    @ Ordinary multiplies must retain their accumulator/destination reads.
+    mov r2, #9
+    mov r0, #7
+    mov r1, #11
+    mov r3, #13
+    mla r7, r0, r1, r3
+    check r7, 90
+    mov r2, #10
+    ldr r7, =0xfffffff8
+    mov r6, #2
+    mov r0, #3
+    mov r1, #5
+    umlal r7, r6, r0, r1
+    check r7, 7
+    check r6, 3
+
+    @ Thumb BL consumes banked LR through the shared accumulator port.
+    mov r2, #11
+    adr r5, .Lafter_thumb
+    adr r0, .Lthumb_caller
+    orr r0, r0, #1
+    bx r0
+    .thumb
+    .align 1
+.Lthumb_caller:
+    bl .Lthumb_leaf
+    adds r7, #0x22
+    bx r5
+.Lthumb_leaf:
+    movs r7, #0x55
+    bx lr
+    .arm
+    .align 2
+.Lafter_thumb:
+    check r7, 0x77
     mov r0, #0
     b .Lbank_return
 .Lbank_fail:

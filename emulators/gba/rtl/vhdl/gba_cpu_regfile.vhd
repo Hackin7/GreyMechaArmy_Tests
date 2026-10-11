@@ -11,6 +11,7 @@ entity gba_cpu_regfile is
        write_data, pc : in unsigned(31 downto 0);
        rn, rm, rd, ra, rs, rb : in unsigned(3 downto 0);
        block_user : in std_logic;
+       dest_user : in std_logic := '0';
        data_n, data_m, data_d, data_a, data_b, data_lr : out unsigned(31 downto 0);
        data_s : out unsigned(7 downto 0));
 end;
@@ -19,7 +20,7 @@ architecture rtl of gba_cpu_regfile is
   signal ram : ram_t;
   signal valid : std_logic_vector(31 downto 0) := (others => '0');
   signal addr_n, addr_m, addr_d, addr_a, addr_b, addr_s, addr_lr, addr_write : integer range 0 to 31;
-  signal block_mode : std_logic_vector(3 downto 0);
+  signal block_mode, dest_mode : std_logic_vector(3 downto 0);
   function physical(index : unsigned(3 downto 0); mode : std_logic_vector(3 downto 0)) return integer is
     variable bank : integer range 0 to 5;
     variable reg_index : integer range 0 to 15;
@@ -41,9 +42,10 @@ architecture rtl of gba_cpu_regfile is
   end;
 begin
   block_mode <= x"0" when block_user='1' else read_mode;
+  dest_mode <= x"0" when dest_user='1' else read_mode;
   addr_n <= physical(rn,read_mode);
   addr_m <= physical(rm,read_mode);
-  addr_d <= physical(rd,read_mode);
+  addr_d <= physical(rd,dest_mode);
   addr_a <= physical(ra,read_mode);
   addr_s <= physical(rs,read_mode);
   addr_b <= physical(rb,block_mode);

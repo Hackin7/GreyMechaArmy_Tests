@@ -1,4 +1,4 @@
-FREQUENCY NET "clk_core" 105.0 MHz;
+FREQUENCY NET "clk_core" 21.0 MHz;
 FREQUENCY NET "clk_panel" 85.0 MHz;
 FREQUENCY NET "clk_flash" 53.0 MHz;
 LOCATE COMP "btn[0]" SITE "B4";

@@ -1,8 +1,11 @@
 `timescale 1ns/1ps
-module tb_gba_flash;
+module tb_gba_flash #(
+    parameter real CORE_HALF_NS=25,
+    parameter real FLASH_HALF_NS=10
+);
     reg clk=0,fast_clk=0,reset=1,request=0;
-    always #5 clk=~clk;
-    initial begin #2.3; forever #10 fast_clk=~fast_clk; end
+    always #(CORE_HALF_NS) clk=~clk;
+    initial begin #2.3; forever #(FLASH_HALF_NS) fast_clk=~fast_clk; end
     reg [24:0] address=0;
     wire done,sck,cs,mosi;reg miso=0;
     wire [31:0] data,second,misses;

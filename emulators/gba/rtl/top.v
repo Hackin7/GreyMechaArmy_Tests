@@ -32,7 +32,7 @@ module top(
     always @(posedge clk_panel or posedge core_reset) begin
         if(core_reset) lines_sync<=0;else lines_sync<={lines_sync[0],1'b1};
     end
-    gba_buttons buttons(.clk(clk_core),.reset(reset),.btn_n(btn),
+    gba_buttons #(.CLK_HZ(21000000)) buttons(.clk(clk_core),.reset(reset),.btn_n(btn),
         .grey_n(btn_grey_n),.red_n(btn_red_n),.inject_enable(inject_enable),
         .injected(injected),.keys(keys),.physical(physical),.mode_toggle(mode_toggle));
     wire [7:0] rx_data,tx_data;wire rx_valid,tx_valid,tx_ready;

@@ -56,6 +56,9 @@ class Console:
         self.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
                      "from gba_app import deferred_upload\ndeferred_upload()\n", resets=True)
         deadline = time.monotonic() + 30
+        # The badge's 6 MHz PIO loader also retires programming for 200 ms.
+        # Let cold boot/upload finish before execute() sends any Ctrl-C.
+        time.sleep(5)
         while time.monotonic() < deadline:
             time.sleep(1)
             try:
@@ -170,9 +173,13 @@ def main():
                         raise RuntimeError('Diagnostic checks failed: ' + repr(log['diagnostic']))
                     for mask in (1,2,4,8,16,32,64,128,256,512,0x300,0):
                         console.execute('_gba_host.keys(%d)\n' % mask)
-                        time.sleep(0.5)
-                        observed = struct.unpack_from('<I', console.save(20,4))[0]
-                        if observed != mask:
+                        key_deadline = time.monotonic() + 10
+                        while time.monotonic() < key_deadline:
+                            observed = struct.unpack_from('<I', console.save(20,4))[0]
+                            if observed == mask:
+                                break
+                            time.sleep(0.1)
+                        else:
                             raise RuntimeError('KEYINPUT readback mismatch %x vs %x' % (observed,mask))
                     console.execute('_gba_host.keys(None)\n')
                     log['key_injection'] = 'pass'

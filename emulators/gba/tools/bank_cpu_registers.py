@@ -39,11 +39,17 @@ def bank_cpu_registers(source):
                               block_writevalue <= reg_data_b;
                            else block_writevalue <= (others=>'0'); end if;
 ''' + source[b:]
+    # These are the pinned upstream consumers whose instruction cases permit
+    # sharing. Reject additions until their simultaneous reads are reviewed.
+    for data, count in [('reg_data_d',2),('reg_data_a',1),('reg_data_b',2),('reg_data_lr',1)]:
+        assert len(re.findall(r'\b'+data+r'\b',source))==count, data
     declarations='''
    signal reg_read_mode : std_logic_vector(3 downto 0) := x"0";
    signal reg_write_mode : std_logic_vector(3 downto 0);
    signal reg_write_index : unsigned(3 downto 0);
    signal reg_write_enable, reg_block_user : std_logic;
+   signal reg_dest_user : std_logic;
+   signal reg_dest_index,reg_acc_index : unsigned(3 downto 0);
    signal reg_write_overlap : std_logic := '0';
    signal reg_data_n,reg_data_m,reg_data_d,reg_data_a,reg_data_b,reg_data_lr : unsigned(31 downto 0);
    signal reg_data_s : unsigned(7 downto 0);
@@ -54,6 +60,17 @@ def bank_cpu_registers(source):
     logic='''
    reg_block_user <= '1' when execute_block_usermoderegs='1' and
       cpu_mode/=CPUMODE_USER and cpu_mode/=CPUMODE_SYSTEM else '0';
+   -- Block transfers never consume the normal store/multiply destination
+   -- read, and Thumb BL never consumes the multiply accumulator read.
+   reg_dest_index <= to_unsigned(block_regindex,4) when
+      execute_functions_detail=block_read or execute_functions_detail=block_write
+      else unsigned(execute_rdest);
+   reg_dest_user <= reg_block_user when
+      execute_functions_detail=block_read or execute_functions_detail=block_write else '0';
+   reg_acc_index <= to_unsigned(14,4) when execute_functions_detail=long_branch_with_link_low
+      else unsigned(execute_muladd);
+   reg_data_b <= reg_data_d;
+   reg_data_lr <= reg_data_a;
    reg_write_index <= unsigned(load_writeback_reg) when execute_writeback_load='1'
       else unsigned(writeback_reg);
    reg_write_mode <= x"0" when execute_writeback_userreg='1' else
@@ -66,11 +83,11 @@ def bank_cpu_registers(source):
       read_mode=>reg_read_mode, write_mode=>reg_write_mode,
       write_index=>reg_write_index, write_data=>calc_result, pc=>regs(15),
       rn=>unsigned(execute_Rn_op1),rm=>unsigned(execute_Rm_op2),
-      rd=>unsigned(execute_rdest),ra=>unsigned(execute_muladd),
-      rs=>unsigned(execute_shiftsettings(7 downto 4)),rb=>to_unsigned(block_regindex,4),
-      block_user=>reg_block_user, data_n=>reg_data_n,data_m=>reg_data_m,
+      rd=>reg_dest_index,ra=>reg_acc_index,
+      rs=>unsigned(execute_shiftsettings(7 downto 4)),rb=>to_unsigned(0,4),
+      block_user=>'0',dest_user=>reg_dest_user, data_n=>reg_data_n,data_m=>reg_data_m,
       data_d=>reg_data_d,data_a=>reg_data_a,data_s=>reg_data_s,
-      data_b=>reg_data_b,data_lr=>reg_data_lr);
+      data_b=>open,data_lr=>open);
    process(clk100)
    begin
       if rising_edge(clk100) then

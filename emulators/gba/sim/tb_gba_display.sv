@@ -1,6 +1,11 @@
 `timescale 1ns/1ps
-module tb_gba_display;
-    reg cc=0,pc=0,reset=1;always #5 cc=~cc;always #6.25 pc=~pc;
+module tb_gba_display #(
+    parameter real CORE_HALF_NS=25,
+    parameter real PANEL_HALF_NS=6.25
+);
+    reg cc=0,pc=0,reset=1;
+    always #(CORE_HALF_NS) cc=~cc;
+    always #(PANEL_HALF_NS) pc=~pc;
     reg we=0,mode=0;reg [7:0] x=0,y=0;reg [17:0] colour=0;
     wire ready,overflow,lr,lf,ld;wire [31:0] captured,displayed;
     wire [7:0] ln,ra;wire [15:0] data;wire initialized,sclk,mosi,dc,cs,rst;

@@ -6,7 +6,7 @@ use std.env.all;
 entity tb_gba_cpu_regfile is end;
 architecture sim of tb_gba_cpu_regfile is
   signal clk : std_logic := '0';
-  signal reset,we,user_bank : std_logic := '0';
+  signal reset,we,user_bank,dest_user : std_logic := '0';
   signal read_mode,write_mode : std_logic_vector(3 downto 0) := x"F";
   signal index,write_index : unsigned(3 downto 0) := (others=>'0');
   signal data,n,m,d,a,b,lr : unsigned(31 downto 0) := (others=>'0');
@@ -19,7 +19,7 @@ begin
   dut : entity work.gba_cpu_regfile port map(clk=>clk,reset=>reset,write_enable=>we,
     read_mode=>read_mode,write_mode=>write_mode,write_index=>write_index,
     write_data=>data,pc=>pc,rn=>index,rm=>index,rd=>index,ra=>index,rs=>index,rb=>index,
-    block_user=>user_bank,data_n=>n,data_m=>m,data_d=>d,data_a=>a,data_s=>s,data_b=>b,data_lr=>lr);
+    block_user=>user_bank,dest_user=>dest_user,data_n=>n,data_m=>m,data_d=>d,data_a=>a,data_s=>s,data_b=>b,data_lr=>lr);
   process
     type common_t is array(0 to 12) of unsigned(31 downto 0);
     type fiq_t is array(8 to 12) of unsigned(31 downto 0);
@@ -45,16 +45,18 @@ begin
       end if;
     end;
     procedure check_all is
-      variable wanted,block_wanted : unsigned(31 downto 0);
+      variable wanted,block_wanted,dest_wanted : unsigned(31 downto 0);
     begin
       for bank in modes'range loop
         read_mode<=modes(bank);
         for regnum in 0 to 15 loop
           index<=to_unsigned(regnum,4); step;
           wanted:=expected(bank,regnum);
-          assert n=wanted and m=wanted and d=wanted and a=wanted and s=wanted(7 downto 0)
+          assert n=wanted and m=wanted and a=wanted and s=wanted(7 downto 0)
             report "Register data mismatch bank=" & integer'image(bank) & " reg=" & integer'image(regnum) severity failure;
           if user_bank='1' then block_wanted:=expected(0,regnum); else block_wanted:=wanted; end if;
+          if dest_user='1' then dest_wanted:=expected(0,regnum); else dest_wanted:=wanted; end if;
+          assert d=dest_wanted report "Shared destination user bank mismatch" severity failure;
           assert b=block_wanted report "STM user bank mismatch" severity failure;
           assert lr=expected(bank,14) report "Banked LR mismatch" severity failure;
         end loop;
@@ -69,11 +71,12 @@ begin
       for regnum in 13 to 14 loop put(bank,regnum,to_unsigned(16#3000#+bank*256+regnum,32)); end loop;
     end loop;
     check_all; user_bank<='1'; check_all; user_bank<='0';
+    dest_user<='1'; check_all; dest_user<='0';
     reset<='1'; step; reset<='0';
     common:=(others=>(others=>'0')); fiq:=(others=>(others=>'0')); stacks:=(others=>(others=>(others=>'0')));
     check_all;
     put(0,5,x"FEDCBA98"); check_all;
-    report "PASS banked register RAM: all read ports, six ARM banks, user/system alias, FIQ sharing, STM user selection, warm reset";
+    report "PASS banked register RAM: all read ports, six ARM banks, user/system alias, FIQ sharing, shared destination/user selection, warm reset";
     finish;
   end process;
 end;

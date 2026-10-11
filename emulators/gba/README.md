@@ -7,19 +7,29 @@ Hardware acceptance is pending; simulation passes alone do not establish a
 working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
-The latest measured area build on 2026-10-12 uses 42/56 block RAMs, 27/28 DSPs
-and 24,427/24,288 logic sites, down from the initial 40,436 sites. It therefore
-**does not fit yet**. The board shares DMA address adders and the CPU's
+The latest mapped build on 2026-10-12 uses 43/56 block RAMs, 27/28 DSPs
+and 24,107/24,288 logic sites, down from the initial 40,436 sites. It is
+within the resource budget; final routing and timing are pending.
+The board shares DMA address adders and the CPU's
 ADD/ADC/SUB/SBC datapath and ARM barrel shifter. Their arithmetic behavior
 is exhaustively proved with Yosys SAT; the diagnostic also checks carry, borrow and
 overflow flags after booting the open BIOS. Sprite priority/coverage
 metadata now uses two block RAMs. The ARM general registers use distributed
 RAM with native bank selection instead of copying banks through flip-flops.
+Mutually exclusive instruction types share destination/block and
+accumulator/Thumb-BL read ports without adding read latency.
 The area mapping uses ABC's area objective without carry cells or wide LUTs.
 This includes the object-window RAM and block-RAM panel command ROM.
 Host transfer counters and bounds arithmetic now use the validated 8 MiB
 range; exhaustive SAT checks preserve the original packet validation and
-legal counter updates. Their combined resource measurement is pending.
+legal counter updates. Sprite line settings also use block RAM, retaining
+their original registered read latency.
+The 100 MHz core target placed but its estimated maximum was about 32 MHz.
+The board now targets a nominal 20 MHz core with unchanged 80 MHz panel
+and 50 MHz flash clocks. The internal oscillator makes these approximately
+20.67/82.67/51.67 MHz; the LPF constrains them to 21/85/53 MHz.
+Button counters use the core frequency bound. Flash and complete LCD-stream
+simulations pass at these core/panel/flash clock ratios.
 No GBA bitstream has been programmed on the board.
 
 Run the build commands in WSL from this directory. Required tools are GHDL,
@@ -92,6 +102,8 @@ failed case, or is zero when all pass.
 Offset 44 identifies the first failed banking case. The diagnostic executes
 mode changes through all six physical ARM banks, checks each saved status
 register, and exercises user-bank STM/LDM transfers while in FIQ mode.
+It also checks MLA, UMLAL with carry and Thumb BL to verify that shared
+ports retain the normal multiply operands and banked link register.
 The current generated board core passes the open BIOS and this complete
 diagnostic in Verilator, including pause, KEYINPUT and frame output. This
 checks guest behavior with a variable-latency PSRAM model; physical SPI

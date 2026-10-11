@@ -38,6 +38,7 @@ def compact(source, folder, board_memory=False):
         # External low VRAM frees EBRs for the cartridge data/tag cache, OAM
         # and palettes. Avoid spending thousands of logic sites on LUT RAM.
         modules = ('syncramdual_Brtl_Lmem_64_6', 'syncramdual_Brtl_Lmem_18_6',
+                   'syncramdual_Brtl_Lmem_3_8',
                    'syncramdualnotpow2_Brtl_Lmem_8_256',
                    'syncramdualnotpow2_Brtl_Lmem_8_128')
         for module in modules:

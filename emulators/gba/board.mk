@@ -9,6 +9,7 @@ YOSYS ?= yosys
 NEXTPNR ?= nextpnr-ecp5
 ECPPACK ?= ecppack
 CORE_SIM_ARGS ?= +FASTMEM
+FLASH_TEST_PARAMS ?=
 GB_RTL := ../gameboy_gbc/rtl
 RAM_RTL := ../../io/fpga_psram_j1/src
 OLED_RTL := ../arduboy/rtl/fast_oled
@@ -54,7 +55,7 @@ test-display:
 
 test-flash:
 	mkdir -p $(BUILD)
-	$(IVERILOG) -g2012 -s tb_gba_flash -o $(BUILD)/flash.vvp sim/tb_gba_flash.sv rtl/gba_flash.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v
+	$(IVERILOG) -g2012 $(FLASH_TEST_PARAMS) -s tb_gba_flash -o $(BUILD)/flash.vvp sim/tb_gba_flash.sv rtl/gba_flash.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v
 	$(VVP) $(BUILD)/flash.vvp
 
 test-vram:
