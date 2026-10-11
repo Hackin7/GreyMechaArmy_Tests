@@ -1,0 +1,38 @@
+# Public GreyMecha board nets: J1 and these FPGA I/O banks use +3V3.
+# Connector numbering below is KiCad pad numbering, NOT standard PMOD order.
+LOCATE COMP "btn_rst_n" SITE "C12";
+IOBUF PORT "btn_rst_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+LOCATE COMP "btn_test_n" SITE "B4";
+IOBUF PORT "btn_test_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+
+LOCATE COMP "led[0]" SITE "C3";
+LOCATE COMP "led[1]" SITE "D3";
+LOCATE COMP "led[2]" SITE "C4";
+LOCATE COMP "led[3]" SITE "D4";
+LOCATE COMP "led[4]" SITE "C5";
+LOCATE COMP "led[5]" SITE "D5";
+LOCATE COMP "led[6]" SITE "C6";
+LOCATE COMP "led[7]" SITE "D6";
+IOBUF PORT "led[*]" IO_TYPE=LVCMOS33;
+
+LOCATE COMP "host_sck" SITE "A15";
+LOCATE COMP "host_mosi" SITE "B15";
+LOCATE COMP "host_miso" SITE "B16";
+LOCATE COMP "host_cs_n" SITE "C15";
+IOBUF PORT "host_sck" IO_TYPE=LVCMOS33 PULLMODE=DOWN;
+IOBUF PORT "host_mosi" IO_TYPE=LVCMOS33;
+IOBUF PORT "host_miso" IO_TYPE=LVCMOS33;
+IOBUF PORT "host_cs_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+
+LOCATE COMP "pmod_j1[0]" SITE "A10"; # J1 pad 5: CE#
+LOCATE COMP "pmod_j1[1]" SITE "A9";  # J1 pad 7: IO0 / MOSI
+LOCATE COMP "pmod_j1[2]" SITE "A8";  # J1 pad 9: IO3
+LOCATE COMP "pmod_j1[3]" SITE "A3";  # J1 pad 11: SCLK
+LOCATE COMP "pmod_j1[4]" SITE "B10"; # J1 pad 6: IO1 / MISO
+LOCATE COMP "pmod_j1[5]" SITE "B9";  # J1 pad 8: IO2
+LOCATE COMP "pmod_j1[6]" SITE "B8";  # J1 pad 10: unused
+LOCATE COMP "pmod_j1[7]" SITE "A4";  # J1 pad 12: unused
+IOBUF PORT "pmod_j1[*]" IO_TYPE=LVCMOS33;
+IOBUF PORT "pmod_j1[4]" PULLMODE=UP; # Distinguish an undriven IO1 from valid data.
+IOBUF PORT "pmod_j1[5]" PULLMODE=UP;
+IOBUF PORT "pmod_j1[2]" PULLMODE=UP;

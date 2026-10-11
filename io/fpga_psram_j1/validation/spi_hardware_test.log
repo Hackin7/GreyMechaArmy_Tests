@@ -1,0 +1,20 @@
+UPLOAD_BEGIN
+113127 bytes uploaded in 163 ms (694 kB/s)
+UPLOAD_DONE
+ID: ['0xd', '0x5d', '0x53']
+INITIAL_STATUS: {'pass': False, 'error': False, 'address': 875859, 'data': 83, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 0}
+STRING_READBACK: b'Hello FPGA'
+BYTE_READBACK: 0x3ff [128]
+BYTE_READBACK: 0x400 [1]
+BYTE_READBACK: 0x400000 [195]
+BYTE_READBACK: 0x7fffff [90]
+FPGA_SELF_TEST: 0x0 {'pass': True, 'error': False, 'address': 255, 'data': 90, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 90}
+FPGA_SELF_TEST: 0x3f0 {'pass': True, 'error': False, 'address': 1263, 'data': 78, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 78}
+FPGA_SELF_TEST: 0x10000 {'pass': True, 'error': False, 'address': 65791, 'data': 91, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 91}
+FPGA_SELF_TEST: 0x400000 {'pass': True, 'error': False, 'address': 4194559, 'data': 26, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 26}
+FPGA_SELF_TEST: 0x7fff00 {'pass': True, 'error': False, 'address': 8388607, 'data': 218, 'ready': True, 'busy': False, 'error_code': 0, 'id_good': True, 'expected': 218}
+ADDRESS_DATA_TEST_BEGIN
+ADDRESS_DATA_TEST_PASS
+RESET_ID: ['0xd', '0x5d', '0x53']
+POST_RESET_READ_WRITE_PASS
+HARDWARE_TEST_PASS
