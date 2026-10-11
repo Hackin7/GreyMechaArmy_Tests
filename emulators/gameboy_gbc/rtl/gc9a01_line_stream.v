@@ -3,7 +3,9 @@
 // SCLK is low and the panel samples on the following rising edge.  Unlike the
 // old byte-SPI implementation, it never relies on simple_spi_master at its
 // unreliable divider-zero setting.
-module gc9a01_line_stream (
+module gc9a01_line_stream #(
+    parameter SWAP_RB = 1
+) (
     input wire clk, input wire resetn, input wire enable,
     input wire line_ready, input wire line_bank, input wire [7:0] line_number,
     output reg line_done, output reg [7:0] rd_addr, output reg rd_bank,
@@ -17,8 +19,13 @@ module gc9a01_line_stream (
     reg [3:0] bit_count;
     reg [7:0] pixel_count;
     reg phase;
+    reg prefetch_wait;
     reg clearing;
     reg [7:0] clear_line;
+    // Keep core/line-buffer pixels in logical RGB565. Match the channel
+    // correction used by the panel-proven Arduboy driver at serialization.
+    wire [15:0] panel_data = SWAP_RB
+        ? {rd_data[4:0], rd_data[10:5], rd_data[15:11]} : rd_data;
 
     always @(posedge clk) begin
         line_done  <= 1'b0;
@@ -31,6 +38,7 @@ module gc9a01_line_stream (
             bit_count <= 4'd15;
             pixel_count <= 0;
             phase     <= 0;
+            prefetch_wait <= 0;
             clearing  <= 1'b1;
             clear_line <= 0;
             sclk      <= 0;
@@ -48,6 +56,7 @@ module gc9a01_line_stream (
             bit_count <= 4'd15;
             pixel_count <= 0;
             phase     <= 0;
+            prefetch_wait <= 0;
             sclk      <= 0;
             mosi      <= 0;
             dc        <= 1;
@@ -66,19 +75,25 @@ module gc9a01_line_stream (
                         // The first line owns CS; later lines retain it so
                         // RAMWR remains one continuous pixel transaction.
                         cs_n <= 1'b0;
+                        prefetch_wait <= 1'b1;
                         state <= PREFETCH;
                     end
                 end
                 PREFETCH: begin
                     // gb_line_capture has a synchronous panel-side read.
-                    // Give it one complete panel clock before latching.
-                    shift     <= clearing ? 16'hFFFF : rd_data;
-                    mosi      <= clearing ? 1'b1 : rd_data[15];
-                    bit_count <= 4'd15;
-                    pixel_count <= 0;
-                    phase     <= 1'b0;
-                    sclk      <= 1'b0;
-                    state     <= STREAM;
+                    // rd_addr/bank were assigned on the previous edge. The
+                    // RAM registers that address now; latch on the next edge.
+                    if (prefetch_wait) begin
+                        prefetch_wait <= 1'b0;
+                    end else begin
+                        shift     <= clearing ? 16'hFFFF : panel_data;
+                        mosi      <= clearing ? 1'b1 : panel_data[15];
+                        bit_count <= 4'd15;
+                        pixel_count <= 0;
+                        phase     <= 1'b0;
+                        sclk      <= 1'b0;
+                        state     <= STREAM;
+                    end
                 end
                 STREAM: begin
                     if (!phase) begin
@@ -112,8 +127,8 @@ module gc9a01_line_stream (
                             end else begin
                                 pixel_count <= pixel_count + 1'b1;
                                 bit_count <= 4'd15;
-                                shift <= clearing ? 16'hFFFF : rd_data;
-                                mosi <= clearing ? 1'b1 : rd_data[15];
+                                shift <= clearing ? 16'hFFFF : panel_data;
+                                mosi <= clearing ? 1'b1 : panel_data[15];
                             end
                         end else begin
                             shift <= {shift[14:0], 1'b0};

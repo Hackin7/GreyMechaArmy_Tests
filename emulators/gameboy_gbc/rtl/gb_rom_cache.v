@@ -1,4 +1,6 @@
-module gb_rom_cache (
+module gb_rom_cache #(
+    parameter CACHE_SET_BITS = 5 // 32 sets x 2 ways x 256 bytes = 16 KiB
+) (
     input wire clk, input wire reset,
     input wire request, input wire [22:0] address,
     output reg [7:0] data, output reg ready,
@@ -7,36 +9,39 @@ module gb_rom_cache (
     input wire fill_we, input wire [7:0] fill_offset,
     input wire [7:0] fill_data, input wire fill_commit
 );
-    reg [7:0] way0 [0:4095];
-    reg [7:0] way1 [0:4095];
-    reg [10:0] tag0 [0:15], tag1 [0:15];
-    reg valid0 [0:15], valid1 [0:15], lru [0:15];
+    localparam SETS = 1 << CACHE_SET_BITS;
+    localparam WAY_BYTES = SETS * 256;
+    localparam TAG_BITS = 23 - 8 - CACHE_SET_BITS;
+    reg [7:0] way0 [0:WAY_BYTES-1];
+    reg [7:0] way1 [0:WAY_BYTES-1];
+    reg [TAG_BITS-1:0] tag0 [0:SETS-1], tag1 [0:SETS-1];
+    reg valid0 [0:SETS-1], valid1 [0:SETS-1], lru [0:SETS-1];
     reg [7:0] q0, q1;
     reg [22:0] held_address;
     reg lookup;
     reg fill_way;
-    reg [3:0] fill_set;
-    reg [10:0] fill_tag;
+    reg [CACHE_SET_BITS-1:0] fill_set;
+    reg [TAG_BITS-1:0] fill_tag;
     integer i;
 
-    wire [3:0] req_set = held_address[11:8];
-    wire [10:0] req_tag = held_address[22:12];
-    wire [3:0] incoming_set = fill_address[11:8];
-    wire [10:0] incoming_tag = fill_address[22:12];
+    wire [CACHE_SET_BITS-1:0] req_set = held_address[8+CACHE_SET_BITS-1:8];
+    wire [TAG_BITS-1:0] req_tag = held_address[22:8+CACHE_SET_BITS];
+    wire [CACHE_SET_BITS-1:0] incoming_set = fill_address[8+CACHE_SET_BITS-1:8];
+    wire [TAG_BITS-1:0] incoming_tag = fill_address[22:8+CACHE_SET_BITS];
 
     always @(posedge clk) begin
         if (reset) begin
             ready <= 0; lookup <= 0; miss_request <= 0;
             held_address <= 0; fill_way <= 0; fill_set <= 0; fill_tag <= 0;
-            for (i=0; i<16; i=i+1) begin
+            for (i=0; i<SETS; i=i+1) begin
                 valid0[i] <= 0; valid1[i] <= 0; lru[i] <= 0;
             end
         end else begin
             if (ready && (!request || address != held_address)) ready <= 0;
             if (!ready && !lookup && request && !miss_request) begin
                 held_address <= address;
-                q0 <= way0[address[11:0]];
-                q1 <= way1[address[11:0]];
+                q0 <= way0[address[8+CACHE_SET_BITS-1:0]];
+                q1 <= way1[address[8+CACHE_SET_BITS-1:0]];
                 lookup <= 1;
             end else if (lookup) begin
                 lookup <= 0;

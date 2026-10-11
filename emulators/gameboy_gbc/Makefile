@@ -1,6 +1,8 @@
 PROJ := gameboy_gbc
 BRAM_ROM ?= 1
 FLASH_ROM ?= 0
+CACHE_SET_BITS ?= 5
+PANEL_SWAP_RB ?= 1
 FLASH_DIAGNOSTIC ?= 0
 PANEL_DIAGNOSTIC ?= 0
 TARGET_FREQ_MHZ ?= 16
@@ -126,7 +128,7 @@ generated: $(GENERATED_VHDL) $(GEN)/cgb_boot.hex
 
 $(BUILD)/$(PROJ).json: $(ALL_RTL) $(GEN)/cgb_boot.hex
 	mkdir -p $(BUILD) $(LOG)
-	bash -lc "set -o pipefail; $(YOSYS) -p 'read_verilog -sv -Irtl/panel_common $(ALL_RTL); chparam -set BRAM_ROM $(BRAM_ROM) -set FLASH_ROM $(FLASH_ROM) -set FLASH_DIAGNOSTIC $(FLASH_DIAGNOSTIC) -set PANEL_DIAGNOSTIC $(PANEL_DIAGNOSTIC) top; synth_ecp5 -noabc9 -top top -json $@' 2>&1 | tee $(LOG)/yosys.log"
+	bash -lc "set -o pipefail; $(YOSYS) -p 'read_verilog -sv -Irtl/panel_common $(ALL_RTL); chparam -set BRAM_ROM $(BRAM_ROM) -set FLASH_ROM $(FLASH_ROM) -set CACHE_SET_BITS $(CACHE_SET_BITS) -set PANEL_SWAP_RB $(PANEL_SWAP_RB) -set FLASH_DIAGNOSTIC $(FLASH_DIAGNOSTIC) -set PANEL_DIAGNOSTIC $(PANEL_DIAGNOSTIC) top; synth_ecp5 -noabc9 -top top -json $@' 2>&1 | tee $(LOG)/yosys.log"
 
 $(BUILD)/$(PROJ)_out.config: $(BUILD)/$(PROJ).json pinout.lpf
 	bash -lc "set -o pipefail; $(NEXTPNR) --freq $(TARGET_FREQ_MHZ) --json $< --textcfg $@ --25k --package CABGA256 --lpf pinout.lpf 2>&1 | tee $(LOG)/nextpnr-ecp5.log"
@@ -229,7 +231,7 @@ $(SIM_CACHE_EXE): $(SIM_CPU_RTL) $(GEN)/cgb_boot.hex sim/tb_cache_defcon.v
 		-Wno-fatal -Wno-TIMESCALEMOD -Wno-WIDTHTRUNC \
 		-Wno-WIDTHEXPAND -Wno-PINMISSING -Wno-CASEINCOMPLETE \
 		-Wno-MULTIDRIVEN -Wno-ASCRANGE \
-		--top-module tb_cache_defcon -Mdir $(SIM_BUILD)/obj_cache \
+		--top-module tb_cache_defcon -GCACHE_SET_BITS=$(CACHE_SET_BITS) -Mdir $(dir $@) \
 		-Irtl -I$(VENDOR_RTL) $(SIM_CPU_RTL) sim/tb_cache_defcon.v
 
 sim-cache-defcon: $(SIM_CACHE_EXE)
@@ -243,8 +245,8 @@ $(SIM_FLASH_DEFCON_EXE): $(SIM_CPU_RTL) rtl/ecp5_flash_reader.v \
 		-Wno-fatal -Wno-TIMESCALEMOD -Wno-WIDTHTRUNC \
 		-Wno-WIDTHEXPAND -Wno-PINMISSING -Wno-CASEINCOMPLETE \
 		-Wno-MULTIDRIVEN -Wno-ASCRANGE \
-		--top-module tb_cache_defcon -GFLASH_BACKEND=1 \
-		-Mdir $(SIM_BUILD)/obj_flash_defcon \
+		--top-module tb_cache_defcon -GFLASH_BACKEND=1 -GCACHE_SET_BITS=$(CACHE_SET_BITS) \
+		-Mdir $(dir $@) \
 		-Irtl -I$(VENDOR_RTL) $(SIM_CPU_RTL) rtl/ecp5_flash_reader.v \
 		sim/tb_cache_defcon.v
 
@@ -260,6 +262,22 @@ $(SIM_FLASH_EXE): rtl/ecp5_flash_reader.v rtl/gb_rom_cache.v sim/tb_flash_cache.
 
 sim-flash: $(SIM_FLASH_EXE)
 	$(VVP) $(SIM_FLASH_EXE)
+
+.PHONY: sim-rom-cache
+sim-rom-cache:
+	mkdir -p $(SIM_BUILD)
+	$(IVERILOG) -g2012 -Ptb_rom_cache.CACHE_SET_BITS=4 -o $(SIM_BUILD)/cache8.vvp rtl/gb_rom_cache.v sim/tb_rom_cache.v
+	$(VVP) $(SIM_BUILD)/cache8.vvp
+	$(IVERILOG) -g2012 -Ptb_rom_cache.CACHE_SET_BITS=5 -o $(SIM_BUILD)/cache16.vvp rtl/gb_rom_cache.v sim/tb_rom_cache.v
+	$(VVP) $(SIM_BUILD)/cache16.vvp
+
+.PHONY: sim-panel-colours
+sim-panel-colours:
+	mkdir -p $(SIM_BUILD)
+	$(IVERILOG) -g2012 -Ptb_panel_colours.SWAP_RB=1 -o $(SIM_BUILD)/colours-bgr.vvp rtl/gc9a01_line_stream.v sim/tb_panel_colours.v
+	$(VVP) $(SIM_BUILD)/colours-bgr.vvp
+	$(IVERILOG) -g2012 -Ptb_panel_colours.SWAP_RB=0 -o $(SIM_BUILD)/colours-rgb.vvp rtl/gc9a01_line_stream.v sim/tb_panel_colours.v
+	$(VVP) $(SIM_BUILD)/colours-rgb.vvp
 
 clean:
 	rm -rf $(BUILD)

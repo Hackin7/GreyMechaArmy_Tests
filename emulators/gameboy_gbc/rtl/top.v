@@ -1,5 +1,7 @@
 module top #(
     parameter BRAM_ROM = 1,
+    parameter CACHE_SET_BITS = 5,
+    parameter PANEL_SWAP_RB = 1,
     parameter FLASH_ROM = 0,
     parameter FLASH_DIAGNOSTIC = 0,
     parameter PANEL_DIAGNOSTIC = 0
@@ -187,7 +189,7 @@ module top #(
 
     wire pixel_valid,frame_sync,lcd_on_debug,lcd_clock_debug; wire [15:0] pixel_rgb565,audio_l,audio_r,debug_pc;
     wire running;
-    gb_core_wrapper #(.BRAM_ROM(BRAM_ROM)) gameboy (
+    gb_core_wrapper #(.BRAM_ROM(BRAM_ROM), .CACHE_SET_BITS(CACHE_SET_BITS)) gameboy (
         .clk(clk_core),.reset(reset | core_reset_pulse),.core_run(core_run),
         .gbc_mode(gbc_mode),.buttons(gb_buttons),.host_rom_we(rom_we),
         .host_rom_addr(rom_addr),.host_rom_data(rom_data),
@@ -223,7 +225,7 @@ module top #(
             .init_done(), .streaming()
         );
     end else begin : panel_gameboy
-        gc9a01_native display (.clk(clk_panel),.resetn(panel_resetn),
+        gc9a01_native #(.SWAP_RB(PANEL_SWAP_RB)) display (.clk(clk_panel),.resetn(panel_resetn),
             .line_ready(line_ready),.line_bank(line_bank),.line_number(line_number),
             .line_done(line_done),.rd_addr(rd_addr),.rd_bank(rd_bank),.rd_data(rd_data),
             .sclk(oled_scl),.mosi(oled_sda),.dc(oled_dc),.cs_n(oled_cs),.rst_n(oled_rst));

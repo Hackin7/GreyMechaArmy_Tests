@@ -2,7 +2,10 @@
 
 // Full cache-mode cartridge test. Only the 512-byte header is uploaded, then
 // cache misses are serviced from a host-side ROM image exactly as on the badge.
-module tb_cache_defcon #(parameter FLASH_BACKEND = 0);
+module tb_cache_defcon #(
+    parameter FLASH_BACKEND = 0,
+    parameter CACHE_SET_BITS = 5
+);
     reg clk = 0;
     always #5 clk = ~clk;
 
@@ -57,7 +60,7 @@ module tb_cache_defcon #(parameter FLASH_BACKEND = 0);
     reg [15:0] last_bus = 0;
     integer r5, g5, b5, r8, g8, b8;
 
-    gb_core_wrapper #(.BRAM_ROM(0)) dut (
+    gb_core_wrapper #(.BRAM_ROM(0), .CACHE_SET_BITS(CACHE_SET_BITS)) dut (
         .clk(clk), .reset(reset), .core_run(core_run), .gbc_mode(gbc_mode),
         .buttons(buttons), .host_rom_we(host_rom_we),
         .host_rom_addr(host_rom_addr), .host_rom_data(host_rom_data),

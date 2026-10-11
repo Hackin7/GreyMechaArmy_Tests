@@ -1,4 +1,6 @@
-module gc9a01_native (
+module gc9a01_native #(
+    parameter SWAP_RB = 1
+) (
     input wire clk, input wire resetn,
     input wire line_ready, input wire line_bank, input wire [7:0] line_number,
     output wire line_done, output wire [7:0] rd_addr, output wire rd_bank,
@@ -17,7 +19,7 @@ module gc9a01_native (
         .init_done(init_done), .ramwr_pulse(ramwr_pulse),
         .sclk(i_sclk), .mosi(i_mosi), .dc(i_dc), .cs_n(i_cs), .rst_n(i_rst)
     );
-    gc9a01_line_stream stream (
+    gc9a01_line_stream #(.SWAP_RB(SWAP_RB)) stream (
         .clk(clk), .resetn(resetn), .enable(init_done && !init_owner),
         .line_ready(line_ready), .line_bank(line_bank),
         .line_number(line_number), .line_done(line_done),

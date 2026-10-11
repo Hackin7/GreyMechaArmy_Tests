@@ -1,5 +1,6 @@
 module gb_core_wrapper #(
-    parameter BRAM_ROM = 1
+    parameter BRAM_ROM = 1,
+    parameter CACHE_SET_BITS = 5
 ) (
     input wire clk, input wire reset, input wire core_run, input wire gbc_mode,
     input wire [7:0] buttons,
@@ -47,7 +48,7 @@ module gb_core_wrapper #(
     end
 
     generate if (BRAM_ROM == 0) begin : cache_path
-        gb_rom_cache cache (
+        gb_rom_cache #(.CACHE_SET_BITS(CACHE_SET_BITS)) cache (
             .clk(clk), .reset(reset), .request(rom_request), .address(mbc_addr),
             .data(cache_data), .ready(cache_ready), .miss_request(cache_miss),
             .miss_address(cache_miss_address), .fill_begin(fill_begin),

@@ -22,6 +22,23 @@ The design uses the external 16 MHz oscillator, a 16 MHz system clock, a 64 MHz
 panel clock, native 160x144 output centered on the 240x240 GC9A01, mono buzzer
 audio, and the same board pinout as `arduboy_fx`.
 
+Cached-ROM builds default to a 16 KiB ROM cache: 32 sets, two ways per set,
+256-byte lines, and least-recently-used replacement. A miss stalls the core
+until the complete line arrives; cartridge RAM remains separate. The flash
+build uses 55 of the ECP5-25K's 56 BRAM blocks. For the previous
+8 KiB geometry, use `make bit-flash CACHE_SET_BITS=4`; the default is 5.
+`make sim-rom-cache` tests both sizes, including replacement, all sets,
+line-end bytes, and reset invalidation. Rebuild when changing parameters;
+ordinary `make bit` does not track parameter changes in existing outputs.
+
+The native panel output defaults to `PANEL_SWAP_RB=1`, matching the working
+Arduboy driver for the badge's BGR colour order. Core and line-buffer pixels
+remain RGB565; red/blue are swapped only when serialized. Use
+`make bit-flash PANEL_SWAP_RB=0` for a panel with RGB order instead.
+`make sim-panel-colours` checks both modes, pure colours, asymmetric brown,
+the initial white clear, and two complete scanlines. The Acid2 panel model
+decodes the physical badge's BGR wire order before comparing RGB images.
+
 ## Build dependencies
 
 - GHDL with synthesis support (generates the CPU and audio Verilog from VHDL)

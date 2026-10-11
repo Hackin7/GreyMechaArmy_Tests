@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
-module tb_rom_cache;
+module tb_rom_cache #(parameter CACHE_SET_BITS = 5);
+    localparam SETS = 1 << CACHE_SET_BITS;
+    localparam WAY_BYTES = SETS * 256;
     reg clk = 0;
     reg reset = 1;
     reg request = 0;
@@ -18,8 +20,9 @@ module tb_rom_cache;
 
     integer i;
     integer checks = 0;
+    integer line;
 
-    gb_rom_cache dut (
+    gb_rom_cache #(.CACHE_SET_BITS(CACHE_SET_BITS)) dut (
         .clk(clk), .reset(reset),
         .request(request), .address(address),
         .data(data), .ready(ready),
@@ -126,9 +129,9 @@ module tb_rom_cache;
         release_request();
 
         // Fill the second way in the same set.
-        start_request(23'h002234);
-        expect_miss(23'h002200);
-        fill_line(23'h002200, 8'hB0);
+        start_request(23'h001234 + WAY_BYTES);
+        expect_miss(23'h001200 + WAY_BYTES);
+        fill_line(23'h001200 + WAY_BYTES, 8'hB0);
         expect_hit(8'h34 ^ 8'hB0);
         release_request();
 
@@ -138,9 +141,9 @@ module tb_rom_cache;
         release_request();
 
         // A third conflicting tag must evict way 1 only.
-        start_request(23'h003234);
-        expect_miss(23'h003200);
-        fill_line(23'h003200, 8'hC0);
+        start_request(23'h001234 + 2*WAY_BYTES);
+        expect_miss(23'h001200 + 2*WAY_BYTES);
+        fill_line(23'h001200 + 2*WAY_BYTES, 8'hC0);
         expect_hit(8'h34 ^ 8'hC0);
         release_request();
 
@@ -148,15 +151,45 @@ module tb_rom_cache;
         expect_hit(8'h34 ^ 8'hA0);
         release_request();
 
-        start_request(23'h002234);
-        expect_miss(23'h002200);
+        start_request(23'h001234 + WAY_BYTES);
+        expect_miss(23'h001200 + WAY_BYTES);
 
-        $display("PASS gb_rom_cache checks=%0d", checks);
+        // Reset must invalidate all sets, including the expanded upper half.
+        @(negedge clk);
+        request = 0;
+        reset = 1;
+        repeat (2) @(negedge clk);
+        reset = 0;
+        // Populate every line with a distinct signature. A wrong set/tag or
+        // data index (especially bit 12) aliases the two halves and fails.
+        for (line = 0; line < SETS*2; line = line + 1) begin
+            start_request(line*256 + 255);
+            expect_miss(line*256);
+            fill_line(line*256, line[7:0]);
+            expect_hit(8'hff ^ line[7:0]);
+            release_request();
+        end
+        for (line = 0; line < SETS*2; line = line + 1) begin
+            start_request(line*256);
+            expect_hit(line[7:0]);
+            release_request();
+            start_request(line*256 + 255);
+            expect_hit(8'hff ^ line[7:0]);
+            release_request();
+        end
+        @(negedge clk);
+        reset = 1;
+        repeat (2) @(negedge clk);
+        reset = 0;
+        start_request((SETS*2-1)*256);
+        expect_miss((SETS*2-1)*256);
+
+        $display("PASS gb_rom_cache bytes=%0d checks=%0d", WAY_BYTES*2, checks);
         $finish;
     end
 
     initial begin
-        #200000;
+        #1000000;
         $fatal(1, "global timeout");
     end
 endmodule

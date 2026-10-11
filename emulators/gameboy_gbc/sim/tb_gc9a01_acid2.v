@@ -206,9 +206,13 @@ module tb_gc9a01_acid2;
                         pixel_high = received_byte;
                         pixel_low_next = 1;
                     end else begin
+                        // Model the badge panel's BGR interpretation, not
+                        // merely the raw wire word. This property is fixed
+                        // independently of the serializer's SWAP_RB setting.
                         if (panel_pixel_count < 23040)
                             panel_window[panel_pixel_count] =
-                                {pixel_high, received_byte};
+                                {received_byte[4:0], pixel_high[2:0],
+                                 received_byte[7:5], pixel_high[7:3]};
                         panel_pixel_count = panel_pixel_count + 1;
                         pixel_low_next = 0;
                         if (panel_pixel_count == 23040) begin
