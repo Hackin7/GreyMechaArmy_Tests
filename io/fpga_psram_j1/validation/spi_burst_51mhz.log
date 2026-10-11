@@ -1,0 +1,17 @@
+126567 bytes uploaded in 183 ms (691 kB/s)
+ID: [13, 93, 83]
+CLOCK_SAMPLES_HZ: [1.02726e+08, 1.0273e+08, 1.02735e+08]
+MEASURED_SYS_HZ: 1.0273e+08
+MODE: {'pass': False, 'error': False, 'id_good': True, 'data': 83, 'expected': 0, 'qpi': False, 'address': 875859, 'error_code': 0, 'busy': False, 'ready': True}
+BYTE_ADDRESS_DATA_PASS
+FIVE_REGION_TEST_PASS
+BENCHMARK: 0x0 0 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x3f0 1 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x10000 2 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x400000 3 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x7f0000 4 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x0 5 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x400000 6 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+BENCHMARK: 0x7f0000 7 {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.8486, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.0273e+08, 'read_MB_s': 4.63007, 'read_cycles': 1454080}
+RESET_RECOVERY_PASS
+BENCHMARK_HARDWARE_PASS

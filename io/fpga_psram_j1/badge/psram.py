@@ -55,6 +55,7 @@ def decode_response(data):
         "busy": bool(data[1] & 1), "ready": bool(data[1] & 2),
         "pass": bool(data[1] & 4), "error": bool(data[1] & 8),
         "id_good": bool(data[1] & 16), "data": data[2], "expected": data[3],
+        "qpi": bool(data[1] & 32),
         "address": (data[4] << 16) | (data[5] << 8) | data[6],
         "error_code": data[7],
     }
@@ -139,6 +140,47 @@ class Psram:
             if self.read(0)[0] != value:
                 raise RuntimeError("Data-line test failed")
         return True
+
+    def measure_clock(self, periods=256, timeout=3):
+        """Measure GP12 reference with native RP2350 pulse capture (microseconds)."""
+        import board
+        import pulseio
+        pulses = pulseio.PulseIn(board.GP12, maxlen=periods * 2 + 2, idle_state=False)
+        deadline = time.monotonic() + timeout
+        try:
+            while len(pulses) < periods * 2 + 2:
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Clock reference did not toggle')
+                time.sleep(0.001)
+            pulses.pause()
+            elapsed_us = sum(pulses[index] for index in range(1, periods * 2 + 1))
+            return periods * 65536 * 1000000 / elapsed_us
+        finally:
+            pulses.deinit()
+
+    def benchmark(self, address=0, size=65536, seed=0, clock_hz=None):
+        """Destructive FPGA write/verify, timed in FPGA cycles (not USB time)."""
+        if size < 256 or size > 65536 or size & (size - 1):
+            raise ValueError('Size must be a power of two, 256..65536')
+        if address < 0 or address + size > 8 * 1024 * 1024 or not 0 <= seed <= 7:
+            raise ValueError('Invalid benchmark range/seed')
+        exponent = 0
+        remaining = size
+        while remaining > 1:
+            exponent += 1
+            remaining >>= 1
+        result = self._command(7, address, (seed << 5) | exponent)
+        if not result['pass']:
+            raise RuntimeError('Benchmark verify failed: ' + repr(result))
+        metrics = [self._command(8, value=index)['address'] for index in range(6)]
+        write_cycles, read_cycles, count, sys_khz, burst, spi_khz = metrics
+        clock_hz = sys_khz * 1000 if clock_hz is None else clock_hz
+        return {'bytes': count, 'write_cycles': write_cycles, 'read_cycles': read_cycles,
+                'sys_khz': sys_khz, 'spi_khz': spi_khz, 'burst_bytes': burst,
+                'qpi': result['qpi'], 'pass': True,
+                'measured_sys_hz': clock_hz,
+                'write_MB_s': count * clock_hz / (write_cycles * 1000000),
+                'read_MB_s': count * clock_hz / (read_cycles * 1000000)}
 
     def deinit(self):
         self.spi.deinit()

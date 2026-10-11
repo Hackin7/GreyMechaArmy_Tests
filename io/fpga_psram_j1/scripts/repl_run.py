@@ -54,6 +54,8 @@ def main():
         result = stdout.decode("utf-8", "replace")
         if stderr:
             result += "\nDEVICE_EXCEPTION:\n" + stderr.decode("utf-8", "replace")
+        # CircuitPython emits CR/CR/LF through this console; keep text logs clean.
+        result = result.replace("\r\n", "\n").replace("\r", "")
         Path(args.log).write_text(result, encoding="utf-8")
         print(result)
         if stderr:

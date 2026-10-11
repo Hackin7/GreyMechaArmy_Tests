@@ -5,7 +5,15 @@ This standalone Verilog design lets the ECP5-25K directly read and write an
 The FPGA generates every PSRAM transaction. The badge's RP2350 is only a
 command bridge, accessed through its CircuitPython USB REPL.
 
-The generated bitstream is [build/fpga_psram_j1.bit](build/fpga_psram_j1.bit).
+The working SPI baseline is committed as `fcf34af`. The default build now
+uses **one-bit burst SPI**, measured at **4.85 MB/s writes and 4.63 MB/s
+reads** on the connected badge. A full 8 MiB write/verify and unaligned
+page-crossing test passed. See [THROUGHPUT_REPORT.md](THROUGHPUT_REPORT.md).
+The experimental QPI controller still fails hardware tests and stays
+disabled; see [EXPERIMENTS.md](EXPERIMENTS.md). The chip has no dual-SPI mode.
+
+The tested bitstream is [bitstreams/spi_burst_51mhz.bit](bitstreams/spi_burst_51mhz.bit).
+Rebuilding with `make all` generates `build/fpga_psram_j1.bit`.
 The design includes initialization, cached ID reads, single-byte reads/writes,
 a destructive 256-byte FPGA self-test, LED status and an interactive client.
 
@@ -68,7 +76,7 @@ Create `/apps/psram_j1/` on the badge's CIRCUITPY drive and copy:
 
 | Repo file | Badge destination |
 | --- | --- |
-| `build/fpga_psram_j1.bit` | `/apps/psram_j1/fpga_psram_j1.bit` |
+| `bitstreams/spi_burst_51mhz.bit` | `/apps/psram_j1/fpga_psram_j1.bit` |
 | `badge/psram.py` | `/apps/psram_j1/psram.py` |
 | `badge/run.py` | `/apps/psram_j1/run.py` |
 
@@ -123,9 +131,11 @@ active-low reset button at C12 restarts the whole design and initialization.
 | 2 | Last 256-byte self-test passed |
 | 3 | Command/test error |
 | 4 | ID KGD byte equals 0x5d |
-| 5–7 | Unused |
+| 5 | Experimental QPI initialization completed |
+| 6–7 | Unused |
 
-A passed self-test is cleared by the next nonzero host command. Read
+A passed self-test is cleared by the next operation command; pad, metric
+and trace queries preserve it. Read
 `p.status()` immediately afterwards to inspect it. On failure, the reply
 contains the first failing address, actual byte and expected byte.
 
@@ -134,7 +144,7 @@ contains the first failing address, actual byte and expected byte.
 ```text
 CircuitPython USB REPL
    -> RP2350 GP8/9/10/11, slow command SPI
-   -> host_spi -> psram_demo -> psram_spi -> spi_transaction
+   -> host_spi -> psram_demo -> spi_burst (data) / psram_spi (initialization)
    -> J1 -> external APS6404L
 ```
 
@@ -144,21 +154,34 @@ CircuitPython USB REPL
 - `src/psram_spi.v`: power-up wait, QPI exit `F5`, reset `66/99`, ID `9F`,
   standard SPI read `03` and write `02`.
 - `src/spi_transaction.v`: mode-0 clock/data shifting and CE# spacing.
+- `src/spi_burst.v`: one-bit `02` writes and `03` or `0B` reads,
+  byte prefetch and streaming receive. The tested fast build uses `0B`.
+- `src/qpi_burst.v`: experimental quad `02`/`0B` bursts, four read dummy
+  clocks, optional trace capture. Hardware validation is still failing.
 
-OSCG DIV=6 has nominal 51.67 MHz frequency; the RAM clock divides it by four,
-giving about **12.9 MHz SPI**. Oscillator tolerance affects actual speed.
-Single-byte read/write transfers are 40 SPI clocks. Initialization's ID
-transfer is 56 clocks. CE# has eight system cycles of hold time and at least
-eight cycles of high spacing. Even the longest transfer is about 4.5 us,
-below the datasheet's 8 us maximum selected interval; CE# is never held low
-while waiting for RP2350/USB commands. The startup wait exceeds 150 us.
+The FPGA drives a system-clock/65536 reference on C16 (RP2350 GP12).
+`p.measure_clock()` uses native pulse capture to calibrate benchmark rates.
+With the current instrumented SPI build, run
+`p.benchmark(clock_hz=p.measure_clock())` for an autonomous, destructive
+64 KiB write/verify benchmark. The original committed baseline bitstream
+does not support these added commands.
 
-This is a bring-up design: data reads/writes use **single-bit SPI and one
-byte per transaction**, not burst/QPI bandwidth. Python's bit-banged command
-bridge is deliberately slow; it doesn't indicate achievable FPGA memory
-throughput. The FPGA self-test runs without per-byte host traffic. The
-256-byte test checks a local region; `address_test()` separately checks
-address aliasing. Neither is a full exhaustive 8 MiB memory test.
+The default build uses OSCG DIV=3, nominal 103.33 MHz system clock and
+51.67 MHz SCK, with 16-byte bursts for autonomous tests. Native calibration
+measured about 102.73 MHz / 51.36 MHz on this badge. Above 33 MHz SCK,
+`0B` fast reads replace `03` and add eight dummy clocks. Initialization uses
+a slower clock for reset/ID. Oscillator tolerance affects actual speed.
+Sixteen-byte write/read transactions select CE# for approximately 3.2/3.4 us
+on this badge, below the 8 us limit. CE# is released between bursts and is
+never held low while waiting for host commands. The startup wait exceeds
+150 us. When changing speed or burst size, recheck the selected interval.
+
+Python `read()`/`write()` still issue one host command per byte. The measured
+rates are FPGA memory throughput in autonomous tests; USB/bit-banged command
+transport remains slower. The streaming controller can be reused by FPGA
+logic that supplies bytes without stalls. `self_test()` checks 256 bytes;
+`address_test()` separately checks aliasing. `device_full_test.py` writes and
+verifies all 8 MiB using 128 autonomous 64 KiB regions.
 
 ## Host protocol
 
@@ -184,14 +207,22 @@ Command: `[opcode, address_hi, address_mid, address_lo, write_data]`.
 | 4 | Write/read 256 bytes starting at address |
 | 5 | Return cached ID |
 | 6 | Return pad levels, accumulated activity and SCK rising-edge count |
+| 7 | Autonomous write/verify: data bits 4:0 encode log2(bytes), 8..16; bits 7:5 select seed |
+| 8 | Metrics: data 0=write cycles, 1=read cycles, 2=bytes, 3=nominal system kHz, 4=burst bytes, 5=nominal SCK kHz |
+| 9 | Optional trace word: data bits 4:0 select word 0..31; zero when TRACE=0 |
 
 Reply: `[0x50, flags, actual_data, expected_data, result_hi, result_mid,
 result_lo, error_code]`. Flags bits 0..4 are busy, ready, self-test pass,
-error, ID-good. Result is the operation/test address, or the three ID bytes
+error, ID-good. Bit 5 indicates experimental QPI initialization completed.
+Result is the operation/test address, or the three ID bytes
 for opcodes 3/5. Errors: 0=none, 1=initializing/busy, 2=unknown opcode,
 3=out-of-range, 4=test mismatch. Commands received while a requested
 operation/test is running are ignored; replies remain available. Partial
 command frames are discarded when CE# rises.
+
+For opcode 8, the 24-bit result contains the selected metric. Opcode 9 returns
+a 32-bit trace word in `{actual_data, result}`. Metrics count FPGA cycles
+and exclude command transport; calibrate rates because OSCG varies.
 
 For opcode 6, `actual_data[5:0]` is `{CE#, SCK, IO3, IO2, IO1, IO0}`.
 `expected_data[7:0]` contains activity flags in this order, low bit first:
@@ -209,9 +240,16 @@ Icarus Verilog, and Verilator. From this directory in Linux/WSL:
 
 ```sh
 make test lint all
+# Original single-byte SPI configuration:
+make all BUILD=build/spi_legacy QPI=0 SPI_BURST=0 OSC_DIV=6 HALF_PERIOD=2
+# Faster serial SPI, matching the tested artifact:
+make all BUILD=build/spi_burst_51mhz QPI=0 SPI_BURST=1 SPI_FAST_READ=1 OSC_DIV=3 HALF_PERIOD=1 BURST_BYTES=16
 ```
 
 Build logs, configuration, bitstream and SVF are in `build/` (ignored by Git).
+Use a new build directory when changing parameters; parameters alone do
+not invalidate an existing Make target. Eight simulations cover original
+SPI, QPI, serial bursts and fast serial reads, with four strict lint modes.
 `make test` exercises a behavioral APS6404L model and the complete command
 transport. It checks ID framing, QPI recovery, reads/writes at the top and
 at a 1 KiB boundary, successful self-tests, injected read corruption,
@@ -235,4 +273,5 @@ string, boundary, five-region FPGA self-test and address/data tests.
 `scripts/device_memory_diag.py` performs only reset/ID and read-only checks.
 Logs are saved in `build/`. The existing root `code.py` is preserved.
 
-See [BUILD_REPORT.md](BUILD_REPORT.md) for the generated artifact's results.
+See [THROUGHPUT_REPORT.md](THROUGHPUT_REPORT.md) for the current artifact and
+[BUILD_REPORT.md](BUILD_REPORT.md) for the preserved original SPI baseline.

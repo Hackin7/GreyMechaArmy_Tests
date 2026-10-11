@@ -1,0 +1,10 @@
+126694 bytes uploaded in 183 ms (692 kB/s)
+ID: [13, 93, 83]
+CLOCK_SAMPLES_HZ: [5.13534e+07, 5.13688e+07, 5.13747e+07]
+MEASURED_SYS_HZ: 5.13688e+07
+MODE: {'pass': False, 'error': False, 'id_good': True, 'data': 83, 'expected': 0, 'qpi': True, 'address': 875859, 'error_code': 0, 'busy': False, 'ready': True}
+
+DEVICE_EXCEPTION:
+Traceback (most recent call last):
+  File "<stdin>", line 20, in <module>
+AssertionError:

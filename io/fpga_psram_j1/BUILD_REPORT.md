@@ -1,11 +1,11 @@
-# Build report
+# Original SPI baseline build report
 
 Generated on 2026-10-12 for the GreyMecha ECP5-25K, CABGA256, rebuilt for
 the corrected wiring: IO0=A9, IO1=B10, IO2=B9, IO3=A8, SCLK=A3, CE#=A10.
 
 | Item | Result |
 | --- | --- |
-| Bitstream | `build/fpga_psram_j1.bit`, compressed |
+| Preserved bitstream | `bitstreams/spi_12mhz.bit`, compressed |
 | Size | 113,127 bytes |
 | Nominal FPGA clock | OSCG DIV=6, 51.67 MHz |
 | Nominal PSRAM clock | FPGA clock / 4, 12.92 MHz |

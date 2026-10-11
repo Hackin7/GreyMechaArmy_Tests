@@ -23,6 +23,8 @@ IOBUF PORT "host_sck" IO_TYPE=LVCMOS33 PULLMODE=DOWN;
 IOBUF PORT "host_mosi" IO_TYPE=LVCMOS33;
 IOBUF PORT "host_miso" IO_TYPE=LVCMOS33;
 IOBUF PORT "host_cs_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+LOCATE COMP "clock_ref" SITE "C16"; # RP2350 GP12, frequency calibration.
+IOBUF PORT "clock_ref" IO_TYPE=LVCMOS33;
 
 LOCATE COMP "pmod_j1[0]" SITE "A10"; # J1 pad 5: CE#
 LOCATE COMP "pmod_j1[1]" SITE "A9";  # J1 pad 7: IO0 / MOSI

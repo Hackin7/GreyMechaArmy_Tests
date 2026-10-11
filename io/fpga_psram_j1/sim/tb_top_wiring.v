@@ -1,18 +1,22 @@
 `timescale 1ns/1ps
 // Oscillator replacement for simulation of the complete board wrapper.
 module OSCG #(parameter DIV=6)(output reg OSC=0);
-    always #10 OSC=~OSC;
+    always #((DIV*10)/6) OSC=~OSC;
 endmodule
 
-module tb_top_wiring;
+module tb_top_wiring #(parameter QPI=0, parameter OSC_DIV=6,
+                      parameter HALF_PERIOD=2, parameter BURST_BYTES=32,
+                      parameter SPI_BURST=0, parameter FAST_READ=0);
     reg reset_n=0, test_n=1;
     wire [7:0] led;
     wire host_miso;
+    wire clock_ref;
     tri A10,A9,A8,A3,B10,B9,B8,A4;
     // Header vector ordered by the repository's LPF pin assignments.
-    top dut(.btn_rst_n(reset_n),.btn_test_n(test_n),.led(led),
+    top #(.ENABLE_QPI(QPI),.OSC_DIV(OSC_DIV),.QPI_HALF_PERIOD(HALF_PERIOD),
+          .BURST_BYTES(BURST_BYTES),.SPI_BURST(SPI_BURST),.SPI_FAST_READ(FAST_READ)) dut(.btn_rst_n(reset_n),.btn_test_n(test_n),.led(led),
         .host_sck(1'b0),.host_mosi(1'b0),.host_cs_n(1'b1),
-        .host_miso(host_miso),.pmod_j1({A4,B8,B9,B10,A3,A8,A9,A10}));
+        .host_miso(host_miso),.clock_ref(clock_ref),.pmod_j1({A4,B8,B9,B10,A3,A8,A9,A10}));
     // Independent board connection from the user's six physical-pin names.
     aps6404_model model(.cs_n(A10),.sck(A3),.dq({A8,B9,B10,A9}),.corrupt_reads(1'b0));
     integer transactions_after_test;
@@ -20,7 +24,7 @@ module tb_top_wiring;
         #1; model.qpi_mode=1; // Requires all four SIO wires to be mapped correctly.
         #199; reset_n=1;
         #450000;
-        if (led[4:0] !== 5'b10010)
+        if (led[4:0] !== 5'b10010 || led[5] !== (QPI != 0))
             $fatal(1,"Physical-pin initialization/ID failed: LED=%h",led);
         if (B8 !== 1'bz || A4 !== 1'bz)
             $fatal(1,"Unused J1 pins are driven");

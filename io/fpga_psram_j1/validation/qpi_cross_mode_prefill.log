@@ -1,0 +1,11 @@
+113127 bytes uploaded in 163 ms (694 kB/s)
+SPI_PREFILL: [252, 233, 214, 179, 112, 173, 90, 7]
+126694 bytes uploaded in 183 ms (692 kB/s)
+QPI_WROTE: [3, 22, 41, 76, 143, 82, 165, 248]
+QPI_READ: [3, 96, 146, 194, 138, 85, 165, 122]
+113127 bytes uploaded in 170 ms (665 kB/s)
+SPI_READ_QPI_DATA: [3, 22, 41, 76, 143, 82, 165, 7]
+SPI_WROTE: [3, 22, 41, 76, 143, 82, 165, 248]
+SPI_READ: [3, 22, 41, 76, 143, 82, 165, 248]
+126694 bytes uploaded in 183 ms (692 kB/s)
+QPI_READ_SPI_DATA: [3, 96, 146, 194, 143, 85, 165, 255]

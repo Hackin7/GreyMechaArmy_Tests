@@ -1,7 +1,8 @@
 `timescale 1ns/1ps
-module tb_psram_demo;
+module tb_psram_demo #(parameter QPI=0, parameter HALF_PERIOD=2, parameter BURST_BYTES=32,
+                      parameter CLK_HALF_NS=10, parameter SPI_BURST=0, parameter FAST_READ=0);
     reg clk=0, reset=1, button=0;
-    always #10 clk=~clk;
+    always #(CLK_HALF_NS) clk=~clk;
     reg host_sck=0, host_mosi=0, host_cs_n=1;
     wire host_miso, ram_cs_n, ram_sck;
     tri [3:0] dq;
@@ -12,7 +13,9 @@ module tb_psram_demo;
     generate for (g=0;g<4;g=g+1) begin: io
         assign dq[g]=dq_oe[g] ? dq_out[g] : 1'bz;
     end endgenerate
-    psram_demo dut(.clk(clk),.reset(reset),.test_button(button),
+    psram_demo #(.ENABLE_QPI(QPI),.QPI_HALF_PERIOD(HALF_PERIOD),.BURST_BYTES(BURST_BYTES),
+                .SPI_BURST(SPI_BURST),.SPI_FAST_READ(FAST_READ)) dut(
+        .clk(clk),.reset(reset),.test_button(button),
         .host_sck(host_sck),.host_mosi(host_mosi),.host_cs_n(host_cs_n),
         .host_miso(host_miso),.ram_cs_n(ram_cs_n),.ram_sck(ram_sck),
         .ram_cs_sense(ram_cs_n),.ram_sck_sense(ram_sck),
@@ -83,7 +86,7 @@ module tb_psram_demo;
         command(5,0,0); wait_idle(response);
         if(response[31:8] !== 24'h0d5d26) $fatal(1,"Cached ID mismatch: %h",response);
         command(6,0,0); wait_idle(response);
-        if(response[39:32] !== 8'hff || response[31:8] !== 24'd74)
+        if(response[39:32] !== 8'hff || response[31:8] !== (QPI ? 24'd82 : 24'd74))
             $fatal(1,"Pad activity/clock counter mismatch: %h",response);
         check_byte(0,8'ha5); check_byte(1,8'h5a);
         check_byte(24'h0003ff,8'h80); check_byte(24'h000400,8'h01);
@@ -106,6 +109,18 @@ module tb_psram_demo;
         if(response[7:0] !== 3) $fatal(1,"BIST range wraps");
         command(8'hff,0,0); wait_idle(response);
         if(response[7:0] !== 2) $fatal(1,"Missing opcode check");
+        command(7,24'h7ffff0,16); wait_idle(response);
+        if(response[7:0] !== 3) $fatal(1,"Benchmark range overflow");
+        command(7,0,7); wait_idle(response);
+        if(response[7:0] !== 3) $fatal(1,"Benchmark invalid size");
+        command(7,24'h1000,10); wait_idle(response);
+        if(!response[50]) $fatal(1,"1 KiB timed benchmark failed: %h",response);
+        command(8,0,0); wait_idle(response);
+        if(response[31:8] == 0) $fatal(1,"Missing write cycle metric");
+        $display("BENCH_WRITE_CYCLES=%0d",response[31:8]);
+        command(8,0,1); wait_idle(response);
+        if(response[31:8] == 0) $fatal(1,"Missing read cycle metric");
+        $display("BENCH_READ_CYCLES=%0d",response[31:8]);
         // An incomplete frame must not launch a write.
         host_cs_n=0; #500;
         begin: partial

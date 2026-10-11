@@ -1,0 +1,17 @@
+126567 bytes uploaded in 183 ms (691 kB/s)
+MEASURED_SYS_HZ: 1.02704e+08
+MODE: {'pass': False, 'error': False, 'id_good': True, 'data': 0, 'expected': 0, 'qpi': False, 'address': 0, 'error_code': 0, 'busy': False, 'ready': True}
+UNALIGNED_PAGE_CROSSING: {'sys_khz': 103333, 'write_cycles': 1388544, 'burst_bytes': 16, 'write_MB_s': 4.84738, 'bytes': 65536, 'spi_khz': 51666, 'pass': True, 'qpi': False, 'measured_sys_hz': 1.02704e+08, 'read_MB_s': 4.6289, 'read_cycles': 1454080}
+VERIFIED_BYTES: 1048576
+VERIFIED_BYTES: 2097152
+VERIFIED_BYTES: 3145728
+VERIFIED_BYTES: 4194304
+VERIFIED_BYTES: 5242880
+VERIFIED_BYTES: 6291456
+VERIFIED_BYTES: 7340032
+VERIFIED_BYTES: 8388608
+WRITE_MB_S: 4.84738
+READ_MB_S: 4.6289
+WRITE_CYCLES: 177733632 READ_CYCLES: 186122240
+FINAL_STATUS: {'pass': True, 'error': False, 'id_good': True, 'data': 138, 'expected': 0, 'qpi': False, 'address': 51666, 'error_code': 0, 'busy': False, 'ready': True}
+FULL_8MIB_HARDWARE_PASS

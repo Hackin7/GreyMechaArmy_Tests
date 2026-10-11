@@ -1,13 +1,19 @@
 `timescale 1ns/1ps
-module top(
+module top #(parameter ENABLE_QPI=0, parameter OSC_DIV=6,
+             parameter QPI_HALF_PERIOD=2, parameter BURST_BYTES=32, parameter TRACE=0,
+             parameter SPI_BURST=0, parameter SPI_FAST_READ=0)(
     input wire btn_rst_n, input wire btn_test_n,
     output wire [7:0] led,
     input wire host_sck, input wire host_mosi, input wire host_cs_n,
     output wire host_miso,
+    output wire clock_ref,
     inout wire [7:0] pmod_j1
 );
     wire clk;
-    OSCG #(.DIV(6)) oscillator(.OSC(clk));
+    OSCG #(.DIV(OSC_DIV)) oscillator(.OSC(clk));
+    reg [15:0] reference_divider=0;
+    always @(posedge clk) reference_divider <= reference_divider+1'b1;
+    assign clock_ref = reference_divider[15]; // GP12: system clock / 65536.
     (* async_reg = "true" *) reg [1:0] reset_sync = 0;
     reg [7:0] startup = 0;
     wire reset = !(&startup);
@@ -46,7 +52,11 @@ module top(
     // Dedicated point-to-point return wire; the RP2350 keeps GP10 as input.
     // Real input ports avoid constant-Z assignments erasing sensed inputs
     // during Yosys tristate lowering.
-    psram_demo demo(.clk(clk),.reset(reset),.test_button(test_pulse),
+    psram_demo #(.ENABLE_QPI(ENABLE_QPI),.QPI_HALF_PERIOD(QPI_HALF_PERIOD),
+        .BURST_BYTES(BURST_BYTES),.SYS_KHZ(310000/OSC_DIV),
+        .POWERUP_CYCLES(120000/OSC_DIV),.INIT_HALF_PERIOD(OSC_DIV < 4 ? 3 : 2),.TRACE(TRACE),
+        .SPI_BURST(SPI_BURST),.SPI_FAST_READ(SPI_FAST_READ)) demo(
+        .clk(clk),.reset(reset),.test_button(test_pulse),
         .host_sck(host_sck),.host_mosi(host_mosi),
         .host_cs_n(host_cs_n),.host_miso(host_miso),
         .ram_cs_n(ram_cs_n),.ram_sck(ram_sck),.ram_dq_in(ram_in),
