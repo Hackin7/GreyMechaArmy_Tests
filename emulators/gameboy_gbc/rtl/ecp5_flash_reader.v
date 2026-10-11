@@ -4,12 +4,14 @@
 // instantiated by top.v. flash_clk is explicitly phased from clk so MOSI is
 // stable before every rising SPI edge and MISO is sampled while SCK is high.
 module ecp5_flash_reader #(
-    parameter [23:0] ROM_BASE = 24'h100000
+    parameter [23:0] ROM_BASE = 24'h100000,
+    parameter SPI_CYCLES = 3 // 3 at 16 MHz (fallback), 4 at 64 MHz (fast)
 ) (
     input  wire        clk,
     input  wire        reset,
     input  wire        start,
     input  wire [22:0] line_address,
+    input  wire        fill_ready,
     output reg         busy,
 
     output reg         fill_begin,
@@ -95,9 +97,9 @@ module ecp5_flash_reader #(
                             phase <= 2'd1;
                         end
                         2'd1: phase <= 2'd2;
-                        default: begin
+                        2'd2: begin
                             flash_clk <= 1'b0;
-                            phase <= 2'd0;
+                            phase <= (SPI_CYCLES == 4) ? 2'd3 : 2'd0;
                             if (tx_bits_left == 6'd1) begin
                                 flash_mosi <= 1'b0;
                                 rx_bit <= 3'd0;
@@ -109,14 +111,19 @@ module ecp5_flash_reader #(
                                 tx_bits_left <= tx_bits_left - 1'b1;
                             end
                         end
+                        2'd3: phase <= 2'd0;
                     endcase
                 end
 
                 READ: begin
                     case (phase)
                         2'd0: begin
-                            flash_clk <= 1'b1;
-                            phase <= 2'd1;
+                            // Backpressure is allowed only between bytes,
+                            // with SCK low; never truncate a high pulse.
+                            if (rx_bit != 0 || fill_ready) begin
+                                flash_clk <= 1'b1;
+                                phase <= 2'd1;
+                            end
                         end
                         2'd1: begin
                             rx_shift <= {rx_shift[6:0], flash_miso};
@@ -134,10 +141,11 @@ module ecp5_flash_reader #(
                                 rx_bit <= rx_bit + 1'b1;
                             end
                         end
-                        default: begin
+                        2'd2: begin
                             flash_clk <= 1'b0;
-                            phase <= 2'd0;
+                            phase <= (SPI_CYCLES == 4) ? 2'd3 : 2'd0;
                         end
+                        2'd3: phase <= 2'd0;
                     endcase
                 end
 

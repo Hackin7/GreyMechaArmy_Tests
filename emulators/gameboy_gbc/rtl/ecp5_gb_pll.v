@@ -3,6 +3,7 @@ module ecp5_gb_pll (
     input  wire reset,
     output wire clk_75mhz,
     output wire clk_core,
+    output wire clk_flash,
     output wire locked
 );
     // This is the same, board-proven PLL arrangement used by arduboy_fx.
@@ -21,9 +22,15 @@ module ecp5_gb_pll (
         .CLKOS_DIV(40),
         .CLKOS_CPHASE(20),
         .CLKOS_FPHASE(0),
+        // Existing panel:core ratio is 40:8 = 5:1. A separate output
+        // gives flash:core = 40:10 = 4:1 without changing panel timing.
+        .CLKOS2_DIV(10),
+        .CLKOS2_CPHASE(5),
+        .CLKOS2_FPHASE(0),
         .FEEDBK_PATH("CLKOP"),
         .CLKOP_ENABLE("ENABLED"),
-        .CLKOS_ENABLE("ENABLED")
+        .CLKOS_ENABLE("ENABLED"),
+        .CLKOS2_ENABLE("ENABLED")
     ) pll_i (
         .CLKI(clk_50mhz),
         .CLKFB(clk_75mhz),
@@ -34,6 +41,7 @@ module ecp5_gb_pll (
         .ENCLKOS(1'b0), .ENCLKOS2(1'b0), .ENCLKOS3(1'b0),
         .CLKOP(clk_75mhz),
         .CLKOS(clk_core),
+        .CLKOS2(clk_flash),
         .CLKINTFB(),
         .LOCK(locked)
     );

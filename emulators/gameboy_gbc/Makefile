@@ -1,6 +1,7 @@
 PROJ := gameboy_gbc
 BRAM_ROM ?= 1
 FLASH_ROM ?= 0
+FLASH_SPI_FAST ?= 1
 CACHE_SET_BITS ?= 5
 PANEL_SWAP_RB ?= 1
 FLASH_DIAGNOSTIC ?= 0
@@ -62,6 +63,8 @@ LOCAL_RTL := \
 	rtl/gb_spi_phy.v \
 	rtl/gb_host_bridge.v \
 	rtl/ecp5_flash_reader.v \
+	rtl/gb_flash_fifo.v \
+	rtl/ecp5_flash_backend.v \
 	rtl/gb_rom_cache.v \
 	rtl/gb_save_cache.v \
 	rtl/gb_line_capture.v \
@@ -92,6 +95,9 @@ SIM_FLASH_DEFCON_EXE := $(SIM_BUILD)/obj_flash_defcon/Vtb_cache_defcon
 SIM_FLASH_EXE := $(SIM_BUILD)/tb_flash_cache.vvp
 SIM_CPU_RTL := \
 	$(SIM_CPU_GEN) \
+	rtl/ecp5_flash_reader.v \
+	rtl/gb_flash_fifo.v \
+	rtl/ecp5_flash_backend.v \
 	$(GEN)/gbc_snd.v \
 	$(UPSTREAM_RTL) \
 	rtl/cheatcodes_stub.v \
@@ -128,7 +134,7 @@ generated: $(GENERATED_VHDL) $(GEN)/cgb_boot.hex
 
 $(BUILD)/$(PROJ).json: $(ALL_RTL) $(GEN)/cgb_boot.hex
 	mkdir -p $(BUILD) $(LOG)
-	bash -lc "set -o pipefail; $(YOSYS) -p 'read_verilog -sv -Irtl/panel_common $(ALL_RTL); chparam -set BRAM_ROM $(BRAM_ROM) -set FLASH_ROM $(FLASH_ROM) -set CACHE_SET_BITS $(CACHE_SET_BITS) -set PANEL_SWAP_RB $(PANEL_SWAP_RB) -set FLASH_DIAGNOSTIC $(FLASH_DIAGNOSTIC) -set PANEL_DIAGNOSTIC $(PANEL_DIAGNOSTIC) top; synth_ecp5 -noabc9 -top top -json $@' 2>&1 | tee $(LOG)/yosys.log"
+	bash -lc "set -o pipefail; $(YOSYS) -p 'read_verilog -sv -Irtl/panel_common $(ALL_RTL); chparam -set BRAM_ROM $(BRAM_ROM) -set FLASH_ROM $(FLASH_ROM) -set FLASH_SPI_FAST $(FLASH_SPI_FAST) -set CACHE_SET_BITS $(CACHE_SET_BITS) -set PANEL_SWAP_RB $(PANEL_SWAP_RB) -set FLASH_DIAGNOSTIC $(FLASH_DIAGNOSTIC) -set PANEL_DIAGNOSTIC $(PANEL_DIAGNOSTIC) top; synth_ecp5 -noabc9 -top top -json $@' 2>&1 | tee $(LOG)/yosys.log"
 
 $(BUILD)/$(PROJ)_out.config: $(BUILD)/$(PROJ).json pinout.lpf
 	bash -lc "set -o pipefail; $(NEXTPNR) --freq $(TARGET_FREQ_MHZ) --json $< --textcfg $@ --25k --package CABGA256 --lpf pinout.lpf 2>&1 | tee $(LOG)/nextpnr-ecp5.log"
@@ -240,14 +246,15 @@ sim-cache-defcon: $(SIM_CACHE_EXE)
 		+TARGET_FRAMES=120
 
 $(SIM_FLASH_DEFCON_EXE): $(SIM_CPU_RTL) rtl/ecp5_flash_reader.v \
+		rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v \
 		$(GEN)/cgb_boot.hex sim/tb_cache_defcon.v
 	$(VERILATOR) --binary --timing -j 0 \
 		-Wno-fatal -Wno-TIMESCALEMOD -Wno-WIDTHTRUNC \
 		-Wno-WIDTHEXPAND -Wno-PINMISSING -Wno-CASEINCOMPLETE \
 		-Wno-MULTIDRIVEN -Wno-ASCRANGE \
-		--top-module tb_cache_defcon -GFLASH_BACKEND=1 -GCACHE_SET_BITS=$(CACHE_SET_BITS) \
+		--top-module tb_cache_defcon -GFLASH_BACKEND=1 -GFLASH_SPI_FAST=$(FLASH_SPI_FAST) -GCACHE_SET_BITS=$(CACHE_SET_BITS) \
 		-Mdir $(dir $@) \
-		-Irtl -I$(VENDOR_RTL) $(SIM_CPU_RTL) rtl/ecp5_flash_reader.v \
+		-Irtl -I$(VENDOR_RTL) $(SIM_CPU_RTL) \
 		sim/tb_cache_defcon.v
 
 sim-flash-defcon: $(SIM_FLASH_DEFCON_EXE)
@@ -256,12 +263,26 @@ sim-flash-defcon: $(SIM_FLASH_DEFCON_EXE)
 		+MAX_CYCLES=350000000 +TARGET_FRAMES=480 \
 		+START_PRESS_FRAME=360 +START_RELEASE_FRAME=370
 
-$(SIM_FLASH_EXE): rtl/ecp5_flash_reader.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
+$(SIM_FLASH_EXE): rtl/ecp5_flash_reader.v rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
 	mkdir -p $(SIM_BUILD)
 	$(IVERILOG) -g2012 -o $@ $^
 
 sim-flash: $(SIM_FLASH_EXE)
 	$(VVP) $(SIM_FLASH_EXE)
+
+.PHONY: sim-flash-matrix
+sim-flash-matrix:
+	mkdir -p $(SIM_BUILD)
+	$(IVERILOG) -g2012 -o $(SIM_BUILD)/flash-fifo.vvp rtl/gb_flash_fifo.v sim/tb_flash_fifo.v
+	$(VVP) $(SIM_BUILD)/flash-fifo.vvp
+	$(IVERILOG) -g2012 -Ptb_flash_cache.FAST_SPI=0 -Ptb_flash_cache.CACHE_SET_BITS=4 -o $(SIM_BUILD)/flash-slow.vvp rtl/ecp5_flash_reader.v rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
+	$(VVP) $(SIM_BUILD)/flash-slow.vvp
+	$(IVERILOG) -g2012 -Ptb_flash_cache.CACHE_SET_BITS=4 -o $(SIM_BUILD)/flash-fast8.vvp rtl/ecp5_flash_reader.v rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
+	$(VVP) $(SIM_BUILD)/flash-fast8.vvp
+	$(IVERILOG) -g2012 -o $(SIM_BUILD)/flash-fast16.vvp rtl/ecp5_flash_reader.v rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
+	$(VVP) $(SIM_BUILD)/flash-fast16.vvp
+	$(IVERILOG) -g2012 -Ptb_flash_cache.CORE_HALF_NS=500 -o $(SIM_BUILD)/flash-backpressure.vvp rtl/ecp5_flash_reader.v rtl/gb_flash_fifo.v rtl/ecp5_flash_backend.v rtl/gb_rom_cache.v sim/tb_flash_cache.v
+	$(VVP) $(SIM_BUILD)/flash-backpressure.vvp
 
 .PHONY: sim-rom-cache
 sim-rom-cache:

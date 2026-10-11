@@ -3,6 +3,7 @@ module top #(
     parameter CACHE_SET_BITS = 5,
     parameter PANEL_SWAP_RB = 1,
     parameter FLASH_ROM = 0,
+    parameter FLASH_SPI_FAST = 1,
     parameter FLASH_DIAGNOSTIC = 0,
     parameter PANEL_DIAGNOSTIC = 0
 ) (
@@ -14,14 +15,14 @@ module top #(
     output wire oled_cs, output wire oled_rst,
     inout wire [4:0] s, output wire buzzer
 );
-    wire osc_clk, clk_panel, clk_core, pll_locked;
+    wire osc_clk, clk_panel, clk_core, clk_flash, pll_locked;
     // The on-chip oscillator is used by the already-working Arduboy port.
     // Do not depend on clk_ext: it is not a reliable clock source here.
     defparam OSCI1.DIV = "6";
     OSCG OSCI1 (.OSC(osc_clk));
     wire unused_clk_ext = clk_ext;
     ecp5_gb_pll pll (.clk_50mhz(osc_clk), .reset(1'b0),
-        .clk_75mhz(clk_panel), .clk_core(clk_core), .locked(pll_locked));
+        .clk_75mhz(clk_panel), .clk_core(clk_core), .clk_flash(clk_flash), .locked(pll_locked));
     reg [7:0] reset_count = 0;
     reg [1:0] panel_reset_sync = 0;
     wire resetn = &reset_count;
@@ -139,15 +140,15 @@ module top #(
             end
             if (FLASH_DIAGNOSTIC && flash_fill_commit) begin
                 flash_diag_done <= 1'b1;
-                if (flash_diag_count != 9'd255)
+                if (flash_diag_count != (FLASH_SPI_FAST ? 9'd256 : 9'd255))
                     flash_diag_failed <= 1'b1;
             end
         end
     end
 
     generate if (FLASH_ROM) begin : flash_backend
-        ecp5_flash_reader reader (
-            .clk(clk_core),.reset(reset),
+        ecp5_flash_backend #(.FAST_SPI(FLASH_SPI_FAST)) reader (
+            .clk_core(clk_core),.clk_fast(clk_flash),.reset(reset | core_reset_pulse),
             .start(FLASH_DIAGNOSTIC ? flash_diag_start : cache_miss),
             .line_address(FLASH_DIAGNOSTIC ? 23'h000100 : cache_miss_address),
             .busy(flash_busy),

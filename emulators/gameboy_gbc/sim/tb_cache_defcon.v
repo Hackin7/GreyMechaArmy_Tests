@@ -4,10 +4,13 @@
 // cache misses are serviced from a host-side ROM image exactly as on the badge.
 module tb_cache_defcon #(
     parameter FLASH_BACKEND = 0,
+    parameter FLASH_SPI_FAST = 1,
     parameter CACHE_SET_BITS = 5
 );
     reg clk = 0;
     always #5 clk = ~clk;
+    reg flash_fast_clk = 0;
+    always #1.25 flash_fast_clk = ~flash_fast_clk;
 
     reg reset = 1;
     reg core_run = 0;
@@ -78,8 +81,8 @@ module tb_cache_defcon #(
         .debug_pc(debug_pc), .debug_boot_rom(debug_boot_rom)
     );
 
-    ecp5_flash_reader flash_reader (
-        .clk(clk),.reset(reset || !FLASH_BACKEND),.start(cache_miss),
+    ecp5_flash_backend #(.FAST_SPI(FLASH_SPI_FAST)) flash_reader (
+        .clk_core(clk),.clk_fast(flash_fast_clk),.reset(reset || !FLASH_BACKEND),.start(cache_miss),
         .line_address(cache_miss_address),.busy(flash_busy),
         .fill_begin(flash_fill_begin),.fill_address(flash_fill_address),
         .fill_we(flash_fill_we),.fill_offset(flash_fill_offset),

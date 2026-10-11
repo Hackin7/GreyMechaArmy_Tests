@@ -1,7 +1,8 @@
 LOCATE COMP "clk_ext" SITE "A7";
 IOBUF PORT  "clk_ext" IO_TYPE=LVCMOS33;
 FREQUENCY PORT "clk_ext" 16.0 MHz;
-FREQUENCY NET "clk_panel" 64.0 MHz;
+FREQUENCY NET "clk_panel" 80.0 MHz;
+FREQUENCY NET "clk_flash" 64.0 MHz;
 FREQUENCY NET "clk_core" 16.0 MHz;
 FREQUENCY NET "gameboy.core.clk_cpu" 8.5 MHz;
 FREQUENCY NET "gameboy.core.clk" 4.3 MHz;

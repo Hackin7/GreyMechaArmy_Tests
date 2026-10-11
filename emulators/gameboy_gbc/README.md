@@ -18,9 +18,23 @@ including the supplied Python/PIO FPGA programmer. No custom native C module
 is required. Run Defcon simulation with `make sim-flash-defcon
 DEFCON_ROM=/path/to/defcon.gbc`; supply your own ROM.
 
-The design uses the external 16 MHz oscillator, a 16 MHz system clock, a 64 MHz
-panel clock, native 160x144 output centered on the 240x240 GC9A01, mono buzzer
+The design uses the ECP5 internal oscillator and PLL, targeting a 16 MHz core,
+80 MHz panel clock and separate 64 MHz flash-reader clock. Native 160x144
+output is centered on the 240x240 GC9A01, with mono buzzer
 audio, and the same board pinout as `arduboy_fx`.
+
+The panel/core PLL ratio has always been 5:1; the old 64 MHz panel constraint
+was incorrect. The added flash/core ratio is 4:1, leaving the working panel
+clock unchanged. Actual frequencies track the internal oscillator's tolerance.
+
+Flash builds now default to nominal 16 MHz, 50%-duty SPI (`FLASH_SPI_FAST=1`).
+A held-address request handshake and eight-entry asynchronous distributed-RAM
+FIFO return bytes safely to the 16 MHz cache. Simulated complete fills take
+130.75 us versus 391.5 us for the original backend. Use
+`make bit-flash FLASH_SPI_FAST=0` to build the 5.33 MHz fallback.
+`make sim-flash-matrix` covers FIFO backpressure, both cache sizes, SPI timing,
+all line bytes, bank boundaries and reset during a transaction.
+See [fast SPI design and validation](docs/flash_spi16.md).
 
 Cached-ROM builds default to a 16 KiB ROM cache: 32 sets, two ways per set,
 256-byte lines, and least-recently-used replacement. A miss stalls the core
