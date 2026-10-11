@@ -16,11 +16,15 @@ entity gba_top is
       Softmap_GBA_EEPROM_ADDR  : integer; -- count:    8192    -- 8/32 Kbyte Data for GBA EEProm
       Softmap_SaveState_ADDR   : integer; -- count:  524288    -- 512 Kbyte Data for Savestate
       is_simu                  : std_logic := '0';
+      ExternalFastMemory       : boolean := false;
+      ExternalVRAMLow          : boolean := false;
+      ROMCacheSize             : positive := 1024;
       turbosound               : std_logic  -- sound buffer to play sound in turbo mode without sound pitched up
    );
    port 
    (
-      clk100                : in     std_logic;  
+      clk100                : in     std_logic;
+      video_ready           : in     std_logic := '1';
       -- settings                 
       GBA_on                : in     std_logic;  -- switching from off to on = reset
       GBA_lockspeed         : in     std_logic;  -- 1 = 100% speed, 0 = max speed
@@ -63,6 +67,12 @@ entity gba_top is
       bus_out_rnw           : out    std_logic;                     -- read = 1, write = 0
       bus_out_ena           : out    std_logic;                     -- one cycle high for each action
       bus_out_done          : in     std_logic;                     -- should be one cycle high when write is done or read value is valid
+      VRAM_Ext_req, VRAM_Ext_read : out std_logic := '0';
+      VRAM_Ext_addr : out std_logic_vector(13 downto 0) := (others => '0');
+      VRAM_Ext_wdata : out std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_be : out std_logic_vector(3 downto 0) := (others => '0');
+      VRAM_Ext_rdata : in std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_done : in std_logic := '0';
       -- savestate           
       SAVE_out_Din          : out    std_logic_vector(63 downto 0); -- data read from savestate
       SAVE_out_Dout         : in     std_logic_vector(63 downto 0); -- data written to savestate
@@ -202,6 +212,7 @@ architecture arch of gba_top is
    signal VRAM_Lo_addr         : integer range 0 to 16383;
    signal VRAM_Lo_datain       : std_logic_vector(31 downto 0);
    signal VRAM_Lo_dataout      : std_logic_vector(31 downto 0);
+   signal VRAM_Lo_re, VRAM_Lo_done : std_logic;
    signal VRAM_Lo_we           : std_logic;
    signal VRAM_Lo_be           : std_logic_vector(3 downto 0);
    signal VRAM_Hi_addr         : integer range 0 to 8191;
@@ -529,6 +540,9 @@ begin
    generic map
    (
       is_simu                  => is_simu,
+      ExternalFastMemory       => ExternalFastMemory,
+      ExternalVRAMLow          => ExternalVRAMLow,
+      ROMCacheSize             => ROMCacheSize,
       Softmap_GBA_Gamerom_ADDR => Softmap_GBA_Gamerom_ADDR,
       Softmap_GBA_WRam_ADDR    => Softmap_GBA_WRam_ADDR,
       Softmap_GBA_FLASH_ADDR   => Softmap_GBA_FLASH_ADDR,
@@ -595,6 +609,7 @@ begin
       
       bitmapdrawmode       => bitmapdrawmode,
       
+      VRAM_Lo_re => VRAM_Lo_re, VRAM_Lo_done => VRAM_Lo_done,
       VRAM_Lo_addr         => VRAM_Lo_addr,   
       VRAM_Lo_datain       => VRAM_Lo_datain, 
       VRAM_Lo_dataout      => VRAM_Lo_dataout,
@@ -719,6 +734,7 @@ begin
    igba_gpu : entity work.gba_gpu
    generic map
    (
+      ExternalVRAMLow => ExternalVRAMLow,
       is_simu => is_simu
    )
    port map
@@ -743,6 +759,7 @@ begin
       pixel_out_data       => pixel_out_data,
       pixel_out_we         => pixel_out_we,
       render_stall         => gpu_render_stall,
+      video_ready          => video_ready,
 
       new_cycles           => new_cycles,
       new_cycles_valid     => new_cycles_valid,
@@ -756,6 +773,7 @@ begin
       videodma_start       => videodma_start,
       videodma_stop        => videodma_stop ,   
                         
+      VRAM_Lo_re => VRAM_Lo_re, VRAM_Lo_done => VRAM_Lo_done,
       VRAM_Lo_addr         => VRAM_Lo_addr,   
       VRAM_Lo_datain       => VRAM_Lo_datain, 
       VRAM_Lo_dataout      => VRAM_Lo_dataout,
@@ -766,6 +784,10 @@ begin
       VRAM_Hi_dataout      => VRAM_Hi_dataout,
       VRAM_Hi_we           => VRAM_Hi_we,        
       VRAM_Hi_be           => VRAM_Hi_be,  
+      VRAM_Ext_req => VRAM_Ext_req, VRAM_Ext_read => VRAM_Ext_read,
+      VRAM_Ext_addr => VRAM_Ext_addr, VRAM_Ext_wdata => VRAM_Ext_wdata,
+      VRAM_Ext_be => VRAM_Ext_be, VRAM_Ext_rdata => VRAM_Ext_rdata,
+      VRAM_Ext_done => VRAM_Ext_done,
       vram_blocked         => vram_blocked,        
                          
       OAMRAM_PROC_addr     => OAMRAM_PROC_addr,   

@@ -1,4 +1,3 @@
-# Downloaded tools and generated simulation output.
 /.tools/
 /build/
 __pycache__/
@@ -8,8 +7,8 @@ __pycache__/
 *.fst
 *.vvp
 /debug_gbasim*.txt
+reference/
 
-# Required source configuration and fixtures covered by parent ignore rules.
 !*.json
 !*.config
 !/sim/smoke_bios.hex

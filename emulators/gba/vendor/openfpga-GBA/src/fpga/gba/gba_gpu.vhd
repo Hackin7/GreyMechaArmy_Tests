@@ -10,7 +10,8 @@ use work.pReg_gba_display.all;
 entity gba_gpu is
    generic
    (
-      is_simu : std_logic
+      is_simu : std_logic;
+      ExternalVRAMLow : boolean := false
    );
    port 
    (
@@ -34,6 +35,7 @@ entity gba_gpu is
       pixel_out_data       : out   std_logic_vector(17 downto 0);
       pixel_out_we         : out   std_logic := '0';
       render_stall         : out   std_logic := '0';
+      video_ready          : in    std_logic := '1';
 
       new_cycles           : in    unsigned(7 downto 0);
       new_cycles_valid     : in    std_logic;
@@ -47,6 +49,14 @@ entity gba_gpu is
       videodma_start       : out    std_logic;
       videodma_stop        : out    std_logic;
                           
+      VRAM_Ext_req, VRAM_Ext_read : out std_logic := '0';
+      VRAM_Ext_addr : out std_logic_vector(13 downto 0) := (others => '0');
+      VRAM_Ext_wdata : out std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_be : out std_logic_vector(3 downto 0) := (others => '0');
+      VRAM_Ext_rdata : in std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_done : in std_logic := '0';
+      VRAM_Lo_re : in std_logic := '0';
+      VRAM_Lo_done : out std_logic := '0';
       VRAM_Lo_addr         : in    integer range 0 to 16383;
       VRAM_Lo_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : out   std_logic_vector(31 downto 0);
@@ -117,6 +127,7 @@ begin
       new_cycles                   => new_cycles,
       new_cycles_valid             => new_cycles_valid,
       drawer_ready                 => drawer_ready,
+      video_ready                  => video_ready,
       render_stall                 => render_stall,
 
       IRP_HBlank                   => IRP_HBlank,
@@ -144,6 +155,7 @@ begin
    igba_gpu_drawer : entity work.gba_gpu_drawer
    generic map
    (
+      ExternalVRAMLow => ExternalVRAMLow,
       is_simu => is_simu
    )
    port map
@@ -174,6 +186,12 @@ begin
       newline_invsync        => newline_invsync,  
       pixelpos               => pixelpos,         
             
+      VRAM_Ext_req => VRAM_Ext_req, VRAM_Ext_read => VRAM_Ext_read,
+      VRAM_Ext_addr => VRAM_Ext_addr, VRAM_Ext_wdata => VRAM_Ext_wdata,
+      VRAM_Ext_be => VRAM_Ext_be, VRAM_Ext_rdata => VRAM_Ext_rdata,
+      VRAM_Ext_done => VRAM_Ext_done,
+      external_reset => reset or not gb_on,
+      VRAM_Lo_re => VRAM_Lo_re, VRAM_Lo_done => VRAM_Lo_done,
       VRAM_Lo_addr           => VRAM_Lo_addr,   
       VRAM_Lo_datain         => VRAM_Lo_datain, 
       VRAM_Lo_dataout        => VRAM_Lo_dataout,

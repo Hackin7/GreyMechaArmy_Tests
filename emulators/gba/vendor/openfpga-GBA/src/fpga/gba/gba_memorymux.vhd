@@ -11,6 +11,9 @@ entity gba_memorymux is
    generic
    (
       is_simu : std_logic;
+      ExternalFastMemory : boolean := false;
+      ExternalVRAMLow : boolean := false;
+      ROMCacheSize : positive := 1024;
       Softmap_GBA_Gamerom_ADDR : integer; -- count: 8388608  -- 32 Mbyte Data for GameRom   
       Softmap_GBA_WRam_ADDR    : integer; -- count:   65536  -- 256 Kbyte Data for GBA WRam Large
       Softmap_GBA_FLASH_ADDR   : integer; -- count:  131072  -- 128/512 Kbyte Data for GBA Flash
@@ -77,6 +80,8 @@ entity gba_memorymux is
       
       bitmapdrawmode       : in     std_logic;
                                     
+      VRAM_Lo_re : out std_logic := '0';
+      VRAM_Lo_done : in std_logic := '1';
       VRAM_Lo_addr         : out    integer range 0 to 16383;
       VRAM_Lo_datain       : out    std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : in     std_logic_vector(31 downto 0);
@@ -131,6 +136,8 @@ architecture arch of gba_memorymux is
       ADDR_DECODE,
       READPAK_CACHE,
       READBIOS,
+      WAIT_EXTERNAL_BIOS,
+      WAIT_EXTERNAL_IWRAM,
       READSMALLRAM,
       READPALETTERAM,
       PALETTEDONE,
@@ -152,6 +159,7 @@ architecture arch of gba_memorymux is
       WRITE_PALETTE,
       WRITE_VRAM,
       VRAMWAITWRITE,
+      WAIT_EXTERNAL_VRAM_WRITE,
       WRITE_OAM,
       EEPROMREAD,
       EEPROM_WAITREAD,
@@ -270,6 +278,7 @@ begin
 
    settle <= '1' when registersettle = '1' or (new_cycles_valid = '1' and dma_soon = '1') else '0';
 
+   gintern : if not ExternalFastMemory generate
    igba_bios : entity work.gba_bios
    port map
    (
@@ -313,13 +322,14 @@ begin
       smallram_DataOut(((i+1) * 8) - 1 downto (i * 8)) <= smallram_dout_single;
    end generate;
    
+   end generate;
    smallram_addr_r <= to_integer(unsigned(adr_save(14 downto 2)));
    
    
    i_gamepak_cache : entity work.cache
    generic map
    (
-      SIZE                     => 1024,
+      SIZE                     => ROMCacheSize,
       SIZEBASEBITS             => 23,
       BITWIDTH                 => 32,
       Softmap_GBA_Gamerom_ADDR => Softmap_GBA_Gamerom_ADDR
@@ -434,6 +444,7 @@ begin
          smallram_we     <= (others => '0');
          VRAM_Hi_we      <= '0';
          VRAM_Lo_we      <= '0';
+         VRAM_Lo_re      <= '0';
          OAMRAM_PROC_we  <= (others => '0');
          PALETTE_BG_we   <= (others => '0');
          PALETTE_OAM_we  <= (others => '0');
@@ -494,7 +505,13 @@ begin
                                  state <= READ_UNREADABLE;
                               end if;
                            else
-                              state <= READBIOS;
+                              if ExternalFastMemory then
+                                 bus_out_Adr <= std_logic_vector(to_unsigned(16#12000#, busadr_bits) + unsigned(adr_save(13 downto 2)));
+                                 bus_out_rnw <= '1'; bus_out_ena <= '1';
+                                 state <= WAIT_EXTERNAL_BIOS;
+                              else
+                                 state <= READBIOS;
+                              end if;
                            end if;
 
                         when x"2" =>
@@ -504,7 +521,13 @@ begin
                            state        <= WAIT_PROCBUS;
 
                         when x"3" =>
-                           state         <= READSMALLRAM;
+                           if ExternalFastMemory then
+                              bus_out_Adr <= std_logic_vector(to_unsigned(16#10000#, busadr_bits) + unsigned(adr_save(14 downto 2)));
+                              bus_out_rnw <= '1'; bus_out_ena <= '1';
+                              state <= WAIT_EXTERNAL_IWRAM;
+                           else
+                              state <= READSMALLRAM;
+                           end if;
 
                         when x"4" =>
                            if (unsigned(adr_save) < x"4000400") then
@@ -529,6 +552,7 @@ begin
                            VRAM_Hi_addr   <= to_integer(unsigned(adr_save(14 downto 2)));
                            VRAM_Lo_addr   <= to_integer(unsigned(adr_save(15 downto 2)));
                            state          <= READVRAM;
+                           if ExternalVRAMLow and adr_save(16) = '0' then VRAM_Lo_re <= '1'; end if;
 
                         when x"7" =>
                            OAMRAM_PROC_addr <= to_integer(unsigned(adr_save(9 downto 2)));
@@ -600,7 +624,18 @@ begin
                            end if;
 
                         -- done is ok, if the next state goes back to idle without conditions
-                        when x"3" => state <= WRITE_WRAMSMALL; mem_bus_done <= '1';
+                        when x"3" =>
+                           if ExternalFastMemory then
+                              if acc_save = ACCESS_32BIT then
+                                 state <= WRITE_WRAMLARGE;
+                              else
+                                 bus_out_Adr <= std_logic_vector(to_unsigned(16#10000#, busadr_bits) + unsigned(adr_save(14 downto 2)));
+                                 bus_out_rnw <= '1'; bus_out_ena <= '1';
+                                 state <= WAIT_WRAMREADMODIFYWRITE;
+                              end if;
+                           else
+                              state <= WRITE_WRAMSMALL; mem_bus_done <= '1';
+                           end if;
 
                         when x"4" =>
                            state <= WRITE_REG;
@@ -608,7 +643,11 @@ begin
                            registersettle     <= '1';
 
                         when x"5" => state <= WRITE_PALETTE;   mem_bus_done <= '1';
-                        when x"6" => state <= WRITE_VRAM;      mem_bus_done <= not vram_blocked or adr_save(16); vramwait <= vram_blocked;
+                        when x"6" =>
+                           state <= WRITE_VRAM; vramwait <= vram_blocked;
+                           if not ExternalVRAMLow or adr_save(16) = '1' then
+                              mem_bus_done <= not vram_blocked or adr_save(16);
+                           end if;
                         when x"7" => state <= WRITE_OAM;       mem_bus_done <= '1';
                         when x"8" =>
                            mem_bus_done <= '1';
@@ -680,7 +719,18 @@ begin
 
             -- reading
                
-            when READBIOS => 
+            when WAIT_EXTERNAL_BIOS =>
+               if bus_out_done = '1' then
+                  bios_data_last <= bus_out_Dout;
+                  rotate_data <= bus_out_Dout;
+                  state <= ROTATE;
+               end if;
+            when WAIT_EXTERNAL_IWRAM =>
+               if bus_out_done = '1' then
+                  rotate_data <= bus_out_Dout;
+                  state <= ROTATE;
+               end if;
+            when READBIOS =>
                bios_data_last <= bios_data;
                if (acc_save = ACCESS_8BIT or acc_save = ACCESS_16BIT) then
                   rotate_data  <= bios_data;
@@ -736,12 +786,14 @@ begin
             when READVRAM =>
                state <= VRAMDONE;
             when VRAMDONE =>
-               if (adr_save(16) = '1') then
-                  rotate_data  <= VRAM_Hi_dataout;
-               else
-                  rotate_data  <= VRAM_Lo_dataout;
+               if not ExternalVRAMLow or adr_save(16) = '1' or VRAM_Lo_done = '1' then
+                  if (adr_save(16) = '1') then
+                     rotate_data <= VRAM_Hi_dataout;
+                  else
+                     rotate_data <= VRAM_Lo_dataout;
+                  end if;
+                  state <= ROTATE;
                end if;
-               state        <= ROTATE;
 
             when READOAMRAM =>
                state <= OAMDONE;
@@ -926,7 +978,11 @@ begin
             
             when WRITE_WRAMLARGE =>
                bus_out_Din  <= rotate_writedata;
-               bus_out_Adr  <= std_logic_vector(to_unsigned(Softmap_GBA_WRam_ADDR, busadr_bits) + unsigned(adr_save(17 downto 2)));
+               if ExternalFastMemory and adr_save(27 downto 24) = x"3" then
+                  bus_out_Adr <= std_logic_vector(to_unsigned(16#10000#, busadr_bits) + unsigned(adr_save(14 downto 2)));
+               else
+                  bus_out_Adr <= std_logic_vector(to_unsigned(Softmap_GBA_WRam_ADDR, busadr_bits) + unsigned(adr_save(17 downto 2)));
+               end if;
                bus_out_rnw  <= '0';
                bus_out_ena  <= '1';
                state        <= WAIT_PROCBUS;
@@ -1075,11 +1131,21 @@ begin
                   VRAM_Hi_we <= '1';
                else
                   VRAM_Lo_we <= '1';
-                  if (vramwait = '1') then
-                     state        <= VRAMWAITWRITE;
+                  if ExternalVRAMLow then
+                     state <= WAIT_EXTERNAL_VRAM_WRITE;
+                  elsif (vramwait = '1') then
+                     state <= VRAMWAITWRITE;
                   end if;
                end if;
                
+            when WAIT_EXTERNAL_VRAM_WRITE =>
+               if VRAM_Lo_done = '1' then
+                  if vramwait = '1' and vram_blocked = '1' then
+                     state <= VRAMWAITWRITE;
+                  else
+                     mem_bus_done <= '1'; state <= IDLE;
+                  end if;
+               end if;
             when VRAMWAITWRITE =>
                if (vram_blocked = '0') then
                   state        <= IDLE;

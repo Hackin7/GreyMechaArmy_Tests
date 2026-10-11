@@ -27,6 +27,7 @@ entity gba_gpu_timing is
       new_cycles           : in  unsigned(7 downto 0);
       new_cycles_valid     : in  std_logic;
       drawer_ready         : in  std_logic;
+      video_ready          : in  std_logic := '1';
       render_stall         : out std_logic := '0';
 
       IRP_HBlank           : out std_logic := '0';
@@ -192,7 +193,7 @@ begin
                   
                   when HBLANK =>
                      if (cycles >= 224) then -- 272
-                        if (lockspeed = '0' and stable_ff_video = '1' and drawer_ready = '0') then
+                        if (video_ready = '0' or (stable_ff_video = '1' and drawer_ready = '0')) then
                            render_wait <= '1';
                         else
                            render_wait <= '0';
@@ -245,6 +246,10 @@ begin
                   
                   when VBLANKHBLANK =>
                      if (cycles >= 224) then -- 272
+                        if (linecounter = 227 and video_ready = '0') then
+                           render_wait <= '1';
+                        else
+                        render_wait <= '0';
                         cycles      <= cycles - 224;
                         linecounter <= linecounter + 1;
                         if ((linecounter + 1) = unsigned(REG_DISPSTAT_V_Count_Setting) or ((linecounter + 1) = 228 and REG_DISPSTAT_V_Count_Setting = x"00")) then
@@ -268,6 +273,7 @@ begin
                            if ((linecounter + 1) = 227) then
                               REG_DISPSTAT_V_Blank_flag <= "0";  -- (set in line 160..226; not 227)
                            end if;
+                        end if;
                         end if;
                      end if;
                

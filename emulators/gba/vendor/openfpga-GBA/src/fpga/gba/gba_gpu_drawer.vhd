@@ -10,7 +10,8 @@ use work.pReg_gba_display.all;
 entity gba_gpu_drawer is
    generic
    (
-      is_simu : std_logic
+      is_simu : std_logic;
+      ExternalVRAMLow : boolean := false
    );
    port 
    (
@@ -40,6 +41,15 @@ entity gba_gpu_drawer is
       line_trigger         : in    std_logic;
       newline_invsync      : in    std_logic;
       
+      VRAM_Ext_req, VRAM_Ext_read : out std_logic := '0';
+      VRAM_Ext_addr : out std_logic_vector(13 downto 0) := (others => '0');
+      VRAM_Ext_wdata : out std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_be : out std_logic_vector(3 downto 0) := (others => '0');
+      VRAM_Ext_rdata : in std_logic_vector(31 downto 0) := (others => '0');
+      VRAM_Ext_done : in std_logic := '0';
+      VRAM_Lo_re : in std_logic := '0';
+      VRAM_Lo_done : out std_logic := '0';
+      external_reset : in std_logic := '0';
       VRAM_Lo_addr         : in    integer range 0 to 16383;
       VRAM_Lo_datain       : in    std_logic_vector(31 downto 0);
       VRAM_Lo_dataout      : out   std_logic_vector(31 downto 0);
@@ -248,6 +258,8 @@ architecture arch of gba_gpu_drawer is
    signal VRAM_Drawer_addr3    : integer range 0 to 16383;
    signal VRAM_Drawer_data_Lo  : std_logic_vector(31 downto 0);
    signal VRAM_Drawer_data_Hi  : std_logic_vector(31 downto 0);
+   signal VRAM_Lo_cache_hit : std_logic := '1';
+   signal VRAM_Drawer_valid_Lo_raw : std_logic_vector(3 downto 0) := (others => '0');
    signal VRAM_Drawer_valid_Lo : std_logic_vector(3 downto 0) := (others => '0');
    signal VRAM_Drawer_valid_Hi : std_logic_vector(1 downto 0) := (others => '0');
    signal VRAM_Drawer_cnt_Lo   : unsigned(1 downto 0) := (others => '0');
@@ -580,6 +592,7 @@ begin
                                                                                                                                                                                                                
    iREG_BLDY                            : entity work.eProcReg_gba generic map (BLDY                         ) port map  (clk100, gb_bus, "00000"                           , REG_BLDY                          ); 
 
+   g_vram_onchip : if not ExternalVRAMLow generate
    ivram_lo: entity MEM.SyncRamDualByteEnable
    generic map
    (
@@ -612,6 +625,27 @@ begin
       be_b       => "0000"
    );
    
+      VRAM_Lo_done <= '1';
+      VRAM_Lo_cache_hit <= '1';
+   end generate;
+   g_vram_external : if ExternalVRAMLow generate
+      ram : entity work.gba_vram_low_ext port map (
+         clk => clk100, reset => external_reset,
+         cpu_addr => VRAM_Lo_addr, cpu_din => VRAM_Lo_datain,
+         cpu_re => VRAM_Lo_re, cpu_we => VRAM_Lo_we, cpu_be => VRAM_Lo_be,
+         cpu_dout => VRAM_Lo_dataout, cpu_done => VRAM_Lo_done,
+         addr0 => VRAM_Drawer_addr0, addr1 => VRAM_Drawer_addr1,
+         addr2 => VRAM_Drawer_addr2, addr3 => VRAM_Drawer_addr3,
+         mux_addr => VRAM_Drawer_addr_Lo, ppu_data => VRAM_Drawer_data_Lo,
+         ppu_hit => VRAM_Lo_cache_hit,
+         mem_req => VRAM_Ext_req, mem_read => VRAM_Ext_read,
+         mem_addr => VRAM_Ext_addr, mem_wdata => VRAM_Ext_wdata,
+         mem_be => VRAM_Ext_be, mem_rdata => VRAM_Ext_rdata,
+         mem_done => VRAM_Ext_done
+      );
+   end generate;
+   VRAM_Drawer_valid_Lo <= VRAM_Drawer_valid_Lo_raw when VRAM_Lo_cache_hit = '1' else "0000";
+
    ivram_hi: entity MEM.SyncRamDualByteEnable
    generic map
    (
@@ -1049,10 +1083,10 @@ begin
          
          VRAM_Drawer_cnt_Lo <= VRAM_Drawer_cnt_Lo + 1;
          case (to_integer(VRAM_Drawer_cnt_Lo)) is
-            when 0 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr0; VRAM_Drawer_valid_Lo <= "1000";
-            when 1 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr1; VRAM_Drawer_valid_Lo <= "0001";
-            when 2 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr2; VRAM_Drawer_valid_Lo <= "0010";
-            when 3 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr3; VRAM_Drawer_valid_Lo <= "0100";
+            when 0 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr0; VRAM_Drawer_valid_Lo_raw <= "1000";
+            when 1 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr1; VRAM_Drawer_valid_Lo_raw <= "0001";
+            when 2 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr2; VRAM_Drawer_valid_Lo_raw <= "0010";
+            when 3 => VRAM_Drawer_addr_Lo <= VRAM_Drawer_addr3; VRAM_Drawer_valid_Lo_raw <= "0100";
             when others => null;
          end case;
          

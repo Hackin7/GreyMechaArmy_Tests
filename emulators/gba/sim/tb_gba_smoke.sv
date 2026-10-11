@@ -8,7 +8,7 @@ module tb_gba_smoke;
  wire [31:0] ext_write_data,ext_read_data,debug_cpu_pc;
  wire [7:0] pixel_x,pixel_y; wire [15:0] pixel_addr,audio_left,audio_right;
  wire [17:0] pixel_data; reg [31:0] bios[0:4095]; integer i; integer cycles=0;
- gba_core_wrapper dut(.clk_100(clk),.reset_n(reset_n),
+ gba_core_wrapper dut(.clk_100(clk),.reset_n(reset_n),.pause(1'b0),.video_ready(1'b1),
   .key_a(1'b0),.key_b(1'b0),.key_select(1'b0),.key_start(1'b0),
   .key_right(1'b0),.key_left(1'b0),.key_up(1'b0),.key_down(1'b0),
   .key_r(1'b0),.key_l(1'b0),.max_rom_addr(25'd0),.flash_1m(1'b0),
@@ -35,7 +35,7 @@ module tb_gba_smoke;
  end
  always @(posedge clk) if(reset_n) begin
   cycles<=cycles+1;
-  if(pixel_we && pixel_addr==0 && pixel_data[5:0]==6'h3f) begin
+  if(pixel_we && pixel_addr==1000 && pixel_data[5:0]==6'h3f) begin
    $display("PASS: ARM BIOS executed and PPU emitted red pixel after %0d cycles",cycles); $finish;
   end
   if(cycles==20000000) begin
