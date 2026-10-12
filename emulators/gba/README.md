@@ -8,8 +8,11 @@ working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
 The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 21/28 DSPs
-and 23,714/24,288 logic sites, down from the initial 40,436 sites. It is
-within the resource budget; routing of this optimized build is pending.
+and 23,772/24,288 logic sites, down from the initial 40,436 sites. Synthesis
+checks and pack-only verification pass. The earlier mapping of the corrected
+candidate uses 23,827 sites; its placement has completed and routing is running.
+Both include the LCD recovery fix and soft mapping of single-user
+synchronous resets; the earlier color-sharing map used 23,714 sites.
 The earlier `bf8ace6` candidate completed routing at 24,107 logic sites,
 43 block RAMs and 27 DSPs. Its final speed-grade-8 timing passes at all four
 clock constraints (core maximum 32.62 MHz against 21 MHz). The routed
@@ -42,6 +45,10 @@ RAM with native bank selection instead of copying banks through flip-flops.
 Mutually exclusive instruction types share destination/block and
 accumulator/Thumb-BL read ports without adding read latency.
 The area mapping uses ABC's area objective without carry cells or wide LUTs.
+`MIN_SRST_FANOUT=2` lowers single-user synchronous resets into their data
+paths before flip-flop mapping. This avoids isolated ECP5 tile reset controls
+and retains asynchronous reset behavior; `MIN_SRST_FANOUT=0` disables the
+low-fanout policy for comparisons.
 This includes the object-window RAM and block-RAM panel command ROM.
 Host transfer counters and bounds arithmetic now use the validated 8 MiB
 range; exhaustive SAT checks preserve the original packet validation and
@@ -175,6 +182,14 @@ been exercised on the board; the restored bitstream's SHA256 matches.
 For bring-up of the first candidate, `--retry-stalled-boot` explicitly logs
 up to two warm guest restarts after an unchanged BIOS PC/frame count. A
 successful retried test does not establish reliable cold startup.
+`--resume` attaches the collector to a running guest without reprogramming
+the FPGA, installing a cartridge or clearing guest RAM. Live suite progress
+and completed-suite counters are saved to `build/hardware/suite-progress.json`.
+Progress symbol addresses are used only for the verified ROM binary hash;
+eight-bit test IDs in suites with more than 255 cases are marked ambiguous.
+USB disconnects are recorded as interrupted runs, and cleanup preserves the
+original transport error. The first suite attempt was interrupted by a
+user-confirmed badge reset; a new run is progressing on the hardware.
 The GBA host uses the distinct `gba_protocol` module so menu apps that have
 already imported a different `protocol` module cannot change its wire format.
 The GBA menu entry is added after actual hardware acceptance.

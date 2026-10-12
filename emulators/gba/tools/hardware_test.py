@@ -19,6 +19,7 @@ from pathlib import Path
 import serial
 
 PROJECT = Path(__file__).resolve().parents[1]
+SUITE_PROGRESS_ROM_SHA256 = 'ba369e8bd9d7d532f5cd31deb4e05f324652b62056215487d79b89b81a0f1a7a'
 sys.path.insert(0, str(PROJECT.parents[1] / 'io/fpga_psram_j1/scripts'))
 from repl_run import read_until
 
@@ -30,9 +31,14 @@ class Console:
 
     def close(self):
         if self.console is not None:
-            self.console.write(b'\x02')
-            self.console.close()
+            console = self.console
             self.console = None
+            try:
+                console.write(b'\x02')
+            except (serial.SerialException, OSError):
+                pass
+            finally:
+                console.close()
 
     def execute(self, source, timeout=120, resets=False):
         # CircuitPython clears REPL globals when entering raw mode. Keep one
@@ -98,6 +104,23 @@ class Console:
                               "_gba_host.resume()\n" % (address, size), timeout=180)
         return bytes.fromhex(result.strip())
 
+    def suite_progress(self):
+        # Symbols from the pinned suite.elf (ROM hash checked by the caller).
+        result = self.execute(
+            "_gba_host.pause()\n"
+            "_info=_gba_host.read(0x400ac,8)\n"
+            "_counts=_gba_host.read(0x42ea4,16)\n"
+            "_gba_host.resume()\n"
+            "print(binascii.hexlify(_info).decode(),binascii.hexlify(_counts).decode())\n")
+        info, counts = [bytes.fromhex(item) for item in result.strip().split()]
+        if info[:4] != b'Info':
+            return dict(available=False, info_hex=info.hex())
+        subtest, test, suite = struct.unpack_from('<HBB', info, 4)
+        length, truncated, passed, total = struct.unpack('<4I', counts)
+        return dict(available=True, suite=suite, test=test, subtest=subtest,
+                    completed_passes=passed, completed_results=total,
+                    payload_bytes=length, truncated=bool(truncated))
+
 
 def stage(drive, rom, stage_bit=True):
     app = drive / 'apps/gba'
@@ -148,6 +171,8 @@ def main():
                         help='Log and retry a stalled BIOS boot up to twice (bring-up only)')
     parser.add_argument('--temporary-rom', action='store_true',
                         help='Reuse GBA bitstream disk space to flash the test ROM, then restore the bitstream')
+    parser.add_argument('--resume', action='store_true',
+                        help='Collect the already-running guest without uploading or resetting it')
     args = parser.parse_args()
     console = Console(args.port)
     if args.action == 'status':
@@ -165,7 +190,7 @@ def main():
     device_bit = args.drive/'apps/gba/gba.bit'
     temporary_stage = False
     try:
-        if args.temporary_rom:
+        if args.temporary_rom and not args.resume:
             # Only replace this runner's GBA artifact; retain a local backup
             # before freeing its space on the small CircuitPython volume.
             if not (PROJECT/'build/gba.bit').is_file():
@@ -177,22 +202,39 @@ def main():
                     raise RuntimeError('Device bitstream backup verification failed')
                 device_bit.unlink()
             temporary_stage = True
-        stage(args.drive, rom, stage_bit=not args.temporary_rom)
-        if not args.temporary_rom:
-            console.upload()
-        console.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
-                        "from gba_app import install_rom\ninstall_rom('/apps/gba/%s')\n" % rom, timeout=180)
-        if args.temporary_rom:
-            (args.drive/'apps/gba'/rom).unlink()
-            shutil.copy2(PROJECT/'build/gba.bit', device_bit)
-            temporary_stage = False
-            log['temporary_rom_staging'] = 'restored'
-        console.upload()
-        console.connect()
-        preflight(console, log)
         size = (PROJECT/'build/roms'/rom).stat().st_size
-        result = console.execute("print('GBA_START',_gba_host.start(%d))\n" % size, timeout=180)
-        print(result.strip(), flush=True)
+        if args.resume:
+            console.connect()
+            status = console.status()
+            if not status['run'] or not status['ram_ready'] or status['ram_fault']:
+                raise RuntimeError('No running GBA guest to resume: ' + repr(status))
+            if status['pause']:
+                console.execute('_gba_host.resume()\n')
+            log['resumed_run'] = True
+            log['initial_status'] = status
+        else:
+            stage(args.drive, rom, stage_bit=not args.temporary_rom)
+            if not args.temporary_rom:
+                console.upload()
+            console.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
+                            "from gba_app import install_rom\ninstall_rom('/apps/gba/%s')\n" % rom, timeout=180)
+            if args.temporary_rom:
+                (args.drive/'apps/gba'/rom).unlink()
+                shutil.copy2(PROJECT/'build/gba.bit', device_bit)
+                temporary_stage = False
+                log['temporary_rom_staging'] = 'restored'
+            console.upload()
+            console.connect()
+            preflight(console, log)
+            result = console.execute("print('GBA_START',_gba_host.start(%d))\n" % size, timeout=180)
+            print(result.strip(), flush=True)
+        manifest = None
+        if args.action == 'suite':
+            import hashlib
+            metadata = (PROJECT/'build/roms/SUITE_SOURCE.txt').read_text()
+            actual_hash = hashlib.sha256((PROJECT/'build/roms'/rom).read_bytes()).hexdigest()
+            if actual_hash == SUITE_PROGRESS_ROM_SHA256 and 'ROM SHA256: ' + actual_hash in metadata:
+                manifest = json.loads((PROJECT/'vendor/openfpga-GBA/benchmarks/mgba-suite/test-manifest.json').read_text())['suites']
         deadline = time.monotonic() + args.minutes*60
         boot_complete = False
         boot_sample = None
@@ -224,6 +266,20 @@ def main():
                 continue
             report = console.save(0, 64 if args.action == 'diagnostic' else 32)
             log['last_report_hex'] = report.hex()
+            if manifest is not None:
+                progress = console.suite_progress()
+                if progress['available'] and progress['suite'] < len(manifest):
+                    suite = manifest[progress['suite']]
+                    progress['suite_name'] = suite['name']
+                    # ActiveInfo stores only eight bits of the test index.
+                    # Larger suites cannot uniquely identify a case this way.
+                    if len(suite['tests']) > 255:
+                        progress['test_index_ambiguous'] = True
+                    elif progress['test'] < len(suite['tests']):
+                        progress['test_name'] = suite['tests'][progress['test']]
+                log['suite_progress'] = progress
+                (out/'suite-progress.json').write_text(json.dumps(progress, indent=2), encoding='utf-8')
+                print('GBA_SUITE_PROGRESS', progress, flush=True)
             if args.action == 'diagnostic' and report[:8] == b'GBADIAG1':
                 version, passed, done, keys, counter = struct.unpack_from('<5I', report, 8)
                 arithmetic_error, shifter_error, banking_error = struct.unpack_from('<3I', report, 36)
@@ -266,6 +322,10 @@ def main():
                     log['parser_error'] = parsed.stderr
             time.sleep(5)
         raise RuntimeError('ROM test did not complete before the timeout')
+    except serial.SerialException as exc:
+        log['result'] = 'interrupted'
+        log['error'] = str(exc)
+        raise
     except Exception as exc:
         log['result'] = 'failed'
         log['error'] = str(exc)

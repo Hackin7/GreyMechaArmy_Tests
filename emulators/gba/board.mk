@@ -3,6 +3,9 @@ BOARD_WORK ?= /tmp/greymecha_gba_board
 PORTABLE ?= $(BOARD_WORK)/portable
 PORTABLE_FLAGS ?= --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram --banked-register-ram --obj-window-ram --shared-color-arithmetic
 MAPPING_FLAGS ?= -noccu2 -nowidelut
+# ECP5 tile flip-flops share reset controls. Put single-user synchronous
+# resets in the data path instead of consuming a separate tile control set.
+MIN_SRST_FANOUT ?= 2
 BOARD_VHDL := $(patsubst $(VENDOR)/%,$(PORTABLE)/%,$(GBA_VHDL))
 PYTHON ?= python3
 YOSYS ?= yosys
@@ -31,7 +34,7 @@ board-core: portable
 
 bit: board-core
 	cp tools/ecp5_area.abc $(BOARD_WORK)/area.abc
-	$(YOSYS) -Q -T -p 'read_verilog -Irtl -I$(OLED_RTL) -sv $(BOARD_WORK)/gba_top.v $(BOARD_RTL); scratchpad -set abc9.script $(BOARD_WORK)/area.abc; synth_ecp5 -top top $(MAPPING_FLAGS) -no-rw-check -run begin:map_ram; write_rtlil $(BOARD_WORK)/pre_ram.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ram:map_gates; write_rtlil $(BOARD_WORK)/pre_gates.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_gates:check; hierarchy -check; check -assert; stat; write_rtlil $(BOARD_WORK)/mapped.il; blackbox =A:whitebox; write_json $(BOARD_WORK)/top.json' > $(BUILD)/board-yosys.log
+	$(YOSYS) -Q -T -p 'read_verilog -Irtl -I$(OLED_RTL) -sv $(BOARD_WORK)/gba_top.v $(BOARD_RTL); scratchpad -set abc9.script $(BOARD_WORK)/area.abc; synth_ecp5 -top top $(MAPPING_FLAGS) -no-rw-check -run begin:map_ram; write_rtlil $(BOARD_WORK)/pre_ram.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ram:map_gates; write_rtlil $(BOARD_WORK)/pre_gates.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_gates:map_ffs; dfflegalize -cell $$_DFF_?_ 01 -cell $$_DFF_?P?_ r -cell $$_SDFF_?P?_ r -cell $$_DFFE_??_ 01 -cell $$_DFFE_?P??_ r -cell $$_SDFFE_?P??_ r -cell $$_DLATCH_?_ x -minsrst $(MIN_SRST_FANOUT); synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ffs:check; hierarchy -check; check -assert; stat; write_rtlil $(BOARD_WORK)/mapped.il; blackbox =A:whitebox; write_json $(BOARD_WORK)/top.json' > $(BUILD)/board-yosys.log
 	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(BOARD_WORK)/top.json --lpf pinout.lpf --textcfg $(BOARD_WORK)/top.config --seed 1 $(NEXTPNR_FLAGS) > $(BUILD)/board-nextpnr.log 2>&1
 	$(ECPPACK) --compress $(BOARD_WORK)/top.config $(BUILD)/gba.bit
 
