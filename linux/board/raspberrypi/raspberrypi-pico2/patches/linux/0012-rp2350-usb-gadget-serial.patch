@@ -1,0 +1,921 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@local>
+Date: Sat, 6 Jun 2026 00:00:00 +0200
+Subject: [PATCH] usb: gadget: add RP2350 USB device controller
+
+Add a small, built-in USB device controller driver for the RP2350
+full-speed USB controller. The driver is intentionally limited to the
+single-buffered control, bulk and interrupt endpoint behavior needed by
+the legacy CDC ACM serial gadget.
+
+Register definitions and transfer sequencing are based on the RP2350
+register headers in the Raspberry Pi Pico SDK and the Raspberry Pi
+RP2040/RP2350 TinyUSB DCD implementation.
+
+Signed-off-by: Codex <codex@local>
+---
+ drivers/usb/gadget/udc/Kconfig      |  10 +
+ drivers/usb/gadget/udc/Makefile     |   1 +
+ drivers/usb/gadget/udc/rp2350_udc.c | 858 ++++++++++++++++++++++++++++
+ 3 files changed, 869 insertions(+)
+ create mode 100644 drivers/usb/gadget/udc/rp2350_udc.c
+
+diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
+index 111111111111..222222222222 100644
+--- a/drivers/usb/gadget/udc/Kconfig
++++ b/drivers/usb/gadget/udc/Kconfig
+@@ -17,6 +17,16 @@ menu "USB Peripheral Controller"
+ #
+ # Integrated controllers
+ #
++
++config USB_RP2350_UDC
++	tristate "Raspberry Pi RP2350 USB Device Controller"
++	depends on OF
++	depends on HAS_IOMEM
++	help
++	  Device-mode driver for the full-speed USB controller built into
++	  Raspberry Pi RP2350 microcontrollers. This is a minimal PIO-style
++	  UDC intended for gadget serial on tiny NOMMU systems.
++
+ 
+ config USB_AT91
+ 	tristate "Atmel AT91 USB Device Port"
+diff --git a/drivers/usb/gadget/udc/Makefile b/drivers/usb/gadget/udc/Makefile
+index 111111111111..222222222222 100644
+--- a/drivers/usb/gadget/udc/Makefile
++++ b/drivers/usb/gadget/udc/Makefile
+@@ -7,6 +7,7 @@ udc-core-y			:= core.o trace.o
+ #
+ obj-$(CONFIG_USB_GADGET)	+= udc-core.o
+ obj-$(CONFIG_USB_DUMMY_HCD)	+= dummy_hcd.o
++obj-$(CONFIG_USB_RP2350_UDC)	+= rp2350_udc.o
+ obj-$(CONFIG_USB_NET2272)	+= net2272.o
+ obj-$(CONFIG_USB_NET2280)	+= net2280.o
+ obj-$(CONFIG_USB_SNP_CORE)	+= snps_udc_core.o
+diff --git a/drivers/usb/gadget/udc/rp2350_udc.c b/drivers/usb/gadget/udc/rp2350_udc.c
+new file mode 100644
+index 000000000000..333333333333
+--- /dev/null
++++ b/drivers/usb/gadget/udc/rp2350_udc.c
+@@ -0,0 +1,858 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Raspberry Pi RP2350 USB device controller driver.
++ *
++ * This is a small single-buffered UDC for the RP2350 full-speed USB
++ * controller. It targets the built-in CDC ACM serial gadget on a minimal
++ * NOMMU Buildroot system.
++ */
++
++#include <linux/bitops.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/usb/ch9.h>
++#include <linux/usb/gadget.h>
++
++#define RP2350_MAX_EPNUM	15
++#define RP2350_NR_EPS		((RP2350_MAX_EPNUM + 1) * 2)
++#define RP2350_MAX_PACKET	64
++
++#define USB_ADDR_ENDP		0x00
++#define USB_MAIN_CTRL		0x40
++#define USB_SOF_RD		0x48
++#define USB_SIE_CTRL		0x4c
++#define USB_SIE_STATUS		0x50
++#define USB_BUFF_STATUS		0x58
++#define USB_BUFF_CPU_HANDLE	0x5c
++#define USB_EP_STALL_ARM	0x68
++#define USB_ABORT		0x6c
++#define USB_ABORT_DONE		0x70
++#define USB_MUXING		0x74
++#define USB_PWR			0x78
++#define USB_INTE		0x90
++#define USB_INTS		0x98
++
++#define RESETS_RESET		0x00
++#define RESETS_RESET_DONE	0x08
++#define RESETS_USBCTRL		BIT(28)
++
++#define MAIN_CTRL_EN		BIT(0)
++
++#define SIE_CTRL_START_TRANS	BIT(0)
++#define SIE_CTRL_SEND_SETUP	BIT(1)
++#define SIE_CTRL_SEND_DATA	BIT(2)
++#define SIE_CTRL_RECV_DATA	BIT(3)
++#define SIE_CTRL_STOP_TRANS	BIT(4)
++#define SIE_CTRL_SOF_EN		BIT(9)
++#define SIE_CTRL_PULLDOWN_EN	BIT(15)
++#define SIE_CTRL_PULLUP_EN	BIT(16)
++#define SIE_CTRL_EP0_1BUF	BIT(29)
++
++#define SIE_STATUS_SUSPENDED	BIT(4)
++#define SIE_STATUS_BUS_RESET	BIT(19)
++#define SIE_STATUS_SETUP_REC	BIT(17)
++#define SIE_STATUS_RESUME	BIT(11)
++
++#define INTR_BUFF_STATUS	BIT(4)
++#define INTR_BUS_RESET		BIT(12)
++#define INTR_DEV_SUSPEND	BIT(14)
++#define INTR_DEV_RESUME		BIT(15)
++#define INTR_SETUP_REQ		BIT(16)
++
++#define MUXING_TO_PHY		BIT(0)
++#define MUXING_SOFTCON		BIT(3)
++
++#define PWR_VBUS_DETECT		BIT(0)
++#define PWR_VBUS_OVERRIDE	BIT(3)
++
++#define EP_CTRL_ENABLE		BIT(31)
++#define EP_CTRL_INT_PER_BUFFER	BIT(29)
++#define EP_CTRL_TYPE_SHIFT	26
++
++#define BUF_FULL		BIT(15)
++#define BUF_LAST		BIT(14)
++#define BUF_DATA1		BIT(13)
++#define BUF_SEL			BIT(12)
++#define BUF_STALL		BIT(11)
++#define BUF_AVAIL		BIT(10)
++#define BUF_LEN_MASK		0x3ff
++
++#define XFER_CONTROL		0
++#define XFER_ISOC		1
++#define XFER_BULK		2
++#define XFER_INT		3
++
++#define DPRAM_EP_CTRL_BASE	0x004
++#define DPRAM_BUF_CTRL_BASE	0x080
++#define DPRAM_EP0_BUF		0x100
++#define DPRAM_EPX_DATA		0x180
++
++struct rp2350_udc;
++
++struct rp2350_req {
++	struct usb_request req;
++	struct list_head queue;
++};
++
++struct rp2350_ep {
++	struct usb_ep ep;
++	struct rp2350_udc *udc;
++	struct list_head queue;
++	const struct usb_endpoint_descriptor *desc;
++	char name[16];
++	u16 maxpacket;
++	u16 buf_offset;
++	u8 epnum;
++	u8 dir_in;
++	u8 type;
++	u8 next_pid;
++	bool enabled;
++	bool busy;
++	bool halted;
++};
++
++struct rp2350_udc {
++	struct usb_gadget gadget;
++	struct usb_gadget_driver *driver;
++	struct device *dev;
++	void __iomem *dpram;
++	void __iomem *regs;
++	void __iomem *resets;
++	int irq;
++	spinlock_t lock;
++	struct rp2350_ep eps[RP2350_NR_EPS];
++	struct usb_ctrlrequest setup;
++	bool setup_dir_in;
++	u8 pending_addr;
++	bool ep0_zlp;
++};
++
++static const struct usb_endpoint_descriptor ep0_desc = {
++	.bLength = USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType = USB_DT_ENDPOINT,
++	.bEndpointAddress = 0,
++	.bmAttributes = USB_ENDPOINT_XFER_CONTROL,
++	.wMaxPacketSize = cpu_to_le16(RP2350_MAX_PACKET),
++};
++
++static inline struct rp2350_udc *gadget_to_udc(struct usb_gadget *g)
++{
++	return container_of(g, struct rp2350_udc, gadget);
++}
++
++static inline struct rp2350_ep *usb_ep_to_rp2350(struct usb_ep *ep)
++{
++	return container_of(ep, struct rp2350_ep, ep);
++}
++
++static inline struct rp2350_req *usb_req_to_rp2350(struct usb_request *req)
++{
++	return container_of(req, struct rp2350_req, req);
++}
++
++static inline struct rp2350_ep *rp2350_get_ep(struct rp2350_udc *udc,
++					      u8 epnum, bool dir_in)
++{
++	return &udc->eps[epnum * 2 + (dir_in ? 1 : 0)];
++}
++
++static inline u32 rp2350_read(struct rp2350_udc *udc, u32 reg)
++{
++	return readl(udc->regs + reg);
++}
++
++static inline void rp2350_write(struct rp2350_udc *udc, u32 reg, u32 val)
++{
++	writel(val, udc->regs + reg);
++}
++
++static inline void rp2350_update_bits(struct rp2350_udc *udc, u32 reg,
++				      u32 mask, u32 val)
++{
++	u32 tmp = rp2350_read(udc, reg);
++
++	tmp &= ~mask;
++	tmp |= val & mask;
++	rp2350_write(udc, reg, tmp);
++}
++
++static inline void rp2350_write_buf_ctrl(struct rp2350_udc *udc,
++					 struct rp2350_ep *ep, u32 val)
++{
++	u32 off = DPRAM_BUF_CTRL_BASE + ep->epnum * 8 + (ep->dir_in ? 0 : 4);
++
++	writel(val & ~BUF_AVAIL, udc->dpram + off);
++	if (val & BUF_AVAIL) {
++		ndelay(200);
++		writel(val, udc->dpram + off);
++	}
++}
++
++static inline u32 rp2350_read_buf_ctrl(struct rp2350_udc *udc,
++				       struct rp2350_ep *ep)
++{
++	u32 off = DPRAM_BUF_CTRL_BASE + ep->epnum * 8 + (ep->dir_in ? 0 : 4);
++
++	return readl(udc->dpram + off);
++}
++
++static inline void rp2350_write_ep_ctrl(struct rp2350_udc *udc,
++					struct rp2350_ep *ep, u32 val)
++{
++	u32 off;
++
++	if (!ep->epnum)
++		return;
++
++	off = DPRAM_EP_CTRL_BASE + (ep->epnum - 1) * 8 + (ep->dir_in ? 0 : 4);
++	writel(val, udc->dpram + off);
++}
++
++static void rp2350_done(struct rp2350_ep *ep, struct rp2350_req *req, int status)
++{
++	struct rp2350_udc *udc = ep->udc;
++
++	list_del_init(&req->queue);
++	if (req->req.status == -EINPROGRESS)
++		req->req.status = status;
++
++	usb_gadget_unmap_request(&udc->gadget, &req->req, ep->dir_in);
++	spin_unlock(&udc->lock);
++	usb_gadget_giveback_request(&ep->ep, &req->req);
++	spin_lock(&udc->lock);
++}
++
++static void rp2350_ep_stall(struct rp2350_ep *ep)
++{
++	struct rp2350_udc *udc = ep->udc;
++
++	if (!ep->epnum && ep->dir_in)
++		rp2350_write(udc, USB_EP_STALL_ARM, BIT(0));
++	else if (!ep->epnum)
++		rp2350_write(udc, USB_EP_STALL_ARM, BIT(1));
++
++	rp2350_write_buf_ctrl(udc, ep, BUF_STALL);
++	ep->halted = true;
++}
++
++static void rp2350_start_packet(struct rp2350_ep *ep)
++{
++	struct rp2350_udc *udc = ep->udc;
++	struct rp2350_req *req;
++	u8 *buf;
++	u32 ctrl;
++	u16 len;
++	bool last;
++
++	if (ep->busy || ep->halted || list_empty(&ep->queue))
++		return;
++
++	req = list_first_entry(&ep->queue, struct rp2350_req, queue);
++	buf = req->req.buf + req->req.actual;
++	len = min_t(u32, req->req.length - req->req.actual, ep->maxpacket);
++	last = req->req.actual + len >= req->req.length || len < ep->maxpacket;
++
++	if (usb_gadget_map_request(&udc->gadget, &req->req, ep->dir_in))
++		return rp2350_done(ep, req, -EINVAL);
++
++	ctrl = len | BUF_AVAIL;
++	if (ep->next_pid)
++		ctrl |= BUF_DATA1;
++	ep->next_pid ^= 1;
++	if (last)
++		ctrl |= BUF_LAST;
++
++	if (ep->dir_in) {
++		if (len)
++			memcpy_toio(udc->dpram + ep->buf_offset, buf, len);
++		ctrl |= BUF_FULL;
++	}
++
++	ep->busy = true;
++	rp2350_write_buf_ctrl(udc, ep, ctrl);
++}
++
++static void rp2350_complete_ep0_zlp(struct rp2350_udc *udc)
++{
++	struct rp2350_ep *ep = rp2350_get_ep(udc, 0, true);
++
++	ep->busy = false;
++	udc->ep0_zlp = false;
++	if (udc->pending_addr) {
++		rp2350_write(udc, USB_ADDR_ENDP, udc->pending_addr & 0x7f);
++		udc->pending_addr = 0;
++	}
++}
++
++static void rp2350_handle_buffer(struct rp2350_udc *udc, u8 epnum, bool dir_in)
++{
++	struct rp2350_ep *ep = rp2350_get_ep(udc, epnum, dir_in);
++	struct rp2350_req *req;
++	u32 ctrl;
++	u16 len;
++	bool done;
++
++	if (!ep->busy) {
++		if (!epnum && dir_in && udc->ep0_zlp)
++			rp2350_complete_ep0_zlp(udc);
++		return;
++	}
++
++	if (list_empty(&ep->queue)) {
++		ep->busy = false;
++		return;
++	}
++
++	req = list_first_entry(&ep->queue, struct rp2350_req, queue);
++	ctrl = rp2350_read_buf_ctrl(udc, ep);
++	len = ctrl & BUF_LEN_MASK;
++
++	if (!dir_in && len) {
++		u32 avail = req->req.length - req->req.actual;
++
++		len = min_t(u16, len, avail);
++		memcpy_fromio(req->req.buf + req->req.actual,
++			      udc->dpram + ep->buf_offset, len);
++	}
++
++	req->req.actual += len;
++	ep->busy = false;
++
++	done = req->req.actual >= req->req.length ||
++	       (!dir_in && len < ep->maxpacket) ||
++	       (ctrl & BUF_LAST);
++
++	if (done) {
++		rp2350_done(ep, req, 0);
++		if (!epnum && udc->pending_addr) {
++			rp2350_write(udc, USB_ADDR_ENDP, udc->pending_addr & 0x7f);
++			udc->pending_addr = 0;
++		}
++	}
++
++	rp2350_start_packet(ep);
++}
++
++static void rp2350_arm_ep0_zlp(struct rp2350_udc *udc)
++{
++	struct rp2350_ep *ep = rp2350_get_ep(udc, 0, true);
++
++	udc->ep0_zlp = true;
++	ep->busy = true;
++	rp2350_write_buf_ctrl(udc, ep, BUF_AVAIL | BUF_FULL | BUF_LAST);
++}
++
++static void rp2350_ep0_get_status(struct rp2350_udc *udc)
++{
++	struct rp2350_ep *ep = rp2350_get_ep(udc, 0, true);
++	u16 status = 0;
++
++	memcpy_toio(udc->dpram + ep->buf_offset, &status, sizeof(status));
++	udc->ep0_zlp = true;
++	ep->busy = true;
++	rp2350_write_buf_ctrl(udc, ep, sizeof(status) | BUF_AVAIL | BUF_FULL |
++			      BUF_LAST | (ep->next_pid ? BUF_DATA1 : 0));
++	ep->next_pid ^= 1;
++}
++
++static void rp2350_reset_noncontrol(struct rp2350_udc *udc)
++{
++	int i;
++
++	for (i = 1; i <= RP2350_MAX_EPNUM; i++) {
++		struct rp2350_ep *in = rp2350_get_ep(udc, i, true);
++		struct rp2350_ep *out = rp2350_get_ep(udc, i, false);
++
++		rp2350_write_ep_ctrl(udc, in, 0);
++		rp2350_write_ep_ctrl(udc, out, 0);
++		rp2350_write_buf_ctrl(udc, in, 0);
++		rp2350_write_buf_ctrl(udc, out, 0);
++		in->busy = false;
++		out->busy = false;
++		in->halted = false;
++		out->halted = false;
++		in->next_pid = 0;
++		out->next_pid = 0;
++	}
++}
++
++static void rp2350_handle_setup(struct rp2350_udc *udc)
++{
++	struct rp2350_ep *ep0in = rp2350_get_ep(udc, 0, true);
++	struct rp2350_ep *ep0out = rp2350_get_ep(udc, 0, false);
++	struct usb_ctrlrequest setup;
++	int ret;
++
++	memcpy_fromio(&setup, udc->dpram, sizeof(setup));
++	setup.wValue = le16_to_cpu(setup.wValue);
++	setup.wIndex = le16_to_cpu(setup.wIndex);
++	setup.wLength = le16_to_cpu(setup.wLength);
++	udc->setup = setup;
++	udc->setup_dir_in = !!(setup.bRequestType & USB_DIR_IN);
++	dev_info(udc->dev, "setup type=0x%02x req=0x%02x value=0x%04x index=0x%04x len=%u\n",
++		 setup.bRequestType, setup.bRequest, setup.wValue,
++		 setup.wIndex, setup.wLength);
++
++	ep0in->next_pid = 1;
++	ep0out->next_pid = 1;
++	ep0in->halted = false;
++	ep0out->halted = false;
++	rp2350_write_buf_ctrl(udc, ep0in, 0);
++	rp2350_write_buf_ctrl(udc, ep0out, 0);
++
++	if ((setup.bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD) {
++		switch (setup.bRequest) {
++		case USB_REQ_SET_ADDRESS:
++			if (setup.bRequestType == (USB_TYPE_STANDARD | USB_RECIP_DEVICE)) {
++				udc->pending_addr = setup.wValue & 0x7f;
++				rp2350_arm_ep0_zlp(udc);
++				return;
++			}
++			break;
++		case USB_REQ_GET_STATUS:
++			if ((setup.bRequestType & USB_DIR_IN) && setup.wLength == 2) {
++				rp2350_ep0_get_status(udc);
++				return;
++			}
++			break;
++		default:
++			break;
++		}
++	}
++
++	if (!udc->driver || !udc->driver->setup) {
++		rp2350_ep_stall(ep0in);
++		rp2350_ep_stall(ep0out);
++		return;
++	}
++
++	spin_unlock(&udc->lock);
++	ret = udc->driver->setup(&udc->gadget, &setup);
++	spin_lock(&udc->lock);
++	if (ret < 0) {
++		rp2350_ep_stall(ep0in);
++		rp2350_ep_stall(ep0out);
++	}
++}
++
++static irqreturn_t rp2350_irq(int irq, void *data)
++{
++	struct rp2350_udc *udc = data;
++	unsigned long flags;
++	u32 status;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	status = rp2350_read(udc, USB_INTS);
++	if (!status) {
++		spin_unlock_irqrestore(&udc->lock, flags);
++		return IRQ_NONE;
++	}
++
++	if (status & INTR_BUFF_STATUS) {
++		u32 bits = rp2350_read(udc, USB_BUFF_STATUS);
++
++		while (bits) {
++			u8 bit = __ffs(bits);
++			bool dir_in = !(bit & 1);
++			u8 epnum = bit >> 1;
++			u32 mask = BIT(bit);
++
++			rp2350_write(udc, USB_BUFF_STATUS, mask);
++			rp2350_handle_buffer(udc, epnum, dir_in);
++			bits &= ~mask;
++		}
++	}
++
++	if (status & INTR_SETUP_REQ) {
++		rp2350_handle_setup(udc);
++		rp2350_write(udc, USB_SIE_STATUS, SIE_STATUS_SETUP_REC);
++	}
++
++	if (status & INTR_BUS_RESET) {
++		rp2350_write(udc, USB_ADDR_ENDP, 0);
++		udc->pending_addr = 0;
++		udc->ep0_zlp = false;
++		rp2350_reset_noncontrol(udc);
++		usb_gadget_set_state(&udc->gadget, USB_STATE_DEFAULT);
++		rp2350_write(udc, USB_SIE_STATUS, SIE_STATUS_BUS_RESET);
++		dev_info(udc->dev, "USB bus reset\n");
++	}
++
++	if (status & INTR_DEV_SUSPEND) {
++		usb_gadget_set_state(&udc->gadget, USB_STATE_SUSPENDED);
++		rp2350_write(udc, USB_SIE_STATUS, SIE_STATUS_SUSPENDED);
++	}
++
++	if (status & INTR_DEV_RESUME) {
++		usb_gadget_set_state(&udc->gadget, USB_STATE_CONFIGURED);
++		rp2350_write(udc, USB_SIE_STATUS, SIE_STATUS_RESUME);
++	}
++
++	spin_unlock_irqrestore(&udc->lock, flags);
++	return IRQ_HANDLED;
++}
++
++static struct usb_request *rp2350_alloc_request(struct usb_ep *_ep, gfp_t gfp)
++{
++	struct rp2350_req *req;
++
++	req = kzalloc(sizeof(*req), gfp);
++	if (!req)
++		return NULL;
++
++	INIT_LIST_HEAD(&req->queue);
++	return &req->req;
++}
++
++static void rp2350_free_request(struct usb_ep *_ep, struct usb_request *_req)
++{
++	kfree(usb_req_to_rp2350(_req));
++}
++
++static int rp2350_ep_enable(struct usb_ep *_ep,
++			    const struct usb_endpoint_descriptor *desc)
++{
++	struct rp2350_ep *ep = usb_ep_to_rp2350(_ep);
++	struct rp2350_udc *udc = ep->udc;
++	unsigned long flags;
++	u32 ep_ctrl;
++	u8 type;
++
++	if (!desc || !ep->epnum)
++		return -EINVAL;
++
++	type = usb_endpoint_type(desc);
++	if (type == USB_ENDPOINT_XFER_ISOC)
++		return -EINVAL;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	ep->desc = desc;
++	ep->type = type == USB_ENDPOINT_XFER_INT ? XFER_INT : XFER_BULK;
++	ep->maxpacket = min_t(u16, usb_endpoint_maxp(desc), RP2350_MAX_PACKET);
++	ep->next_pid = 0;
++	ep->halted = false;
++	ep->busy = false;
++	ep->enabled = true;
++	ep->ep.maxpacket = ep->maxpacket;
++
++	ep_ctrl = EP_CTRL_ENABLE | EP_CTRL_INT_PER_BUFFER |
++		  ((u32)ep->type << EP_CTRL_TYPE_SHIFT) | ep->buf_offset;
++	rp2350_write_ep_ctrl(udc, ep, ep_ctrl);
++	rp2350_write_buf_ctrl(udc, ep, 0);
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static int rp2350_ep_disable(struct usb_ep *_ep)
++{
++	struct rp2350_ep *ep = usb_ep_to_rp2350(_ep);
++	struct rp2350_udc *udc = ep->udc;
++	struct rp2350_req *req, *tmp;
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	rp2350_write_ep_ctrl(udc, ep, 0);
++	rp2350_write_buf_ctrl(udc, ep, 0);
++	ep->enabled = false;
++	ep->busy = false;
++	ep->halted = false;
++	list_for_each_entry_safe(req, tmp, &ep->queue, queue)
++		rp2350_done(ep, req, -ESHUTDOWN);
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static int rp2350_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
++			   gfp_t gfp)
++{
++	struct rp2350_ep *ep = usb_ep_to_rp2350(_ep);
++	struct rp2350_udc *udc = ep->udc;
++	struct rp2350_req *req = usb_req_to_rp2350(_req);
++	unsigned long flags;
++
++	if (!_req || !_req->complete || !_req->buf)
++		return -EINVAL;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	if (!ep->epnum)
++		ep = rp2350_get_ep(udc, 0, udc->setup_dir_in);
++
++	if (ep->epnum && !ep->enabled) {
++		spin_unlock_irqrestore(&udc->lock, flags);
++		return -ESHUTDOWN;
++	}
++
++	_req->status = -EINPROGRESS;
++	_req->actual = 0;
++	list_add_tail(&req->queue, &ep->queue);
++	rp2350_start_packet(ep);
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static int rp2350_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
++{
++	struct rp2350_ep *ep = usb_ep_to_rp2350(_ep);
++	struct rp2350_udc *udc = ep->udc;
++	struct rp2350_req *req = usb_req_to_rp2350(_req);
++	struct rp2350_req *iter;
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	list_for_each_entry(iter, &ep->queue, queue) {
++		if (iter == req) {
++			rp2350_done(ep, req, -ECONNRESET);
++			break;
++		}
++	}
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static int rp2350_ep_set_halt(struct usb_ep *_ep, int value)
++{
++	struct rp2350_ep *ep = usb_ep_to_rp2350(_ep);
++	struct rp2350_udc *udc = ep->udc;
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	if (value) {
++		rp2350_ep_stall(ep);
++	} else {
++		ep->halted = false;
++		ep->next_pid = 0;
++		rp2350_write_buf_ctrl(udc, ep, 0);
++	}
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static const struct usb_ep_ops rp2350_ep_ops = {
++	.enable = rp2350_ep_enable,
++	.disable = rp2350_ep_disable,
++	.alloc_request = rp2350_alloc_request,
++	.free_request = rp2350_free_request,
++	.queue = rp2350_ep_queue,
++	.dequeue = rp2350_ep_dequeue,
++	.set_halt = rp2350_ep_set_halt,
++};
++
++static int rp2350_pullup(struct usb_gadget *gadget, int is_on)
++{
++	struct rp2350_udc *udc = gadget_to_udc(gadget);
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	rp2350_update_bits(udc, USB_SIE_CTRL, SIE_CTRL_PULLUP_EN,
++			   is_on ? SIE_CTRL_PULLUP_EN : 0);
++	spin_unlock_irqrestore(&udc->lock, flags);
++	dev_info(udc->dev, "USB pullup %s\n", is_on ? "on" : "off");
++
++	return 0;
++}
++
++static int rp2350_udc_start(struct usb_gadget *gadget,
++			    struct usb_gadget_driver *driver)
++{
++	struct rp2350_udc *udc = gadget_to_udc(gadget);
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	udc->driver = driver;
++	gadget->speed = USB_SPEED_FULL;
++	usb_gadget_set_state(gadget, USB_STATE_POWERED);
++	spin_unlock_irqrestore(&udc->lock, flags);
++	dev_info(udc->dev, "UDC started for %s\n", driver->function);
++
++	return 0;
++}
++
++static int rp2350_udc_stop(struct usb_gadget *gadget)
++{
++	struct rp2350_udc *udc = gadget_to_udc(gadget);
++	unsigned long flags;
++
++	spin_lock_irqsave(&udc->lock, flags);
++	udc->driver = NULL;
++	rp2350_update_bits(udc, USB_SIE_CTRL, SIE_CTRL_PULLUP_EN, 0);
++	spin_unlock_irqrestore(&udc->lock, flags);
++
++	return 0;
++}
++
++static const struct usb_gadget_ops rp2350_gadget_ops = {
++	.pullup = rp2350_pullup,
++	.udc_start = rp2350_udc_start,
++	.udc_stop = rp2350_udc_stop,
++};
++
++static void rp2350_release_usbctrl_reset(struct rp2350_udc *udc)
++{
++	int i;
++	u32 reset;
++
++	if (!udc->resets)
++		return;
++
++	reset = readl(udc->resets + RESETS_RESET);
++	writel(reset & ~RESETS_USBCTRL, udc->resets + RESETS_RESET);
++
++	for (i = 0; i < 1000; i++) {
++		if (readl(udc->resets + RESETS_RESET_DONE) & RESETS_USBCTRL)
++			return;
++		udelay(1);
++	}
++
++	dev_warn(udc->dev, "USBCTRL reset did not complete\n");
++}
++
++static void rp2350_hw_init(struct rp2350_udc *udc)
++{
++	rp2350_release_usbctrl_reset(udc);
++	memset_io(udc->dpram, 0, 4096);
++	rp2350_write(udc, USB_MUXING, MUXING_TO_PHY | MUXING_SOFTCON);
++	rp2350_write(udc, USB_PWR, PWR_VBUS_DETECT | PWR_VBUS_OVERRIDE);
++	rp2350_write(udc, USB_ADDR_ENDP, 0);
++	rp2350_write(udc, USB_MAIN_CTRL, MAIN_CTRL_EN);
++	rp2350_write(udc, USB_SIE_CTRL, SIE_CTRL_EP0_1BUF);
++	rp2350_write(udc, USB_INTE, INTR_BUFF_STATUS | INTR_BUS_RESET |
++		     INTR_SETUP_REQ | INTR_DEV_SUSPEND | INTR_DEV_RESUME);
++}
++
++static void rp2350_init_eps(struct rp2350_udc *udc)
++{
++	int epnum, dir;
++
++	INIT_LIST_HEAD(&udc->gadget.ep_list);
++	udc->gadget.ep0 = &rp2350_get_ep(udc, 0, false)->ep;
++
++	for (epnum = 0; epnum <= RP2350_MAX_EPNUM; epnum++) {
++		for (dir = 0; dir < 2; dir++) {
++			struct rp2350_ep *ep = rp2350_get_ep(udc, epnum, dir);
++			bool in = dir;
++			int idx = (epnum - 1) * 2 + (in ? 0 : 1);
++
++			ep->udc = udc;
++			ep->epnum = epnum;
++			ep->dir_in = in;
++			ep->maxpacket = RP2350_MAX_PACKET;
++			ep->ep.maxpacket = RP2350_MAX_PACKET;
++			usb_ep_set_maxpacket_limit(&ep->ep, RP2350_MAX_PACKET);
++			ep->ep.ops = &rp2350_ep_ops;
++			INIT_LIST_HEAD(&ep->queue);
++
++			if (!epnum) {
++				snprintf(ep->name, sizeof(ep->name), "ep0");
++				ep->buf_offset = DPRAM_EP0_BUF;
++				ep->desc = &ep0_desc;
++				ep->enabled = true;
++			} else {
++				snprintf(ep->name, sizeof(ep->name), "ep%d%s",
++					 epnum, in ? "in" : "out");
++				ep->buf_offset = DPRAM_EPX_DATA + idx * RP2350_MAX_PACKET;
++				ep->ep.caps.type_bulk = true;
++				ep->ep.caps.type_int = true;
++				ep->ep.caps.dir_in = in;
++				ep->ep.caps.dir_out = !in;
++				list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
++			}
++			ep->ep.name = ep->name;
++		}
++	}
++}
++
++static int rp2350_probe(struct platform_device *pdev)
++{
++	struct rp2350_udc *udc;
++	int ret;
++
++	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
++	if (!udc)
++		return -ENOMEM;
++
++	udc->dev = &pdev->dev;
++	spin_lock_init(&udc->lock);
++	platform_set_drvdata(pdev, udc);
++
++	udc->dpram = devm_platform_ioremap_resource_byname(pdev, "dpram");
++	if (IS_ERR(udc->dpram))
++		return PTR_ERR(udc->dpram);
++
++	udc->regs = devm_platform_ioremap_resource_byname(pdev, "ctrl");
++	if (IS_ERR(udc->regs))
++		return PTR_ERR(udc->regs);
++
++	udc->resets = devm_platform_ioremap_resource_byname(pdev, "resets");
++	if (IS_ERR(udc->resets)) {
++		ret = PTR_ERR(udc->resets);
++		if (ret == -EINVAL)
++			udc->resets = NULL;
++		else
++			return ret;
++	}
++
++	udc->irq = platform_get_irq(pdev, 0);
++	if (udc->irq < 0)
++		return udc->irq;
++
++	udc->gadget.ops = &rp2350_gadget_ops;
++	udc->gadget.name = "rp2350-udc";
++	udc->gadget.max_speed = USB_SPEED_FULL;
++	udc->gadget.speed = USB_SPEED_UNKNOWN;
++	udc->gadget.is_selfpowered = 0;
++
++	rp2350_init_eps(udc);
++	rp2350_hw_init(udc);
++
++	ret = devm_request_irq(&pdev->dev, udc->irq, rp2350_irq, 0,
++			       dev_name(&pdev->dev), udc);
++	if (ret)
++		return ret;
++
++	ret = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
++	if (ret)
++		return ret;
++
++	dev_info(&pdev->dev, "RP2350 USB gadget controller registered\n");
++	return 0;
++}
++
++static void rp2350_remove(struct platform_device *pdev)
++{
++	struct rp2350_udc *udc = platform_get_drvdata(pdev);
++
++	usb_del_gadget_udc(&udc->gadget);
++	rp2350_write(udc, USB_INTE, 0);
++	rp2350_write(udc, USB_MAIN_CTRL, 0);
++	return;
++}
++
++static const struct of_device_id rp2350_of_match[] = {
++	{ .compatible = "raspberrypi,rp2350-usb-device" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, rp2350_of_match);
++
++static struct platform_driver rp2350_driver = {
++	.probe = rp2350_probe,
++	.remove = rp2350_remove,
++	.driver = {
++		.name = "rp2350-udc",
++		.of_match_table = rp2350_of_match,
++	},
++};
++module_platform_driver(rp2350_driver);
++
++MODULE_DESCRIPTION("Raspberry Pi RP2350 USB device controller");
++MODULE_LICENSE("GPL");
+-- 
+2.45.0

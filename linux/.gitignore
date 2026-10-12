@@ -1,0 +1,50 @@
+package/pico2-bootloader/bootloader/build
+package/pico2-bootloader/bootloader/*.uf2
+package/pico2-bootloader/bootloader/*.bin
+package/pico2-bootloader/bootloader/demo/build
+
+# Keep source configuration visible under the parent repository's broad ignores.
+!*.config
+!*.json
+
+# Local Buildroot downloads, generated images, and caches.
+/buildroot/output/
+/buildroot/dl/
+build/
+__pycache__/
+*.py[cod]
+/flash-image*.bin
+/flash-image*.uf2
+
+# Authored logging packages and documentation assets.
+!/buildroot/docs/website/images/logilin-logo.png
+!/buildroot/docs/website/images/logo.png
+!/buildroot/docs/website/images/logo.xcf
+!/buildroot/docs/website/images/logo_small.png
+!/buildroot/package/linux-pam/login.pam
+!/buildroot/package/log4cplus/
+!/buildroot/package/log4cplus/log4cplus.hash
+!/buildroot/package/log4cplus/log4cplus.mk
+!/buildroot/package/log4cpp/
+!/buildroot/package/log4cpp/log4cpp.hash
+!/buildroot/package/log4cpp/log4cpp.mk
+!/buildroot/package/log4cxx/
+!/buildroot/package/log4cxx/log4cxx.hash
+!/buildroot/package/log4cxx/log4cxx.mk
+!/buildroot/package/log4qt/
+!/buildroot/package/log4qt/log4qt.hash
+!/buildroot/package/log4qt/log4qt.mk
+!/buildroot/package/logrotate/
+!/buildroot/package/logrotate/logrotate.conf
+!/buildroot/package/logrotate/logrotate.hash
+!/buildroot/package/logrotate/logrotate.mk
+!/buildroot/package/logsurfer/
+!/buildroot/package/logsurfer/logsurfer.hash
+!/buildroot/package/logsurfer/logsurfer.mk
+!/buildroot/package/skeleton-init-openrc/skeleton/dev/log
+!/buildroot/package/skeleton-init-openrc/skeleton/var/log
+!/buildroot/package/skeleton-init-sysv/skeleton/dev/log
+!/buildroot/package/skeleton-init-sysv/skeleton/var/log
+
+# Required source and test fixtures covered by parent ignore patterns.
+!/buildroot/support/testing/tests/package/test_file/rootfs-overlay/root/random-data.bin
