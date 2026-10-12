@@ -7,9 +7,14 @@ Hardware acceptance is pending; simulation passes alone do not establish a
 working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
-The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 27/28 DSPs
-and 23,887/24,288 logic sites, down from the initial 40,436 sites. It is
+The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 21/28 DSPs
+and 23,714/24,288 logic sites, down from the initial 40,436 sites. It is
 within the resource budget; final routing and timing are pending.
+Separate synthesis of the core with the board's constant BIOS-write inputs
+and unused audio/pixel-address outputs uses 20,388 LUT4s, 64 distributed RAM
+blocks and 20,774 packed logic sites, plus 40 block RAMs and 21 DSPs.
+This is above the 17K core estimate. Separate optimization means the core
+and board section estimates do not form an exact additive partition.
 The board shares DMA address adders and the CPU's
 ADD/ADC/SUB/SBC datapath and ARM barrel shifter. Their arithmetic behavior
 is exhaustively proved with Yosys SAT; the diagnostic also checks carry, borrow and
@@ -29,12 +34,20 @@ of distributed RAM. Word zero is prefetched during packet reception and
 each subsequent word at PSRAM completion, preserving the issue cadence.
 SPI/CRC tests cover full payloads followed by short packets and upper-address
 readback. This change saves 220 logic sites in the complete mapped design.
+Alpha blending, brightening and darkening share mutually exclusive color
+products and a result register without changing pipeline latency. Exhaustive
+SAT checks compare every color, effect and five-bit coefficient, including
+coefficient saturation, with equations extracted from the original source.
+This saves six DSPs and 173 logic sites in the complete mapped design.
+The renderer reference instantiates an independent original compositor.
 The 100 MHz core target placed but its estimated maximum was about 32 MHz.
 The board now targets a nominal 20 MHz core with unchanged 80 MHz panel
 and 50 MHz flash clocks. The internal oscillator makes these approximately
 20.67/82.67/51.67 MHz; the LPF constrains them to 21/85/53 MHz.
 Button counters use the core frequency bound. Flash and complete LCD-stream
 simulations pass at these core/panel/flash clock ratios.
+The build uses conservative speed-grade-6 timing; `FPGA_SPEED` and
+`NEXTPNR_FLAGS` permit explicit tool overrides.
 No GBA bitstream has been programmed on the board.
 
 Run the build commands in WSL from this directory. Required tools are GHDL,
@@ -71,9 +84,11 @@ priority/coverage metadata use block RAM. Sprite metadata clears one entry
 per clock between scanlines; the next line waits for the clear to finish.
 The object-window buffer also clears sequentially between lines and retains
 its original registered read latency.
-The renderer matches the original for 17,280 pixels with both on-chip and
+The renderer matches the original for 34,560 pixels with both on-chip and
 variable-latency external low VRAM, covering all six modes, layers, sprites,
-transforms, windows, mosaic and blending.
+transforms, windows, mosaic, alpha blending, brightening, darkening and
+coefficients 0, 1, 8, 16, 17 and 31. Semitransparent sprites remain present
+in the brightness scenes to verify their alpha override.
 The build permits undefined simultaneous read/write collisions for block RAM;
 CPU write-cycle read outputs are unused. Generated netlists and memory files
 live on the Linux filesystem under `BOARD_WORK`, normally

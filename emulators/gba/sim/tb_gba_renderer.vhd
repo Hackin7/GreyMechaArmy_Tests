@@ -177,32 +177,12 @@ gb_bus_drive => responses(1)
       bus_in.Adr <= std_logic_vector(to_unsigned(address mod 16#04000000#,28));
       bus_in.Din <= value; bus_in.ena <= '1'; step(2); bus_in.ena <= '0'; step(2);
     end;
-    variable value : unsigned(31 downto 0);
-    variable timeout : natural;
-    variable attr0, attr1, attr2, affine : natural;
-  begin
-    bus_in.rst<='1'; step(2); bus_in.rst<='0'; step(2);
-    low_we<='1'; high_we<='1';
-    for i in 0 to 16383 loop
-      low_addr<=i; high_addr<=i mod 8192;
-      data<=std_logic_vector(to_unsigned((i*73+12345) mod 65536,16)) &
-            std_logic_vector(to_unsigned((i*119+23456) mod 65536,16)); step;
-    end loop;
-    low_we<='0'; high_we<='0'; palette_we<="1111";
-    for i in 0 to 127 loop
-      small_addr<=i;
-      data<=std_logic_vector(to_unsigned((i*137+91) mod 32768,16)) &
-            std_logic_vector(to_unsigned((i*243+17) mod 32768,16)); step;
-    end loop;
-    palette_we<="0000"; oam_we<="1111";
-    for i in 0 to 255 loop
-      oam_addr<=i;
-      if i mod 2=0 then data<=x"00000200"; else data<=x"00000000"; end if; step;
-    end loop;
-    -- Overlap twelve sprites to exercise priority/coverage read-after-write,
-    -- transparent texels, affine transforms, flips, mosaic and OBJ windows.
+    procedure sprites(base : natural) is
+      variable attr0, attr1, attr2, affine : natural;
+    begin
+      oam_we<="1111";
     for obj in 0 to 11 loop
-      attr0 := (obj*3) mod 14 + (obj mod 3)*1024;
+      attr0 := base + (obj*3) mod 14 + (obj mod 3)*1024;
       attr1 := (obj*5) mod 40 + 3*16384; -- 64x64, spanning later test rows
       if obj mod 4=0 then
         attr0 := attr0 + 256; -- affine matrix 0
@@ -224,8 +204,35 @@ gb_bus_drive => responses(1)
       data<=std_logic_vector(to_unsigned(affine,16)) & std_logic_vector(to_unsigned(attr2,16)); step;
     end loop;
     oam_we<="0000";
-    for scene in 0 to 11 loop
+    end;
+    variable value : unsigned(31 downto 0);
+    variable timeout : natural;
+    variable coefficient : natural;
+  begin
+    bus_in.rst<='1'; step(2); bus_in.rst<='0'; step(2);
+    low_we<='1'; high_we<='1';
+    for i in 0 to 16383 loop
+      low_addr<=i; high_addr<=i mod 8192;
+      data<=std_logic_vector(to_unsigned((i*73+12345) mod 65536,16)) &
+            std_logic_vector(to_unsigned((i*119+23456) mod 65536,16)); step;
+    end loop;
+    low_we<='0'; high_we<='0'; palette_we<="1111";
+    for i in 0 to 127 loop
+      small_addr<=i;
+      data<=std_logic_vector(to_unsigned((i*137+91) mod 32768,16)) &
+            std_logic_vector(to_unsigned((i*243+17) mod 32768,16)); step;
+    end loop;
+    palette_we<="0000"; oam_we<="1111";
+    for i in 0 to 255 loop
+      oam_addr<=i;
+      if i mod 2=0 then data<=x"00000200"; else data<=x"00000000"; end if; step;
+    end loop;
+    -- Overlap twelve sprites to exercise priority/coverage read-after-write,
+    -- transparent texels, affine transforms, flips, mosaic and OBJ windows.
+    sprites(0);
+    for scene in 0 to 23 loop
       vb<='1'; step; vb<='0'; step(4);
+      if scene=12 or scene=18 then sprites(scene*6); end if;
       -- Same modes with an additional mosaic/window/blend configuration.
       regwrite(16#04000008#, x"04810100");
       regwrite(16#0400000C#, x"CC8B880A");
@@ -238,7 +245,10 @@ gb_bus_drive => responses(1)
       regwrite(16#04000040#, x"20B010D0"); regwrite(16#04000044#, x"00800080");
       regwrite(16#04000048#, x"3F3F3F3F");
       if scene>=6 then
-        regwrite(16#0400004C#, x"00003232"); regwrite(16#04000050#, x"08083F7F");
+        regwrite(16#0400004C#, x"00003232");
+        if scene>=18 then regwrite(16#04000050#, x"1F103FFF"); -- darken
+        elsif scene>=12 then regwrite(16#04000050#, x"1F103FBF"); -- brighten
+        else regwrite(16#04000050#, x"08083F7F"); end if; -- alpha
       else
         regwrite(16#0400004C#, x"00000000"); regwrite(16#04000050#, x"00000000");
       end if;
@@ -251,6 +261,17 @@ gb_bus_drive => responses(1)
       end loop;
       refupdate<='1'; step; refupdate<='0';
       for row in 0 to 5 loop
+        if scene>=12 then
+          case row is
+            when 0 => coefficient:=0;
+            when 1 => coefficient:=1;
+            when 2 => coefficient:=8;
+            when 3 => coefficient:=16;
+            when 4 => coefficient:=17;
+            when others => coefficient:=31;
+          end case;
+          regwrite(16#04000054#,std_logic_vector(to_unsigned(coefficient,32)));
+        end if;
         -- Use distinct scanlines: the upstream incomplete-frame map intentionally
         -- retains previously drawn rows until a whole frame has been rendered.
         line<=to_unsigned(scene*6+row,8); lt<='1'; clear_count<='1'; step;
@@ -273,7 +294,7 @@ gb_bus_drive => responses(1)
       end loop;
       report "PASS renderer scene " & integer'image(scene);
     end loop;
-    report "PASS shared renderer: 17280 matching pixels across all modes, layers, transforms, OBJ, mosaic, windows and blending";
+    report "PASS shared renderer: 34560 matching pixels across all modes, layers, transforms, OBJ, mosaic, windows, alpha, brighten, darken and saturated coefficients";
     finish;
   end process;
 end;

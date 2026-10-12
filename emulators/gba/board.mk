@@ -1,12 +1,14 @@
 # Keep expensive GHDL output on Linux's filesystem until complete.
 BOARD_WORK ?= /tmp/greymecha_gba_board
 PORTABLE ?= $(BOARD_WORK)/portable
-PORTABLE_FLAGS ?= --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram --banked-register-ram --obj-window-ram
+PORTABLE_FLAGS ?= --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram --banked-register-ram --obj-window-ram --shared-color-arithmetic
 MAPPING_FLAGS ?= -noccu2 -nowidelut
 BOARD_VHDL := $(patsubst $(VENDOR)/%,$(PORTABLE)/%,$(GBA_VHDL))
 PYTHON ?= python3
 YOSYS ?= yosys
 NEXTPNR ?= nextpnr-ecp5
+FPGA_SPEED ?= 6
+NEXTPNR_FLAGS ?=
 ECPPACK ?= ecppack
 CORE_SIM_ARGS ?= +FASTMEM
 FLASH_TEST_PARAMS ?=
@@ -15,7 +17,7 @@ RAM_RTL := ../../io/fpga_psram_j1/src
 OLED_RTL := ../arduboy/rtl/fast_oled
 BOARD_RTL := rtl/top.v rtl/gba_pll.v rtl/gba_core_wrapper.sv rtl/gba_host.v rtl/gba_psram.v rtl/gba_flash.v rtl/gba_buttons.v rtl/gba_lines.v rtl/gba_display.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(GB_RTL)/gb_spi_phy.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
 
-.PHONY: portable board-core bit test-board test-host test-host-ranges test-buttons test-display test-flash test-renderer test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-board-core diagnostic bios suite
+.PHONY: portable board-core bit test-board test-host test-host-ranges test-buttons test-display test-flash test-renderer test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-color-arithmetic test-board-core diagnostic bios suite
 portable:
 	$(PYTHON) tools/prepare_rtl.py $(VENDOR) $(PORTABLE) $(PORTABLE_FLAGS)
 
@@ -30,10 +32,10 @@ board-core: portable
 bit: board-core
 	cp tools/ecp5_area.abc $(BOARD_WORK)/area.abc
 	$(YOSYS) -Q -T -p 'read_verilog -Irtl -I$(OLED_RTL) -sv $(BOARD_WORK)/gba_top.v $(BOARD_RTL); scratchpad -set abc9.script $(BOARD_WORK)/area.abc; synth_ecp5 -top top $(MAPPING_FLAGS) -no-rw-check -run begin:map_ram; write_rtlil $(BOARD_WORK)/pre_ram.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ram:map_gates; write_rtlil $(BOARD_WORK)/pre_gates.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_gates:check; hierarchy -check; check -assert; stat; write_rtlil $(BOARD_WORK)/mapped.il; blackbox =A:whitebox; write_json $(BOARD_WORK)/top.json' > $(BUILD)/board-yosys.log
-	$(NEXTPNR) --25k --package CABGA256 --speed 8 --json $(BOARD_WORK)/top.json --lpf pinout.lpf --textcfg $(BOARD_WORK)/top.config --seed 1 > $(BUILD)/board-nextpnr.log 2>&1
+	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(BOARD_WORK)/top.json --lpf pinout.lpf --textcfg $(BOARD_WORK)/top.config --seed 1 $(NEXTPNR_FLAGS) > $(BUILD)/board-nextpnr.log 2>&1
 	$(ECPPACK) --compress $(BOARD_WORK)/top.config $(BUILD)/gba.bit
 
-test-board: test-flash test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-host test-buttons test-display
+test-board: test-flash test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-color-arithmetic test-host test-buttons test-display
 
 test-host-ranges:
 	$(PYTHON) tools/prove_host_ranges.py
@@ -76,6 +78,9 @@ test-cpu-arithmetic:
 test-cpu-shifter:
 	$(PYTHON) tools/prove_cpu_shifter.py
 
+test-color-arithmetic:
+	$(PYTHON) tools/prove_color_arithmetic.py
+
 test-cpu-registers:
 	mkdir -p $(BUILD)/regfile-test
 	$(GHDL) -a --std=08 --workdir=$(BUILD)/regfile-test rtl/vhdl/gba_cpu_regfile.vhd sim/tb_gba_cpu_regfile.vhd
@@ -100,7 +105,7 @@ test-board-core: diagnostic
 
 test-renderer: board-core
 	$(PYTHON) tools/renderer_reference.py $(VENDOR) $(BOARD_WORK)/reference
-	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_drawer_obj_reference.vhd $(BOARD_WORK)/reference/gba_gpu_drawer_reference.vhd sim/tb_gba_renderer.vhd
+	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_drawer_obj_reference.vhd $(BOARD_WORK)/reference/gba_drawer_merge_reference.vhd $(BOARD_WORK)/reference/gba_gpu_drawer_reference.vhd sim/tb_gba_renderer.vhd
 	$(GHDL) -r --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work tb_gba_renderer --assert-level=error --ieee-asserts=disable-at-0
 	$(GHDL) -r --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work tb_gba_renderer -gExternalMemory=true --assert-level=error --ieee-asserts=disable-at-0
 	$(GHDL) -a --std=08 -fsynopsys -frelaxed -P$(BOARD_WORK)/mem --workdir=$(BOARD_WORK)/work $(BOARD_WORK)/reference/gba_savestates_reference.vhd sim/tb_gba_board_reset.vhd

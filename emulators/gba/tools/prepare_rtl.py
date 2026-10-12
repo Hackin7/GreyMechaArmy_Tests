@@ -38,7 +38,7 @@ def split_args(s):
     return out + [s[start:].strip()]
 
 
-def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False, banked_registers=False, obj_window=False):
+def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False, banked_registers=False, obj_window=False, shared_color=False):
     files = list(src.glob('*.vhd'))
     filenames = {p.stem.lower(): p.name for p in files}
     sources = {p.stem.lower(): p.read_text() for p in files}
@@ -66,6 +66,9 @@ def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=
     if obj_window:
         from block_obj_window import block_obj_window
         sources['gba_gpu_drawer'] = block_obj_window(sources['gba_gpu_drawer'])
+    if shared_color:
+        from share_color_arithmetic import share_color_arithmetic
+        sources['gba_drawer_merge'] = share_color_arithmetic(sources['gba_drawer_merge'])
     ports, buses = {}, {}
     for name, s in sources.items():
         ent = re.search(r'entity\s+\w+\s+is.*?port\s*\(', s, re.I | re.S)
@@ -191,5 +194,6 @@ if __name__ == '__main__':
     ap.add_argument('--obj-metadata-ram', action='store_true')
     ap.add_argument('--banked-register-ram', action='store_true')
     ap.add_argument('--obj-window-ram', action='store_true')
+    ap.add_argument('--shared-color-arithmetic', action='store_true')
     args = ap.parse_args()
-    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram, args.banked_register_ram, args.obj_window_ram)
+    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram, args.banked_register_ram, args.obj_window_ram, args.shared_color_arithmetic)
