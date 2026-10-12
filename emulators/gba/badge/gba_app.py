@@ -159,7 +159,7 @@ def deferred_upload(path=APP_PATH + 'gba.bit'):
     microcontroller.reset()
 
 
-def install_rom(path):
+def install_rom(path, progress=None):
     """Sector-verify cartridge flash; retain the first MiB for FPGA config."""
     size = os.stat(path)[6]
     if size < 192 or size > 8 * 1024 * 1024:
@@ -197,19 +197,26 @@ def install_rom(path):
 
         ecp5f.spi_jtag_on = spi_jtag_on
         ecp5f.spi_jtag_off = jtag.bitbang_jtag_off
-    if not ecp5f.flash(path, addr=0x100000):
+    if progress is None:
+        verified = ecp5f.flash(path, addr=0x100000)
+    else:
+        verified = ecp5f.flash(path, addr=0x100000, progress=progress)
+    if not verified:
         raise RuntimeError('ROM flash verification failed')
     print('GBA_ROM_VERIFIED', path, size)
     return size
 
 
 def app(rom_path=APP_PATH + 'diagnostic.gba'):
+    from gba_launch import start_with_recovery
     spi = BitBangSpi()
     try:
         host = GBAHost(spi)
-        print('GBA_STARTED', host.start(os.stat(rom_path)[6]))
+        start_with_recovery(host, os.stat(rom_path)[6])
         while True:
-            print(host.status())
+            status = host.status()
+            if status['error'] or status['ram_fault'] or status['overflow']:
+                raise RuntimeError('GBA hardware fault: ' + repr(status))
             time.sleep(1)
     finally:
         spi.deinit()

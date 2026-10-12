@@ -262,7 +262,10 @@ an exit condition; sampled PCs `0x194` through `0x1a4` confirm that loop.
 This is a separate BIOS hang, so faster PSRAM alone cannot finish the suite.
 The GBA host uses the distinct `gba_protocol` module so menu apps that have
 already imported a different `protocol` module cannot change its wire format.
-The GBA menu entry is added after actual hardware acceptance.
+The GBA menu app is installed on GreyMecha with the saved 25 MHz image; see
+`badge/README.md`. Normal boot reaches the menu, and the clean-reset launcher
+starts `bld_demo` after one automatic BIOS restart. Complete picker navigation
+and error-return checks remain pending.
 
 `make bld-demo` builds the unmodified Tonc blending demo from pinned
 `gbadev-org/libtonc-examples` commit `db70fa29a0baae12c5c7603426d8535ebb5cc6ed`.
