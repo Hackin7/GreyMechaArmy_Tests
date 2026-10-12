@@ -18,8 +18,9 @@ Hardware PSRAM initialization and boundary/alias readback pass. A warm
 guest restart completes all eleven diagnostic checks (`0x7ff`), including
 arithmetic, shifter and register-bank checks, and continues rendering frames.
 All ten injected KEYINPUT bits, simultaneous L/R and release read back correctly.
-Cold startup remains unreliable: other boots stall in the BIOS after one
-captured frame. Physical button acceptance and the larger ROM suite remain
+The user confirms the physical button indicators respond after a guest
+restart. Cold startup remains unreliable: other boots stall in the BIOS
+after one captured frame. Reliable startup and the larger ROM suite remain
 pending, so this is not yet a completed hardware deployment.
 The LCD now acknowledges discarded partial-frame rows once per FIFO entry.
 A startup regression queues partial rows ahead of frame zero: the original
@@ -155,7 +156,7 @@ Center+Up changes the viewport at a frame boundary. Grey is A, red is B,
 center release taps Start, center+Down is Select, center+grey is L and
 center+red is R. Host key injection can exercise all ten GBA buttons.
 
-Run physical tests from Windows with Python and pyserial:
+Run physical tests from Windows with Python 3.7 or newer and pyserial:
 
 ```powershell
 python tools/hardware_test.py --port COM9 --drive E:/ diagnostic
@@ -167,4 +168,13 @@ reset, programs and verifies the selected cartridge, checks PSRAM boundaries,
 boots the BIOS and checks the ROM's SRAM report. It preserves root `code.py`.
 The diagnostic additionally checks injected buttons; the suite exports its
 CRC-checked result report. Logs and reports go under `build/hardware/`.
+On a full badge filesystem, `--temporary-rom` backs up the device's GBA
+bitstream locally, uses its space to install the test cartridge, then removes
+the temporary ROM and restores the bitstream before launch. This path has
+been exercised on the board; the restored bitstream's SHA256 matches.
+For bring-up of the first candidate, `--retry-stalled-boot` explicitly logs
+up to two warm guest restarts after an unchanged BIOS PC/frame count. A
+successful retried test does not establish reliable cold startup.
+The GBA host uses the distinct `gba_protocol` module so menu apps that have
+already imported a different `protocol` module cannot change its wire format.
 The GBA menu entry is added after actual hardware acceptance.

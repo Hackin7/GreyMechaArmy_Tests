@@ -99,7 +99,7 @@ class Console:
         return bytes.fromhex(result.strip())
 
 
-def stage(drive, rom):
+def stage(drive, rom, stage_bit=True):
     app = drive / 'apps/gba'
     artifacts = dict(gba_bit=PROJECT/'build/gba.bit', bios=PROJECT/'build/roms/open_bios.bin',
                      rom=PROJECT/'build/roms'/rom)
@@ -111,8 +111,8 @@ def stage(drive, rom):
     app.mkdir(parents=True, exist_ok=True)
     for source in (PROJECT / 'badge').glob('*.py'):
         shutil.copy2(source, app/source.name)
-    for name in ('gba.bit',):
-        shutil.copy2(PROJECT/'build'/name, app/name)
+    if stage_bit:
+        shutil.copy2(PROJECT/'build/gba.bit', app/'gba.bit')
     for name in ('open_bios.bin', 'BIOS_SOURCE.txt', 'BIOS_LICENSE.txt', rom):
         shutil.copy2(PROJECT/'build/roms'/name, app/name)
 
@@ -144,6 +144,10 @@ def main():
     parser.add_argument('--drive', type=Path, default=Path('E:/'))
     parser.add_argument('action', choices=['diagnostic', 'suite', 'status'])
     parser.add_argument('--minutes', type=float, default=60)
+    parser.add_argument('--retry-stalled-boot', action='store_true',
+                        help='Log and retry a stalled BIOS boot up to twice (bring-up only)')
+    parser.add_argument('--temporary-rom', action='store_true',
+                        help='Reuse GBA bitstream disk space to flash the test ROM, then restore the bitstream')
     args = parser.parse_args()
     console = Console(args.port)
     if args.action == 'status':
@@ -155,14 +159,34 @@ def main():
     # Stop CircuitPython autoreload before USB filesystem writes.
     console.execute('import supervisor\nsupervisor.runtime.autoreload=False\n')
     rom = 'diagnostic.gba' if args.action == 'diagnostic' else 'suite-bench.gba'
-    stage(args.drive, rom)
     log = dict(test=args.action, rom=rom, started=time.strftime('%Y-%m-%dT%H:%M:%S%z'))
     out = PROJECT/'build/hardware'
     out.mkdir(parents=True, exist_ok=True)
+    device_bit = args.drive/'apps/gba/gba.bit'
+    temporary_stage = False
     try:
-        console.upload()
+        if args.temporary_rom:
+            # Only replace this runner's GBA artifact; retain a local backup
+            # before freeing its space on the small CircuitPython volume.
+            if not (PROJECT/'build/gba.bit').is_file():
+                raise FileNotFoundError('Build artifact missing: build/gba.bit')
+            if device_bit.exists():
+                backup = out/'device-before-temporary-gba.bit'
+                shutil.copy2(device_bit, backup)
+                if backup.read_bytes() != device_bit.read_bytes():
+                    raise RuntimeError('Device bitstream backup verification failed')
+                device_bit.unlink()
+            temporary_stage = True
+        stage(args.drive, rom, stage_bit=not args.temporary_rom)
+        if not args.temporary_rom:
+            console.upload()
         console.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
                         "from gba_app import install_rom\ninstall_rom('/apps/gba/%s')\n" % rom, timeout=180)
+        if args.temporary_rom:
+            (args.drive/'apps/gba'/rom).unlink()
+            shutil.copy2(PROJECT/'build/gba.bit', device_bit)
+            temporary_stage = False
+            log['temporary_rom_staging'] = 'restored'
         console.upload()
         console.connect()
         preflight(console, log)
@@ -171,6 +195,9 @@ def main():
         print(result.strip(), flush=True)
         deadline = time.monotonic() + args.minutes*60
         boot_complete = False
+        boot_sample = None
+        stalled_polls = 0
+        log['boot_restarts'] = 0
         while time.monotonic() < deadline:
             status = console.status()
             log['last_status'] = status
@@ -181,6 +208,18 @@ def main():
             # yet and reading them would unnecessarily pause initialization.
             boot_complete |= 0x02000000 <= status['pc'] < 0x0e000000
             if not boot_complete:
+                sample = (status['pc'], status['frames'])
+                stalled_polls = stalled_polls + 1 if sample == boot_sample and status['ram_idle'] else 0
+                boot_sample = sample
+                if args.retry_stalled_boot and stalled_polls >= 10:
+                    if log['boot_restarts'] >= 2:
+                        raise RuntimeError('BIOS startup stalled after two logged warm restarts')
+                    log['boot_restarts'] += 1
+                    print('GBA_BIOS_STALL_RESTART', log['boot_restarts'], flush=True)
+                    print(console.execute("print('GBA_RESTART',_gba_host.start(%d))\n" % size,
+                                          timeout=180).strip(), flush=True)
+                    boot_sample = None
+                    stalled_polls = 0
                 time.sleep(5)
                 continue
             report = console.save(0, 64 if args.action == 'diagnostic' else 32)
@@ -216,7 +255,9 @@ def main():
                     (out/'suite-bench.sav').write_bytes(save + bytes(65536-len(save)))
                     import subprocess
                     script = PROJECT/'vendor/openfpga-GBA/scripts/parse_mgba_bench_save.py'
-                    parsed = subprocess.run([sys.executable, str(script), str(out/'suite-bench.sav'), '--json'], capture_output=True, text=True)
+                    parsed = subprocess.run(
+                        [sys.executable, str(script), str(out/'suite-bench.sav'), '--json'],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                     (out/'suite-results.json').write_text(parsed.stdout, encoding='utf-8')
                     if parsed.returncode == 0:
                         log['result'] = 'report_complete'
@@ -230,6 +271,11 @@ def main():
         log['error'] = str(exc)
         raise
     finally:
+        if temporary_stage:
+            staged_rom = args.drive/'apps/gba'/rom
+            if staged_rom.exists():
+                staged_rom.unlink()
+            shutil.copy2(PROJECT/'build/gba.bit', device_bit)
         (out/(args.action+'.json')).write_text(json.dumps(log, indent=2), encoding='utf-8')
         try:
             console.execute('_gba_spi.deinit()\n')

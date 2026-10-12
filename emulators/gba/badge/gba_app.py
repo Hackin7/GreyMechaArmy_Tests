@@ -2,7 +2,7 @@
 import os
 import struct
 import time
-from protocol import encode_frame, decode_status
+from gba_protocol import encode_frame, decode_status
 
 APP_PATH = '/apps/gba/'
 EWRAM = 0
