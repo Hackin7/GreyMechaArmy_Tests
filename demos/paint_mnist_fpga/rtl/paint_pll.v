@@ -1,0 +1,17 @@
+module paint_pll(input wire clki, output wire ui_clk, nn_clk, locked);
+    (* FREQUENCY_PIN_CLKI="50", FREQUENCY_PIN_CLKOP="75", FREQUENCY_PIN_CLKOS="25" *)
+    (* ICP_CURRENT="12", LPF_RESISTOR="8", MFG_ENABLE_FILTEROPAMP="1", MFG_GMCREF_SEL="2" *)
+    EHXPLLL #(
+        .PLLRST_ENA("DISABLED"), .INTFB_WAKE("DISABLED"), .STDBY_ENABLE("DISABLED"),
+        .DPHASE_SOURCE("DISABLED"), .OUTDIVIDER_MUXA("DIVA"), .OUTDIVIDER_MUXB("DIVB"),
+        .OUTDIVIDER_MUXC("DIVC"), .OUTDIVIDER_MUXD("DIVD"), .CLKI_DIV(2),
+        .CLKOP_ENABLE("ENABLED"), .CLKOP_DIV(8), .CLKOP_CPHASE(4), .CLKOP_FPHASE(0),
+        .CLKOS_ENABLE("ENABLED"), .CLKOS_DIV(24), .CLKOS_CPHASE(12), .CLKOS_FPHASE(0),
+        .FEEDBK_PATH("CLKOP"), .CLKFB_DIV(3)
+    ) pll (
+        .RST(1'b0), .STDBY(1'b0), .CLKI(clki), .CLKOP(ui_clk), .CLKOS(nn_clk),
+        .CLKFB(ui_clk), .CLKINTFB(), .PHASESEL0(1'b0), .PHASESEL1(1'b0),
+        .PHASEDIR(1'b1), .PHASESTEP(1'b1), .PHASELOADREG(1'b1),
+        .PLLWAKESYNC(1'b0), .ENCLKOP(1'b0), .ENCLKOS(1'b0), .LOCK(locked)
+    );
+endmodule
