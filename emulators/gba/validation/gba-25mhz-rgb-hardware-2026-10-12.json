@@ -1,0 +1,62 @@
+{
+  "rom": "C:\\Users\\zunmun\\Downloads\\GbaRGB-Test-Keyboard-Control.gba",
+  "rom_bytes": 524288,
+  "rom_sha256": "ec62fdf9bb3b6f533868bd05f1f509e7167ec06289f82441f918bd69eefb2789",
+  "bit_sha256": "03940a393b584ed898978c66b8114e982f80737cd454903858fe9d83d770c183",
+  "started": "2026-10-12T22:25:50+0800",
+  "boot_restarts": 1,
+  "flash_verified": true,
+  "initial_status": {
+    "frames": 0,
+    "keys": 0,
+    "error": 0,
+    "ram_ready": true,
+    "sequence": 0,
+    "run": false,
+    "pc": 0,
+    "flash_misses": 0,
+    "device_id": 875859,
+    "panel_ready": true,
+    "ram_idle": true,
+    "ram_fault": false,
+    "busy": false,
+    "overflow": false,
+    "pause": true,
+    "physical": 0
+  },
+  "psram_boundary_test": "pass",
+  "last_status": {
+    "frames": 151,
+    "keys": 0,
+    "error": 0,
+    "ram_ready": true,
+    "sequence": 55,
+    "run": true,
+    "pc": 134218940,
+    "flash_misses": 1236,
+    "device_id": 875859,
+    "panel_ready": true,
+    "ram_idle": true,
+    "ram_fault": false,
+    "busy": false,
+    "overflow": false,
+    "pause": false,
+    "physical": 0
+  },
+  "frames_advanced_in_10_seconds": 116,
+  "result": "rom_running_frames_advance",
+  "physical_screen": "requires user observation",
+  "scope": "25 MHz full emulator: RGB ROM upload, flash verification, PSRAM boundary checks and frame advancement",
+  "steady_state_fps_sample": {
+    "frames": 68,
+    "seconds": 10.016,
+    "fps": 6.789137380189484,
+    "hardware_faults_reported": false
+  },
+  "limitations": [
+    "One warm guest restart required; reliable cold boot remains unresolved",
+    "Saved image predates red/blue correction",
+    "Full mGBA suite completion not established",
+    "Physical controls enabled; this run did not validate all physical buttons"
+  ]
+}

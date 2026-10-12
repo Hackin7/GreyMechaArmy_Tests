@@ -21,9 +21,20 @@ the existing `spi_burst.v` added to the RTL list, and the cached generated
 core from the shared-color build. The current main RTL uses the subsequent
 25 MHz PHY and should not be described as the exact source of this image.
 
-The 25 MHz image is still routing. An archive-only watcher will save it as
-`gba_psram_burst_25mhz.bit` here once routing and timing pass. That watcher
-does not access or program the board.
+The saved `gba_psram_burst_25mhz.bit` has completed routing and passes all
+clock timing checks using the speed-grade-6 model. It is 568,440 bytes;
+its adjacent manifest and checksum identify the tested image.
+
+On 2026-10-12 it was uploaded to GreyMecha with
+`GbaRGB-Test-Keyboard-Control.gba`. ROM flash verification and PSRAM boundary
+read/write checks passed. After one warm guest restart, the guest advanced
+116 captured frames in ten seconds during startup. A later measurement was
+68 frames in 10.016 seconds (6.79 FPS). No hardware faults were reported.
+Physical controls are enabled. The saved image predates the red/blue fix;
+cold-start reliability and full ROM-suite completion remain unresolved.
+Evidence: `../validation/gba-25mhz-rgb-hardware-2026-10-12.json`.
+
+The 10 MHz image and its earlier diagnostic/demo evidence remain available.
 
 The cartridge is the unmodified Tonc `bld_demo` ROM built by `make bld-demo`.
 To repeat deployment, run the diagnostic with the selected saved bitstream,
