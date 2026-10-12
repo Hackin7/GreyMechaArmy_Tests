@@ -54,6 +54,8 @@ test-display:
 	mkdir -p $(BUILD)
 	$(IVERILOG) -g2012 -Irtl -I$(OLED_RTL) -s tb_gba_display -o $(BUILD)/display.vvp sim/tb_gba_display.sv rtl/gba_lines.v rtl/gba_display.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
 	$(VVP) $(BUILD)/display.vvp
+	$(IVERILOG) -g2012 -Irtl -I$(OLED_RTL) -s tb_gba_display -Ptb_gba_display.PARTIAL_START=1 -o $(BUILD)/display-resync.vvp sim/tb_gba_display.sv rtl/gba_lines.v rtl/gba_display.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
+	$(VVP) $(BUILD)/display-resync.vvp
 
 test-flash:
 	mkdir -p $(BUILD)

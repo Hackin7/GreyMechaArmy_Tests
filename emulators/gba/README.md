@@ -9,7 +9,24 @@ followed by the mGBA autorun suite and physical screen/button checks.
 
 The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 21/28 DSPs
 and 23,714/24,288 logic sites, down from the initial 40,436 sites. It is
-within the resource budget; final routing and timing are pending.
+within the resource budget; routing of this optimized build is pending.
+The earlier `bf8ace6` candidate completed routing at 24,107 logic sites,
+43 block RAMs and 27 DSPs. Its final speed-grade-8 timing passes at all four
+clock constraints (core maximum 32.62 MHz against 21 MHz). The routed
+568,491-byte bitstream has been uploaded to the connected GreyMecha.
+Hardware PSRAM initialization and boundary/alias readback pass. A warm
+guest restart completes all eleven diagnostic checks (`0x7ff`), including
+arithmetic, shifter and register-bank checks, and continues rendering frames.
+All ten injected KEYINPUT bits, simultaneous L/R and release read back correctly.
+Cold startup remains unreliable: other boots stall in the BIOS after one
+captured frame. Physical button acceptance and the larger ROM suite remain
+pending, so this is not yet a completed hardware deployment.
+The LCD now acknowledges discarded partial-frame rows once per FIFO entry.
+A startup regression queues partial rows ahead of frame zero: the original
+display stalls; the corrected display passes all pixels in fitted/native
+frames. This fix is not present in the first hardware bitstream and is being
+built into a new candidate. The USB test runner keeps a persistent raw REPL
+session because CircuitPython clears globals when entering raw mode again.
 Separate synthesis of the core with the board's constant BIOS-write inputs
 and unused audio/pixel-address outputs uses 20,388 LUT4s, 64 distributed RAM
 blocks and 20,774 packed logic sites, plus 40 block RAMs and 21 DSPs.

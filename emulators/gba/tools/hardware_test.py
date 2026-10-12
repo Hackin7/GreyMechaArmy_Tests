@@ -26,9 +26,20 @@ from repl_run import read_until
 class Console:
     def __init__(self, port):
         self.port = port
+        self.console = None
+
+    def close(self):
+        if self.console is not None:
+            self.console.write(b'\x02')
+            self.console.close()
+            self.console = None
 
     def execute(self, source, timeout=120, resets=False):
-        with serial.Serial(self.port, 115200, timeout=0.1) as console:
+        # CircuitPython clears REPL globals when entering raw mode. Keep one
+        # raw session open so the SPI pin owners and host survive each command.
+        if self.console is None:
+            self.console = serial.Serial(self.port, 115200, timeout=0.1)
+            console = self.console
             console.write(b'\r\x03\x03')
             time.sleep(0.3)
             console.write(b'\x02\r\x03')
@@ -36,18 +47,20 @@ class Console:
             console.reset_input_buffer()
             console.write(b'\x01')
             read_until(console, b'raw REPL; CTRL-B to exit\r\n>', 5)
-            encoded = source.encode()
-            for offset in range(0, len(encoded), 128):
-                console.write(encoded[offset:offset + 128])
-                time.sleep(0.003)
-            console.write(b'\x04')
-            read_until(console, b'OK', 5)
-            if resets:
-                return ''
-            stdout = read_until(console, b'\x04', timeout)[:-1]
-            stderr = read_until(console, b'\x04', 5)[:-1]
-            read_until(console, b'>', 5)
-            console.write(b'\x02')
+        console = self.console
+        encoded = source.encode()
+        for offset in range(0, len(encoded), 128):
+            console.write(encoded[offset:offset + 128])
+            time.sleep(0.003)
+        console.write(b'\x04')
+        read_until(console, b'OK', 5)
+        if resets:
+            console.close()
+            self.console = None
+            return ''
+        stdout = read_until(console, b'\x04', timeout)[:-1]
+        stderr = read_until(console, b'\x04', 5)[:-1]
+        read_until(console, b'>', 5)
         if stderr:
             raise RuntimeError(stderr.decode('utf-8', 'replace'))
         return stdout.decode('utf-8', 'replace')
@@ -66,6 +79,7 @@ class Console:
                 if 'GBA_BOOT_REPL_READY' in output:
                     return
             except (serial.SerialException, OSError, RuntimeError):
+                self.close()
                 continue
         raise RuntimeError('Badge did not reconnect after bitstream upload')
 
@@ -136,6 +150,7 @@ def main():
         console.connect()
         print(json.dumps(console.status(), indent=2))
         console.execute('_gba_spi.deinit()\n')
+        console.close()
         return
     # Stop CircuitPython autoreload before USB filesystem writes.
     console.execute('import supervisor\nsupervisor.runtime.autoreload=False\n')
@@ -155,13 +170,21 @@ def main():
         result = console.execute("print('GBA_START',_gba_host.start(%d))\n" % size, timeout=180)
         print(result.strip(), flush=True)
         deadline = time.monotonic() + args.minutes*60
+        boot_complete = False
         while time.monotonic() < deadline:
             status = console.status()
             log['last_status'] = status
             print('GBA_STATUS', status, flush=True)
             if status['ram_fault'] or status['overflow'] or status['error']:
                 raise RuntimeError('Hardware fault: ' + repr(status))
+            # Observe BIOS startup through status; guest reports do not exist
+            # yet and reading them would unnecessarily pause initialization.
+            boot_complete |= 0x02000000 <= status['pc'] < 0x0e000000
+            if not boot_complete:
+                time.sleep(5)
+                continue
             report = console.save(0, 64 if args.action == 'diagnostic' else 32)
+            log['last_report_hex'] = report.hex()
             if args.action == 'diagnostic' and report[:8] == b'GBADIAG1':
                 version, passed, done, keys, counter = struct.unpack_from('<5I', report, 8)
                 arithmetic_error, shifter_error, banking_error = struct.unpack_from('<3I', report, 36)
@@ -212,6 +235,7 @@ def main():
             console.execute('_gba_spi.deinit()\n')
         except Exception:
             pass
+        console.close()
 
 
 if __name__ == '__main__':

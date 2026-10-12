@@ -1,7 +1,8 @@
 `timescale 1ns/1ps
 module tb_gba_display #(
     parameter real CORE_HALF_NS=25,
-    parameter real PANEL_HALF_NS=6.25
+    parameter real PANEL_HALF_NS=6.25,
+    parameter PARTIAL_START=0
 );
     reg cc=0,pc=0,reset=1;
     always #(CORE_HALF_NS) cc=~cc;
@@ -44,9 +45,27 @@ module tb_gba_display #(
         force display.init.rom_pause_r=0;
         force display.init.rom_pause_nz_r=0;
         #200;@(negedge cc);reset=0;
+        if(PARTIAL_START)begin
+            wait(initialized);
+            force display.init_owner=1;
+            force display.started=0;
+            // Queue two incomplete-frame rows followed by frame-zero's row 0.
+            for(iy=3;iy<5;iy=iy+1)begin
+                for(ix=0;ix<240;ix=ix+1)begin
+                    @(negedge cc);we=1;x=ix;y=iy;colour=source(ix,iy);
+                end
+                @(negedge cc);we=0;
+            end
+            for(ix=0;ix<240;ix=ix+1)begin
+                @(negedge cc);we=1;x=ix;y=0;colour=source(ix,0);
+            end
+            @(negedge cc);we=0;
+            release display.init_owner;
+            release display.started;
+        end
         for(f=0;f<2;f=f+1)begin
             if(f==1)mode=1;
-            for(iy=0;iy<160;iy=iy+1)begin
+            for(iy=(f==0&&PARTIAL_START ? 1:0);iy<160;iy=iy+1)begin
                 @(negedge cc);we=0;wait(ready);
                 for(ix=0;ix<240;ix=ix+1)begin
                     @(negedge cc);we=1;x=ix;y=iy;colour=source(ix,iy);

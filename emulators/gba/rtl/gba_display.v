@@ -42,7 +42,7 @@ module gba_display #(
             if(initialized&&!init_owner) case(state)
                 0: if(line_ready) begin
                     if(line_number==0) begin fitted<=line_fitted;row<=0;state<=1;scs<=0;end
-                    else line_done<=1;
+                    else begin line_done<=1;state<=6;end
                 end
                 1: begin
                     ssclk<=0;col<=0;rd_addr<=0;
@@ -74,6 +74,7 @@ module gba_display #(
                     end
                 end
                 5: state<=1; // allow the FIFO read pointer to acknowledge
+                6: state<=0; // discard each partial-frame row only once
                 default: state<=0;
             endcase
         end
