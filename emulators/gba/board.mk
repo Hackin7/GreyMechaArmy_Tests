@@ -13,12 +13,14 @@ NEXTPNR ?= nextpnr-ecp5
 FPGA_SPEED ?= 6
 NEXTPNR_FLAGS ?=
 ECPPACK ?= ecppack
+PSRAM_BENCH_ASYNC ?= 1
+PSRAM_BENCH_WORK ?= /tmp/greymecha_gba_psram_bench
 CORE_SIM_ARGS ?= +FASTMEM
 FLASH_TEST_PARAMS ?=
 GB_RTL := ../gameboy_gbc/rtl
 RAM_RTL := ../../io/fpga_psram_j1/src
 OLED_RTL := ../arduboy/rtl/fast_oled
-BOARD_RTL := rtl/top.v rtl/gba_pll.v rtl/gba_core_wrapper.sv rtl/gba_host.v rtl/gba_psram.v rtl/gba_flash.v rtl/gba_buttons.v rtl/gba_lines.v rtl/gba_display.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(GB_RTL)/gb_spi_phy.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
+BOARD_RTL := rtl/top.v rtl/gba_pll.v rtl/gba_core_wrapper.sv rtl/gba_host.v rtl/gba_psram.v rtl/gba_flash.v rtl/gba_buttons.v rtl/gba_lines.v rtl/gba_display.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v $(GB_RTL)/gb_spi_phy.v $(GB_RTL)/ecp5_flash_backend.v $(GB_RTL)/ecp5_flash_reader.v $(GB_RTL)/gb_flash_fifo.v rtl/gba_oled_init.v $(OLED_RTL)/simple_spi_master.v
 
 .PHONY: portable board-core bit test-board test-host test-host-ranges test-buttons test-display test-flash test-renderer test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-color-arithmetic test-board-core diagnostic bios suite
 portable:
@@ -40,13 +42,24 @@ bit: board-core
 
 test-board: test-flash test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-color-arithmetic test-host test-buttons test-display
 
+.PHONY: psram-benchmark-bit
+psram-benchmark-bit:
+	mkdir -p $(PSRAM_BENCH_WORK) $(BUILD)/psram-benchmark
+	$(YOSYS) -Q -T -p 'read_verilog -sv sim/psram_hardware_top.v rtl/gba_pll.v rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v; chparam -set ASYNC_CLOCK $(PSRAM_BENCH_ASYNC) top; synth_ecp5 -top top -no-rw-check; check -assert; write_json $(PSRAM_BENCH_WORK)/top.json' > $(BUILD)/psram-benchmark/yosys.log 2>&1
+	sed -e 's/clk_core/clk/g' -e 's/clk_flash/clk_ram/g' pinout.lpf > $(PSRAM_BENCH_WORK)/benchmark.lpf
+	cat sim/psram_benchmark.lpf >> $(PSRAM_BENCH_WORK)/benchmark.lpf
+	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(PSRAM_BENCH_WORK)/top.json --lpf $(PSRAM_BENCH_WORK)/benchmark.lpf --textcfg $(PSRAM_BENCH_WORK)/top.config --report $(BUILD)/psram-benchmark/timing.json > $(BUILD)/psram-benchmark/nextpnr.log 2>&1
+	$(ECPPACK) --compress $(PSRAM_BENCH_WORK)/top.config $(BUILD)/psram-benchmark/gba-psram-benchmark.bit
+
 test-host-ranges:
 	$(PYTHON) tools/prove_host_ranges.py
 
 test-host: test-host-ranges
 	mkdir -p $(BUILD)
-	$(IVERILOG) -g2012 -s tb_gba_host -o $(BUILD)/host.vvp sim/tb_gba_host.sv rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(IVERILOG) -g2012 -s tb_gba_host -o $(BUILD)/host.vvp sim/tb_gba_host.sv rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
 	$(VVP) $(BUILD)/host.vvp
+	$(IVERILOG) -g2012 -s tb_gba_host -Ptb_gba_host.ASYNC_CLOCK=1 -o $(BUILD)/host-cdc.vvp sim/tb_gba_host.sv rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/host-cdc.vvp
 
 test-buttons:
 	mkdir -p $(BUILD)
@@ -71,8 +84,19 @@ test-vram:
 	$(GHDL) -r --std=08 --workdir=$(BUILD)/ghdl-vram tb_gba_vram_low_ext --assert-level=error
 
 test-psram:
-	$(IVERILOG) -g2012 -s tb_gba_psram_clients -o $(BUILD)/psram-clients.vvp sim/tb_gba_psram_clients.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	mkdir -p $(BUILD)
+	$(IVERILOG) -g2012 -s tb_gba_psram_clients -o $(BUILD)/psram-clients.vvp sim/tb_gba_psram_clients.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
 	$(VVP) $(BUILD)/psram-clients.vvp
+	$(IVERILOG) -g2012 -s tb_gba_psram_clients -Ptb_gba_psram_clients.ASYNC_CLOCK=1 -o $(BUILD)/psram-clients-cdc.vvp sim/tb_gba_psram_clients.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/psram-clients-cdc.vvp
+	$(IVERILOG) -g2012 -s tb_gba_psram_burst -o $(BUILD)/psram-burst.vvp sim/tb_gba_psram_burst.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/psram-burst.vvp
+	$(IVERILOG) -g2012 -s tb_gba_psram_burst -Ptb_gba_psram_burst.ASYNC_CLOCK=1 -o $(BUILD)/psram-burst-cdc.vvp sim/tb_gba_psram_burst.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/psram-burst-cdc.vvp
+	$(IVERILOG) -g2012 -s tb_gba_psram_burst -Ptb_gba_psram_burst.ASYNC_CLOCK=1 -Ptb_gba_psram_burst.PHY_HALF_NS=20 -Ptb_gba_psram_burst.PHY_PHASE_NS=19 -o $(BUILD)/psram-burst-cdc-slow.vvp sim/tb_gba_psram_burst.sv rtl/gba_psram.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/psram-burst-cdc-slow.vvp
+	$(IVERILOG) -g2012 -s tb_gba_psram_benchmark -o $(BUILD)/psram-benchmark.vvp sim/tb_gba_psram_benchmark.sv sim/psram_hardware_top.v rtl/gba_host.v rtl/gba_psram.v $(GB_RTL)/gb_spi_phy.v $(RAM_RTL)/psram_spi.v $(RAM_RTL)/spi_transaction.v $(RAM_RTL)/spi_burst.v ../../io/fpga_psram_j1/sim/aps6404_model.v
+	$(VVP) $(BUILD)/psram-benchmark.vvp
 
 test-dma-arithmetic:
 	$(PYTHON) tools/prove_dma_arithmetic.py

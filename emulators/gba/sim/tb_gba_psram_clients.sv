@@ -1,12 +1,14 @@
 `timescale 1ns/1ps
 module tb_gba_psram_clients;
-    reg clk=0,reset=1;always #5 clk=~clk;
+    parameter ASYNC_CLOCK=0;
+    reg clk=0,reset=1;always #25 clk=~clk;
+    reg clk_ram=0;initial begin #7;forever #10 clk_ram=~clk_ram;end
     reg crq=0,hrq=0,vrq=0,read_op=0;
     wire cd,hd,vd,ready,idle,fault;wire [31:0] cq,hq,vq;
     wire cs,sck;tri [3:0] dq;wire [3:0] dout,oe;wire [23:0] id;
     genvar n;generate for(n=0;n<4;n=n+1)assign dq[n]=oe[n]?dout[n]:1'bz;endgenerate
-    gba_psram #(.POWERUP_CYCLES(20)) dut(
-        .clk(clk),.reset(reset),.core_req(crq),.core_read(read_op),.core_addr(26'h80),
+    gba_psram #(.POWERUP_CYCLES(20),.ASYNC_CLOCK(ASYNC_CLOCK)) dut(
+        .clk(clk),.clk_ram(clk_ram),.reset(reset),.core_req(crq),.core_read(read_op),.core_addr(26'h80),
         .core_wdata(32'h11223344),.core_rdata(cq),.core_done(cd),
         .host_req(hrq),.host_read(read_op),.host_addr(23'h100000),
         .host_wdata(32'h55667788),.host_be(4'hf),.host_rdata(hq),.host_done(hd),

@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 module tb_gba_host;
-    reg clk=0,reset=1;always #5 clk=~clk;
+    parameter ASYNC_CLOCK=0;
+    reg clk=0,reset=1;always #25 clk=~clk;
+    reg clk_ram=0;initial begin #7;forever #10 clk_ram=~clk_ram;end
     reg sck=0,mosi=0,cs=1;wire miso;
     wire [7:0] rx,tx;wire rv,tv,tr;
     gb_spi_phy phy(.clk(clk),.reset(reset),.spi_sck(sck),.spi_mosi(mosi),.spi_csn(cs),
@@ -15,7 +17,7 @@ module tb_gba_host;
         .busy(busy),.error(error),.last_sequence(last));
     wire rcs,rsck;tri [3:0] dq;wire [3:0] dout,oe;
     genvar g;generate for(g=0;g<4;g=g+1)assign dq[g]=oe[g]?dout[g]:1'bz;endgenerate
-    gba_psram #(.POWERUP_CYCLES(20)) ram(.clk(clk),.reset(reset),.core_req(1'b0),.core_read(1'b1),
+    gba_psram #(.POWERUP_CYCLES(20),.ASYNC_CLOCK(ASYNC_CLOCK)) ram(.clk(clk),.clk_ram(clk_ram),.reset(reset),.core_req(1'b0),.core_read(1'b1),
         .core_addr(26'd0),.core_wdata(32'd0),.core_rdata(),.core_done(),
         .host_req(req),.host_read(rd),.host_addr(addr),.host_wdata(wd),.host_be(be),.host_rdata(qd),.host_done(done),
         .video_req(1'b0),.video_read(1'b1),.video_addr(23'd0),.video_wdata(32'd0),.video_be(4'd0),.video_rdata(),.video_done(),

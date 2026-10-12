@@ -71,9 +71,9 @@ class Console:
             raise RuntimeError(stderr.decode('utf-8', 'replace'))
         return stdout.decode('utf-8', 'replace')
 
-    def upload(self):
+    def upload(self, path='/apps/gba/gba.bit'):
         self.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
-                     "from gba_app import deferred_upload\ndeferred_upload()\n", resets=True)
+                     "from gba_app import deferred_upload\ndeferred_upload(%r)\n" % path, resets=True)
         deadline = time.monotonic() + 30
         # The badge's 6 MHz PIO loader also retires programming for 200 ms.
         # Let cold boot/upload finish before execute() sends any Ctrl-C.

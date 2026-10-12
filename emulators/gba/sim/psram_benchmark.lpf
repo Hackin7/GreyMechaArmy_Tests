@@ -1,0 +1,2 @@
+LOCATE COMP "clock_ref" SITE "C16";
+IOBUF PORT "clock_ref" IO_TYPE=LVCMOS33;

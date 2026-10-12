@@ -63,7 +63,7 @@ module top(
     assign pmod_j1[4]=dq_oe[1] ? dq_out[1]:1'bz;
     assign pmod_j1[5]=dq_oe[2] ? dq_out[2]:1'bz;
     assign pmod_j1[2]=dq_oe[3] ? dq_out[3]:1'bz;
-    gba_psram ram(.clk(clk_core),.reset(peripheral_reset),
+    gba_psram #(.ASYNC_CLOCK(1)) ram(.clk(clk_core),.clk_ram(clk_flash),.reset(peripheral_reset),
         .core_req(ext_req),.core_read(ext_read),.core_addr(ext_addr),.core_wdata(ext_wdata),
         .core_rdata(ext_rdata),.core_done(ext_done),.host_req(host_mem_req),.host_read(host_mem_read),
         .host_addr(host_mem_addr),.host_wdata(host_mem_wdata),.host_be(host_mem_be),

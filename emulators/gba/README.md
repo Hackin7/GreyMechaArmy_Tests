@@ -7,12 +7,13 @@ Hardware acceptance is pending; simulation passes alone do not establish a
 working hardware emulator. The first acceptance ROM is the local diagnostic,
 followed by the mGBA autorun suite and physical screen/button checks.
 
-The latest mapped build on 2026-10-12 uses 47/56 block RAMs, 21/28 DSPs
-and 23,772/24,288 logic sites, down from the initial 40,436 sites. Synthesis
-checks and pack-only verification pass. The earlier mapping of the corrected
-candidate uses 23,827 sites; its placement has completed and routing is running.
-Both include the LCD recovery fix and soft mapping of single-user
-synchronous resets; the earlier color-sharing map used 23,714 sites.
+The latest mapped PSRAM burst build on 2026-10-12 uses 47/56 block RAMs,
+21/28 DSPs and 23,672/24,288 logic sites, down from the initial 40,436 sites.
+Synthesis checks and packing pass; full emulator routing is running. The
+same PSRAM arbiter/PHY passes a separate full 8 MiB write/read verification
+on the actual board at approximately 25.66 MHz SPI. Emulator frame rate
+with this controller has not yet been measured. This build includes the
+LCD recovery fix and soft mapping of single-user synchronous resets.
 The earlier `bf8ace6` candidate completed routing at 24,107 logic sites,
 43 block RAMs and 27 DSPs. Its final speed-grade-8 timing passes at all four
 clock constraints (core maximum 32.62 MHz against 21 MHz). The routed
@@ -104,6 +105,61 @@ and rendering line buffers remain on-chip. Four word caches preserve the
 background fetchers' synchronous read interface and suppress valid tokens on
 cache misses; CPU writes invalidate matching cached words. The core, host and
 video clients share PSRAM with round-robin arbitration.
+
+The new PSRAM candidate uses the existing 50 MHz flash clock for its PHY,
+giving nominal 25 MHz single-bit SPI without changing the 20 MHz emulator
+clock. Complete words use one four-byte `02` write or `0B` fast-read burst;
+masked writes issue only their selected byte lanes. Requests and completions
+cross clock domains through a toggle handshake, with the request data held
+until acknowledgement and the read result held until the next transfer.
+Reset asserts immediately and releases synchronously in the PHY domain.
+
+Simulation measures the following request-to-completion word latencies,
+including arbitration and clock-domain overhead:
+
+| PSRAM configuration | SPI clock | Write | Read |
+| --- | ---: | ---: | ---: |
+| Original four separate byte transactions | 2.5 MHz | 68.30 us | 68.30 us |
+| Four-byte burst, core clock | 10 MHz | 7.05 us | 7.85 us |
+| Four-byte burst, separate PHY clock | 25 MHz | 3.15 us | 3.45 us |
+
+The separate-clock candidate reduces complete-word latency approximately
+22x for writes and 20x for reads in simulation. This is a memory-access
+comparison; emulator frame rate has not yet been measured with this image.
+`make test-psram test-host` checks all sixteen byte masks at ten addresses
+through `0x7ffffc`, simultaneous core/host/video requests, multiple clock
+ratios/phases, reset during transfers and handshakes, and host CRC/framing.
+The tests run the core at the actual nominal 20 MHz and enforce CE# low
+at most 8 us and CE# high at least 50 ns, including reset/read-ID. This
+caught the original slow initialization exceeding the refresh limit; the
+candidate also speeds initialization up. Mapping uses 23,672 logic sites,
+47 block RAMs and 21 DSPs. Full emulator routing and acceptance remain
+pending.
+
+The actual board passes a full 8 MiB write/read verification using the exact
+GBA arbiter and PHY in a small benchmark image. Autonomous FPGA counters
+measure 138,412,032 write cycles and 150,994,944 read/verify cycles. Native
+RP2350 PulseIn capture of the core-clock/65536 reference on GP12 measures
+20.528 MHz; the PLL divider ratio gives approximately 25.66 MHz SPI.
+Throughput is **1.244 MB/s writes and 1.140 MB/s reads**, including request,
+arbitration, transaction and verification overhead, excluding USB traffic.
+This exercises every byte with one address-dependent pattern, plus the ten
+host boundary/alias checks. The previous GBA image is restored afterward;
+its file hash remains unchanged. Evidence is in
+[validation/psram-performance-2026-10-12.json](validation/psram-performance-2026-10-12.json).
+
+Build and run this controller benchmark with:
+
+```sh
+make psram-benchmark-bit
+python tools/psram_benchmark.py --port COM9 --drive E:/
+```
+
+The benchmark overwrites all volatile PSRAM, requires an existing device
+`/apps/gba/gba.bit` to restore, and leaves the restored emulator stopped.
+It does not program cartridge flash. The standalone controller test does
+not establish full emulator startup, screen behavior or frame rate.
+
 The cartridge cache is 64 entries; cache, OAM, palettes and sprite
 priority/coverage metadata use block RAM. Sprite metadata clears one entry
 per clock between scanlines; the next line waits for the clear to finish.
@@ -189,7 +245,11 @@ Progress symbol addresses are used only for the verified ROM binary hash;
 eight-bit test IDs in suites with more than 255 cases are marked ambiguous.
 USB disconnects are recorded as interrupted runs, and cleanup preserves the
 original transport error. The first suite attempt was interrupted by a
-user-confirmed badge reset; a new run is progressing on the hardware.
+user-confirmed badge reset. The subsequent run reached 5,033 completed
+results (4,110 passes) but timed out in `Div 00000000/00000000`. The pinned
+open BIOS division routine repeatedly shifts a zero denominator without
+an exit condition; sampled PCs `0x194` through `0x1a4` confirm that loop.
+This is a separate BIOS hang, so faster PSRAM alone cannot finish the suite.
 The GBA host uses the distinct `gba_protocol` module so menu apps that have
 already imported a different `protocol` module cannot change its wire format.
 The GBA menu entry is added after actual hardware acceptance.
