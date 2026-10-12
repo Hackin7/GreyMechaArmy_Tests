@@ -1,5 +1,16 @@
 # GBA on GreyMechaArmy
 
+The saved **10 MHz SPI, four-byte PSRAM burst image is running on hardware**.
+See `bitstreams/gba_psram_burst_10mhz.bit` and its adjacent controller source,
+checksum and timing manifest. With a warm guest restart, all eleven diagnostic
+checks pass, and Tonc `bld_demo` passes graphics-memory and injected blending
+control checks at approximately 1.99 captured frames/s. The user confirms the
+demo is visible. Cold BIOS startup remains unreliable; physical demo controls
+and completion of the larger ROM suite remain pending. Recorded evidence is
+in `validation/gba-10mhz-hardware-2026-10-12.json`. The current main RTL has
+the subsequent 25 MHz PHY; that full image is still routing. The sections
+below include earlier bring-up results and do not supersede this saved image.
+
 The core is `mincer-ray/openfpga-GBA` at
 `b08568fa60ff6f5f918cca5763f5b1923ed2d3db`, GPL-2.0. The board target is
 **LFE5U-25F/CABGA256: 24,288 LUTs, 56 block RAMs, 28 DSPs**.
@@ -74,7 +85,6 @@ Button counters use the core frequency bound. Flash and complete LCD-stream
 simulations pass at these core/panel/flash clock ratios.
 The build uses conservative speed-grade-6 timing; `FPGA_SPEED` and
 `NEXTPNR_FLAGS` permit explicit tool overrides.
-No GBA bitstream has been programmed on the board.
 
 Run the build commands in WSL from this directory. Required tools are GHDL,
 Yosys, nextpnr-ecp5, ecppack, Icarus Verilog, Verilator, and arm-none-eabi-gcc.

@@ -50,14 +50,21 @@ def check_demo(console,log,out):
         if time.monotonic()>deadline:
             raise RuntimeError('Demo graphics initialization failed: '+repr(mismatches))
     log['demo']['assets']=[region['name'] for region in expected['regions']]
-    console.execute('_gba_host.keys(0)\n')
-    wait_frames(console,3)
-    before=stable_text()
-    (out/'bld-demo-text-before.bin').write_bytes(before)
     # R cycles into alpha mode; holding Left lowers EVA. Both must update
     # the visible on-screen values in the character canvas.
     try:
-        for name,mask,frames in [('R: alpha mode',0x100,3),('Left: lower EVA',0x20,16),
+        console.execute('_gba_host.keys(0)\n')
+        wait_frames(console,3)
+        # A resumed test may begin in any blend mode. Return to mode zero
+        # before testing the mode-one transition.
+        for tap in range(3):
+            console.execute('_gba_host.keys(0x200)\n')
+            wait_frames(console,3)
+            console.execute('_gba_host.keys(0)\n')
+            wait_frames(console,2)
+        before=stable_text()
+        (out/'bld-demo-text-before.bin').write_bytes(before)
+        for name,mask,frames in [('R: next blend mode',0x100,3),('Left: lower EVA',0x20,16),
                                  ('Up: increase EVB',0x40,16)]:
             console.execute('_gba_host.keys(%d)\n'%mask)
             wait_frames(console,frames)

@@ -1,0 +1,142 @@
+{
+  "file": "gba_psram_burst_10mhz.bit",
+  "bytes": 565379,
+  "sha256": "470460636e9f017cb923769344b99d53ca3ce582189317898726fefa5cf1cf03",
+  "nominal_spi_mhz": 10,
+  "fpga": "LFE5U-25F/CABGA256",
+  "speed_grade_model": 6,
+  "clocks": {
+    "$glbnet$clk_core": {
+      "achieved": 25.945049285888672,
+      "constraint": 21.00002098083496
+    },
+    "$glbnet$clk_flash": {
+      "achieved": 170.2127685546875,
+      "constraint": 53.002593994140625
+    },
+    "$glbnet$clk_panel": {
+      "achieved": 125.54927825927734,
+      "constraint": 85.0051040649414
+    },
+    "$glbnet$host_sck$TRELLIS_IO_IN": {
+      "achieved": 284.2524108886719,
+      "constraint": 12
+    }
+  },
+  "utilization": {
+    "ALU54B": {
+      "available": 14,
+      "used": 0
+    },
+    "CLKDIVF": {
+      "available": 4,
+      "used": 0
+    },
+    "DCCA": {
+      "available": 56,
+      "used": 4
+    },
+    "DCSC": {
+      "available": 2,
+      "used": 0
+    },
+    "DCUA": {
+      "available": 1,
+      "used": 0
+    },
+    "DDRDLL": {
+      "available": 4,
+      "used": 0
+    },
+    "DLLDELD": {
+      "available": 8,
+      "used": 0
+    },
+    "DP16KD": {
+      "available": 56,
+      "used": 47
+    },
+    "DQSBUFM": {
+      "available": 8,
+      "used": 0
+    },
+    "DTR": {
+      "available": 1,
+      "used": 0
+    },
+    "ECLKBRIDGECS": {
+      "available": 2,
+      "used": 0
+    },
+    "ECLKSYNCB": {
+      "available": 10,
+      "used": 0
+    },
+    "EHXPLLL": {
+      "available": 2,
+      "used": 1
+    },
+    "EXTREFB": {
+      "available": 1,
+      "used": 0
+    },
+    "GSR": {
+      "available": 1,
+      "used": 0
+    },
+    "IOLOGIC": {
+      "available": 128,
+      "used": 0
+    },
+    "JTAGG": {
+      "available": 1,
+      "used": 0
+    },
+    "MULT18X18D": {
+      "available": 28,
+      "used": 21
+    },
+    "OSCG": {
+      "available": 1,
+      "used": 1
+    },
+    "PCSCLKDIV": {
+      "available": 2,
+      "used": 0
+    },
+    "SEDGA": {
+      "available": 1,
+      "used": 0
+    },
+    "SIOLOGIC": {
+      "available": 69,
+      "used": 0
+    },
+    "TRELLIS_COMB": {
+      "available": 24288,
+      "used": 23732
+    },
+    "TRELLIS_ECLKBUF": {
+      "available": 8,
+      "used": 0
+    },
+    "TRELLIS_FF": {
+      "available": 24288,
+      "used": 11310
+    },
+    "TRELLIS_IO": {
+      "available": 197,
+      "used": 34
+    },
+    "TRELLIS_RAMW": {
+      "available": 3036,
+      "used": 103
+    },
+    "USRMCLK": {
+      "available": 1,
+      "used": 1
+    }
+  },
+  "hardware_validation": "Warm diagnostic and bld_demo pass on GreyMecha; screen confirmed; cold boot remains unreliable",
+  "hardware_validation_report": "../validation/gba-10mhz-hardware-2026-10-12.json"
+}

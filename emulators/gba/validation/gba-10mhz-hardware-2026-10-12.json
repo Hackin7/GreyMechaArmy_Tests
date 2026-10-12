@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-12",
+  "board": "GreyMechaArmy LFE5U-25F/CABGA256",
+  "image": "../bitstreams/gba_psram_burst_10mhz.bit",
+  "bit_sha256": "470460636e9f017cb923769344b99d53ca3ce582189317898726fefa5cf1cf03",
+  "nominal_psram_spi_mhz": 10,
+  "diagnostic": {
+    "test": "diagnostic",
+    "rom": "diagnostic.gba",
+    "started": "2026-10-12T16:21:42+0800",
+    "rom_file_sha256": "60bc8c0f94d78acfff82722a72139a9b60b74ec9fcdc1da5274ee9b8de86888c",
+    "bit_file_sha256": "470460636e9f017cb923769344b99d53ca3ce582189317898726fefa5cf1cf03",
+    "bios_file_sha256": "1ac83c61792ab6e8ae531cf84b4cb2db60ee163111c5732c3e5168af86ac4a49",
+    "resumed_run": true,
+    "initial_status": {
+      "frames": 431,
+      "keys": 64,
+      "error": 0,
+      "ram_ready": true,
+      "sequence": 164,
+      "run": true,
+      "pc": 134219016,
+      "flash_misses": 312,
+      "device_id": 875859,
+      "panel_ready": true,
+      "ram_idle": false,
+      "ram_fault": false,
+      "busy": false,
+      "overflow": false,
+      "pause": false,
+      "physical": 2
+    },
+    "boot_restarts": 0,
+    "last_status": {
+      "frames": 431,
+      "keys": 64,
+      "error": 0,
+      "ram_ready": true,
+      "sequence": 164,
+      "run": true,
+      "pc": 134219012,
+      "flash_misses": 312,
+      "device_id": 875859,
+      "panel_ready": true,
+      "ram_idle": false,
+      "ram_fault": false,
+      "busy": false,
+      "overflow": false,
+      "pause": false,
+      "physical": 2
+    },
+    "last_report_hex": "474241444941473101000000ff0700000d600d6040000000f86c0b00000000005aa5000000000000000000000000000000000000000000000000000000000000",
+    "diagnostic": {
+      "version": 1,
+      "passed": 2047,
+      "done": 1611489293,
+      "keys": 64,
+      "counter": 748792,
+      "arithmetic_error": 0,
+      "shifter_error": 0,
+      "banking_error": 0
+    },
+    "key_injection": "pass",
+    "result": "pass"
+  },
+  "bld_demo": {
+    "test": "demo",
+    "rom": "bld_demo.gba",
+    "started": "2026-10-12T16:32:16+0800",
+    "rom_file_sha256": "2d9d36445765576d78bdd35b796eaaa2b465cfb076ad3b4ac428f21a4798ee2a",
+    "bit_file_sha256": "470460636e9f017cb923769344b99d53ca3ce582189317898726fefa5cf1cf03",
+    "bios_file_sha256": "1ac83c61792ab6e8ae531cf84b4cb2db60ee163111c5732c3e5168af86ac4a49",
+    "resumed_run": true,
+    "initial_status": {
+      "frames": 709,
+      "keys": 0,
+      "error": 0,
+      "ram_ready": true,
+      "sequence": 178,
+      "run": true,
+      "pc": 1220,
+      "flash_misses": 935014,
+      "device_id": 875859,
+      "panel_ready": true,
+      "ram_idle": false,
+      "ram_fault": false,
+      "busy": false,
+      "overflow": false,
+      "pause": false,
+      "physical": 0
+    },
+    "boot_restarts": 0,
+    "last_status": {
+      "frames": 729,
+      "keys": 0,
+      "error": 0,
+      "ram_ready": true,
+      "sequence": 178,
+      "run": true,
+      "pc": 134220414,
+      "flash_misses": 961544,
+      "device_id": 875859,
+      "panel_ready": true,
+      "ram_idle": false,
+      "ram_fault": false,
+      "busy": false,
+      "overflow": false,
+      "pause": false,
+      "physical": 0
+    },
+    "demo": {
+      "rom_sha256": "2d9d36445765576d78bdd35b796eaaa2b465cfb076ad3b4ac428f21a4798ee2a",
+      "assets": [
+        "Metroid background tiles",
+        "Fence tile",
+        "Metroid tilemap row 0",
+        "Metroid tilemap row 1",
+        "Metroid tilemap row 2",
+        "Metroid tilemap row 3",
+        "Metroid tilemap row 4",
+        "Metroid tilemap row 5",
+        "Metroid tilemap row 6",
+        "Metroid tilemap row 7"
+      ],
+      "controls": [
+        {
+          "name": "R: next blend mode",
+          "text_sha256": "110e134e3e6b780790fbc76bc07a06dc0a2a049fee23d6f8361f94c9995f3517"
+        },
+        {
+          "name": "Left: lower EVA",
+          "text_sha256": "656d9d3c12cfdfdee9234ae702333b08ae7682bdf59a7d741331cd032ac5a798"
+        },
+        {
+          "name": "Up: increase EVB",
+          "text_sha256": "0f931e2b7ce223636a8624aa7dc0160f170b7417c687fccddef8676309b07fe2"
+        }
+      ],
+      "physical_screen": "User confirmed Metroid images over fence with mode/eva/evb/ey text visible",
+      "physical_buttons": "requires observation",
+      "frames_observed": 20,
+      "observation_seconds": 10.030999999959022,
+      "captured_fps": 1.9938191606102784,
+      "last_status": {
+        "frames": 826,
+        "keys": 0,
+        "error": 0,
+        "ram_ready": true,
+        "sequence": 73,
+        "run": true,
+        "pc": 134220476,
+        "flash_misses": 1090133,
+        "device_id": 875859,
+        "panel_ready": true,
+        "ram_idle": false,
+        "ram_fault": false,
+        "busy": false,
+        "overflow": false,
+        "pause": false,
+        "physical": 0
+      }
+    },
+    "result": "demo_checks_pass"
+  },
+  "startup": {
+    "cold_boot_reliable": false,
+    "cold_stall_pc": "0x00000764",
+    "cold_stall_frames": 1,
+    "diagnostic_recovery": "Manual warm guest restart before resumed passing report",
+    "demo_recovery": "One automatic warm guest restart before successful demo run"
+  },
+  "limitations": [
+    "Physical demo buttons require explicit observation; injected controls passed",
+    "Larger ROM test suite has not completed",
+    "25 MHz full emulator bitstream remains in routing"
+  ],
+  "text_snapshot_bytes": 19200
+}

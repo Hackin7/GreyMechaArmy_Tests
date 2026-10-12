@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -17,8 +18,13 @@ def main():
     parser.add_argument('--drive',default='E:/')
     parser.add_argument('--build',type=Path,default=PROJECT/'build/psram-async-board')
     parser.add_argument('--wait-minutes',type=float,default=240)
+    parser.add_argument('--state-file',type=Path,
+                        help='Separate progress file for an interim candidate')
+    parser.add_argument('--archive-only',action='store_true',
+                        help='Save the timing-clean image without accessing the board')
+    parser.add_argument('--archive-name',choices=['gba_psram_burst_10mhz','gba_psram_burst_25mhz'])
     args=parser.parse_args()
-    state_file=PROJECT/'build/hardware/bld-deployment-state.json'
+    state_file=args.state_file or PROJECT/'build/hardware/bld-deployment-state.json'
     state_file.parent.mkdir(parents=True,exist_ok=True)
     state=dict(state='waiting_for_route',build=str(args.build),port=args.port)
     def update(value):
@@ -50,6 +56,26 @@ def main():
         for name,result in clocks.items():
             if result['achieved']<result['constraint']:
                 raise RuntimeError('Routed timing failed for '+name)
+        archive_name=args.archive_name or {'psram-burst-board':'gba_psram_burst_10mhz',
+                                          'psram-async-board':'gba_psram_burst_25mhz'}.get(args.build.name)
+        if not archive_name:
+            raise RuntimeError('Specify --archive-name for this build directory')
+        archive_dir=PROJECT/'bitstreams'
+        archive_dir.mkdir(parents=True,exist_ok=True)
+        archive=archive_dir/(archive_name+'.bit')
+        digest=hashlib.sha256(bit.read_bytes()).hexdigest()
+        shutil.copy2(bit,archive)
+        if hashlib.sha256(archive.read_bytes()).hexdigest()!=digest:
+            raise RuntimeError('Archived image verification failed')
+        (archive_dir/(archive_name+'.sha256')).write_text(digest+'  '+archive.name+'\n')
+        manifest=dict(file=archive.name,bytes=archive.stat().st_size,sha256=digest,
+                      nominal_spi_mhz=10 if archive_name.endswith('10mhz') else 25,
+                      fpga='LFE5U-25F/CABGA256',speed_grade_model=6,
+                      clocks=clocks,utilization=timing['utilization'],
+                      hardware_validation='Full emulator validation pending')
+        (archive_dir/(archive_name+'.manifest.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+        update(dict(state='archived',archive=str(archive),bit_sha256=digest))
+        if args.archive_only:return
         update(dict(state='testing_diagnostic',bit_sha256=hashlib.sha256(bit.read_bytes()).hexdigest()))
         runner=PROJECT/'tools/hardware_test.py'
         for action in ('diagnostic','demo'):

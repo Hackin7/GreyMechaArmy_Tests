@@ -46,6 +46,10 @@ class Console:
         # raw session open so the SPI pin owners and host survive each command.
         if self.console is None:
             self.console = serial.Serial(self.port, 115200, timeout=0.1)
+            # A complete text/VRAM snapshot prints tens of KiB through USB.
+            # Keep Windows' receive buffer larger than those raw-REPL replies.
+            if hasattr(self.console,'set_buffer_size'):
+                self.console.set_buffer_size(rx_size=131072,tx_size=4096)
             console = self.console
             console.write(b'\r\x03\x03')
             time.sleep(0.3)
@@ -100,12 +104,15 @@ class Console:
         return json.loads(self.execute("print(json.dumps(_gba_host.status()))\n").strip())
 
     def memory(self, address, size, save=False):
-        result = self.execute("_gba_host.pause()\n"
+        for attempt in range(3):
+            result = self.execute("_gba_host.pause()\n"
                               "try:\n"
                               "    print(binascii.hexlify(_gba_host.read(%d,%d,save=%r)).decode())\n"
                               "finally:\n"
                               "    _gba_host.resume()\n" % (address, size, save), timeout=180)
-        return bytes.fromhex(result.strip())
+            data=bytes.fromhex(result.strip())
+            if len(data)==size:return data
+        raise RuntimeError('Incomplete USB memory reply: expected %d bytes, received %d'%(size,len(data)))
 
     def save(self, address, size):
         return self.memory(address,size,save=True)
