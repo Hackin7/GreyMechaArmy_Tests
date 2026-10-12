@@ -253,3 +253,28 @@ This is a separate BIOS hang, so faster PSRAM alone cannot finish the suite.
 The GBA host uses the distinct `gba_protocol` module so menu apps that have
 already imported a different `protocol` module cannot change its wire format.
 The GBA menu entry is added after actual hardware acceptance.
+
+`make bld-demo` builds the unmodified Tonc blending demo from pinned
+`gbadev-org/libtonc-examples` commit `db70fa29a0baae12c5c7603426d8535ebb5cc6ed`.
+The ROM, ELF, license, source/compiler hashes and ROM-derived graphics checks
+are placed in `build/roms`. Grey/Red adjust the brightness weight; Left/Right
+adjust EVA, Up/Down adjust EVB. Center+Red is R (next blend mode), and
+Center+Grey is L (previous mode).
+
+The deferred deployment command waits for successful routing, a complete
+bitstream and passing clock timing, then runs the diagnostic before loading
+the demo:
+
+```powershell
+python tools/deploy_bld_when_ready.py --port COM9 --drive E:/
+```
+
+State is recorded in `build/hardware/bld-deployment-state.json`. The demo
+collector verifies the loaded background tiles, fence and tilemap against
+the built ROM, checks text updates after injected R/Left/Up, and measures
+captured frames over a quiet interval. Physical LCD appearance and physical
+button behavior still require observation. It leaves the demo running with
+physical input enabled after the checks. Existing device GBA images are
+backed up before staging a new candidate, and cartridge flash is replaced
+with the selected demo. `hardware_test.py --bit <path>` selects a separate
+candidate without overwriting the local `build/gba.bit` reference.

@@ -10,6 +10,7 @@ The FPGA cartridge region at 0x100000 is replaced by the selected test ROM.
 Root code.py and the normal menu are preserved; the existing NVM loader is used.
 """
 import argparse
+import hashlib
 import json
 import shutil
 import struct
@@ -98,11 +99,16 @@ class Console:
     def status(self):
         return json.loads(self.execute("print(json.dumps(_gba_host.status()))\n").strip())
 
-    def save(self, address, size):
+    def memory(self, address, size, save=False):
         result = self.execute("_gba_host.pause()\n"
-                              "print(binascii.hexlify(_gba_host.read(%d,%d,save=True)).decode())\n"
-                              "_gba_host.resume()\n" % (address, size), timeout=180)
+                              "try:\n"
+                              "    print(binascii.hexlify(_gba_host.read(%d,%d,save=%r)).decode())\n"
+                              "finally:\n"
+                              "    _gba_host.resume()\n" % (address, size, save), timeout=180)
         return bytes.fromhex(result.strip())
+
+    def save(self, address, size):
+        return self.memory(address,size,save=True)
 
     def suite_progress(self):
         # Symbols from the pinned suite.elf (ROM hash checked by the caller).
@@ -122,9 +128,10 @@ class Console:
                     payload_bytes=length, truncated=bool(truncated))
 
 
-def stage(drive, rom, stage_bit=True):
+def stage(drive, rom, stage_bit=True, bit=None):
     app = drive / 'apps/gba'
-    artifacts = dict(gba_bit=PROJECT/'build/gba.bit', bios=PROJECT/'build/roms/open_bios.bin',
+    bit=bit or PROJECT/'build/gba.bit'
+    artifacts = dict(gba_bit=bit, bios=PROJECT/'build/roms/open_bios.bin',
                      rom=PROJECT/'build/roms'/rom)
     for file in artifacts.values():
         if not file.exists():
@@ -135,9 +142,12 @@ def stage(drive, rom, stage_bit=True):
     for source in (PROJECT / 'badge').glob('*.py'):
         shutil.copy2(source, app/source.name)
     if stage_bit:
-        shutil.copy2(PROJECT/'build/gba.bit', app/'gba.bit')
+        shutil.copy2(bit, app/'gba.bit')
     for name in ('open_bios.bin', 'BIOS_SOURCE.txt', 'BIOS_LICENSE.txt', rom):
         shutil.copy2(PROJECT/'build/roms'/name, app/name)
+    if rom=='bld_demo.gba':
+        for name in ('BLD_DEMO_LICENSE.txt','BLD_DEMO_SOURCE.txt'):
+            shutil.copy2(PROJECT/'build/roms'/name,app/name)
 
 
 def preflight(console, log):
@@ -165,7 +175,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', default='COM9')
     parser.add_argument('--drive', type=Path, default=Path('E:/'))
-    parser.add_argument('action', choices=['diagnostic', 'suite', 'status'])
+    parser.add_argument('action', choices=['diagnostic', 'suite', 'demo', 'status'])
+    parser.add_argument('--bit',type=Path,default=PROJECT/'build/gba.bit',
+                        help='Use a separately built FPGA candidate without replacing build/gba.bit')
     parser.add_argument('--minutes', type=float, default=60)
     parser.add_argument('--retry-stalled-boot', action='store_true',
                         help='Log and retry a stalled BIOS boot up to twice (bring-up only)')
@@ -183,18 +195,30 @@ def main():
         return
     # Stop CircuitPython autoreload before USB filesystem writes.
     console.execute('import supervisor\nsupervisor.runtime.autoreload=False\n')
-    rom = 'diagnostic.gba' if args.action == 'diagnostic' else 'suite-bench.gba'
+    rom = {'diagnostic':'diagnostic.gba','suite':'suite-bench.gba','demo':'bld_demo.gba'}[args.action]
     log = dict(test=args.action, rom=rom, started=time.strftime('%Y-%m-%dT%H:%M:%S%z'))
     out = PROJECT/'build/hardware'
     out.mkdir(parents=True, exist_ok=True)
     device_bit = args.drive/'apps/gba/gba.bit'
     temporary_stage = False
     try:
+        log['rom_file_sha256']=hashlib.sha256((PROJECT/'build/roms'/rom).read_bytes()).hexdigest()
+        log['bit_file_sha256']=hashlib.sha256(args.bit.read_bytes()).hexdigest()
+        log['bios_file_sha256']=hashlib.sha256((PROJECT/'build/roms/open_bios.bin').read_bytes()).hexdigest()
+        if not args.resume and device_bit.is_file():
+            previous=device_bit.read_bytes()
+            previous_hash=hashlib.sha256(previous).hexdigest()
+            backup=out/('device-before-'+args.action+'-'+previous_hash[:12]+'.bit')
+            backup.write_bytes(previous)
+            if backup.read_bytes()!=previous:
+                raise RuntimeError('Device bitstream backup verification failed')
+            log['previous_device_bit_sha256']=previous_hash
+            log['previous_device_bit_backup']=str(backup)
         if args.temporary_rom and not args.resume:
             # Only replace this runner's GBA artifact; retain a local backup
             # before freeing its space on the small CircuitPython volume.
-            if not (PROJECT/'build/gba.bit').is_file():
-                raise FileNotFoundError('Build artifact missing: build/gba.bit')
+            if not args.bit.is_file():
+                raise FileNotFoundError('Build artifact missing: '+str(args.bit))
             if device_bit.exists():
                 backup = out/'device-before-temporary-gba.bit'
                 shutil.copy2(device_bit, backup)
@@ -213,14 +237,14 @@ def main():
             log['resumed_run'] = True
             log['initial_status'] = status
         else:
-            stage(args.drive, rom, stage_bit=not args.temporary_rom)
+            stage(args.drive, rom, stage_bit=not args.temporary_rom, bit=args.bit)
             if not args.temporary_rom:
                 console.upload()
             console.execute("import sys\nsys.path.insert(0,'/apps/gba')\n"
                             "from gba_app import install_rom\ninstall_rom('/apps/gba/%s')\n" % rom, timeout=180)
             if args.temporary_rom:
                 (args.drive/'apps/gba'/rom).unlink()
-                shutil.copy2(PROJECT/'build/gba.bit', device_bit)
+                shutil.copy2(args.bit, device_bit)
                 temporary_stage = False
                 log['temporary_rom_staging'] = 'restored'
             console.upload()
@@ -230,7 +254,6 @@ def main():
             print(result.strip(), flush=True)
         manifest = None
         if args.action == 'suite':
-            import hashlib
             metadata = (PROJECT/'build/roms/SUITE_SOURCE.txt').read_text()
             actual_hash = hashlib.sha256((PROJECT/'build/roms'/rom).read_bytes()).hexdigest()
             if actual_hash == SUITE_PROGRESS_ROM_SHA256 and 'ROM SHA256: ' + actual_hash in metadata:
@@ -264,6 +287,12 @@ def main():
                     stalled_polls = 0
                 time.sleep(5)
                 continue
+            if args.action == 'demo':
+                from check_bld_demo import check_demo
+                check_demo(console,log,out)
+                log['result']='demo_checks_pass'
+                print('GBA_BLD_DEMO_CHECKS_PASS',log['demo'],flush=True)
+                return
             report = console.save(0, 64 if args.action == 'diagnostic' else 32)
             log['last_report_hex'] = report.hex()
             if manifest is not None:
@@ -335,7 +364,7 @@ def main():
             staged_rom = args.drive/'apps/gba'/rom
             if staged_rom.exists():
                 staged_rom.unlink()
-            shutil.copy2(PROJECT/'build/gba.bit', device_bit)
+            shutil.copy2(args.bit, device_bit)
         (out/(args.action+'.json')).write_text(json.dumps(log, indent=2), encoding='utf-8')
         try:
             console.execute('_gba_spi.deinit()\n')

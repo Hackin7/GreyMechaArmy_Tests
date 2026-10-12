@@ -126,6 +126,10 @@ bios:
 suite:
 	$(PYTHON) tools/build_suite.py
 
+.PHONY: bld-demo
+bld-demo:
+	$(PYTHON) tools/build_bld_demo.py
+
 test-board-core: diagnostic
 	$(PYTHON) tools/bin_to_hex.py $(BUILD)/roms/open_bios.bin $(BUILD)/roms/open_bios.hex
 	$(PYTHON) tools/bin_to_hex.py $(BUILD)/roms/diagnostic.gba $(BUILD)/roms/diagnostic.hex
