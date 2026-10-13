@@ -4,6 +4,9 @@ use ieee.numeric_std.all;
 
 -- All thirty physical ARM general registers, with asynchronous read ports.
 -- A validity bit per word makes warm reset independent of RAM contents.
+-- Private RAM layout: shared R0-R12 at 0-12, user SP/LR at 14-15,
+-- FIQ R8-R12 at 16-20, and exception SP/LR pairs at 22-31.
+-- Aligning banks makes FIQ address selection wiring rather than addition.
 entity gba_cpu_regfile is
   port(clk, reset, write_enable : in std_logic;
        read_mode, write_mode : in std_logic_vector(3 downto 0);
@@ -20,37 +23,46 @@ architecture rtl of gba_cpu_regfile is
   signal ram : ram_t;
   signal valid : std_logic_vector(31 downto 0) := (others => '0');
   signal addr_n, addr_m, addr_d, addr_a, addr_b, addr_s, addr_lr, addr_write : integer range 0 to 31;
-  signal block_mode, dest_mode : std_logic_vector(3 downto 0);
-  function physical(index : unsigned(3 downto 0); mode : std_logic_vector(3 downto 0)) return integer is
-    variable bank : integer range 0 to 5;
-    variable reg_index : integer range 0 to 15;
+  signal read_base, write_base, block_base, dest_base : unsigned(4 downto 0);
+  signal read_fiq, write_fiq, block_fiq, dest_fiq : boolean;
+  function stack_base(mode : std_logic_vector(3 downto 0)) return unsigned is
   begin
-    reg_index := to_integer(index);
     case mode is
-      when x"1" => bank:=1; -- FIQ
-      when x"2" => bank:=2; -- IRQ
-      when x"3" => bank:=3; -- supervisor
-      when x"7" => bank:=4; -- abort
-      when x"B" => bank:=5; -- undefined
-      when others => bank:=0; -- user/system
+      when x"1" => return to_unsigned(22,5); -- FIQ
+      when x"2" => return to_unsigned(24,5); -- IRQ
+      when x"3" => return to_unsigned(26,5); -- supervisor
+      when x"7" => return to_unsigned(28,5); -- abort
+      when x"B" => return to_unsigned(30,5); -- undefined
+      when others => return to_unsigned(14,5); -- user/system
     end case;
-    if reg_index<8 then return reg_index;
-    elsif reg_index<13 then
-      if bank=1 then return reg_index+5; else return reg_index; end if;
-    elsif reg_index<15 then return 18+bank*2+reg_index-13;
+  end;
+  function physical(index : unsigned(3 downto 0); fiq : boolean;
+                    base : unsigned(4 downto 0)) return integer is
+  begin
+    if index<8 then return to_integer(index);
+    elsif index<13 then
+      if fiq then return to_integer(to_unsigned(2,2) & index(2 downto 0));
+      else return to_integer(index); end if;
+    elsif index<15 then return to_integer(base(4 downto 1) & not index(0));
     else return 0; end if;
   end;
 begin
-  block_mode <= x"0" when block_user='1' else read_mode;
-  dest_mode <= x"0" when dest_user='1' else read_mode;
-  addr_n <= physical(rn,read_mode);
-  addr_m <= physical(rm,read_mode);
-  addr_d <= physical(rd,dest_mode);
-  addr_a <= physical(ra,read_mode);
-  addr_s <= physical(rs,read_mode);
-  addr_b <= physical(rb,block_mode);
-  addr_lr <= physical(to_unsigned(14,4),read_mode);
-  addr_write <= physical(write_index,write_mode);
+  read_base <= stack_base(read_mode);
+  write_base <= stack_base(write_mode);
+  block_base <= to_unsigned(14,5) when block_user='1' else read_base;
+  dest_base <= to_unsigned(14,5) when dest_user='1' else read_base;
+  read_fiq <= read_mode=x"1";
+  write_fiq <= write_mode=x"1";
+  block_fiq <= read_fiq and block_user/='1';
+  dest_fiq <= read_fiq and dest_user/='1';
+  addr_n <= physical(rn,read_fiq,read_base);
+  addr_m <= physical(rm,read_fiq,read_base);
+  addr_d <= physical(rd,dest_fiq,dest_base);
+  addr_a <= physical(ra,read_fiq,read_base);
+  addr_s <= physical(rs,read_fiq,read_base);
+  addr_b <= physical(rb,block_fiq,block_base);
+  addr_lr <= physical(to_unsigned(14,4),read_fiq,read_base);
+  addr_write <= physical(write_index,write_fiq,write_base);
   data_n <= pc when rn=15 else ram(addr_n) when valid(addr_n)='1' else (others=>'0');
   data_m <= pc when rm=15 else ram(addr_m) when valid(addr_m)='1' else (others=>'0');
   data_d <= pc when rd=15 else ram(addr_d) when valid(addr_d)='1' else (others=>'0');

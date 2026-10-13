@@ -1,0 +1,27 @@
+{
+  "inputs": {
+    "reference_sha256": "611da35924f1f26a91450b66b7228743fd43b8b2fddac37e02a3c3a43c179f4c",
+    "candidate_sha256": "5479ec9460741431fa7c344f89f0925a699bc9c78073c5be489622a43e891c8a",
+    "mapping_flags": "-noccu2 -nowidelut -no-rw-check",
+    "scope": "isolated register-file and address-selection microbenchmark; not whole CPU or packed board"
+  },
+  "baseline": {
+    "LUT4": 661,
+    "$scopeinfo": 1,
+    "TRELLIS_FF": 30,
+    "TRELLIS_DPR16X4": 68
+  },
+  "shift-shared": {
+    "LUT4": 568,
+    "$scopeinfo": 1,
+    "TRELLIS_FF": 30,
+    "TRELLIS_DPR16X4": 64
+  },
+  "shift-shared-decode": {
+    "LUT4": 502,
+    "$scopeinfo": 1,
+    "TRELLIS_FF": 30,
+    "TRELLIS_DPR16X4": 64
+  },
+  "address_equivalence": "PASS: all 16 mode encodings and 16 register indices, modulo private RAM layout"
+}

@@ -135,6 +135,38 @@ banked_register_check:
     check r7, 7
     check r6, 3
 
+    @ Shift-amount reads share the accumulator port but use only its low byte.
+    mov r2, #12
+    mov r0, #3
+    mov r3, #4
+    mov r7, r0, lsl r3
+    check r7, 48
+    mov r3, #32
+    mov r7, r0, lsr r3
+    check r7, 0
+    ldr r0, =0x80000000
+    mov r3, #33
+    mov r7, r0, asr r3
+    check r7, 0xffffffff
+    mov r3, #255
+    mov r7, r0, ror r3
+    check r7, 1
+    mov r3, #256
+    mov r7, r0, lsl r3
+    check r7, 0x80000000
+    @ Rd=Rs must read the pre-write shift amount.
+    mov r7, #3
+    mov r0, #5
+    mov r7, r0, lsl r7
+    check r7, 40
+    @ Banked shift operands must follow FIQ selection too.
+    enter 0xd1
+    mov r8, #5
+    mov r9, #3
+    mov r7, r8, lsl r9
+    check r7, 40
+    enter 0xdf
+
     @ Thumb BL consumes banked LR through the shared accumulator port.
     mov r2, #11
     adr r5, .Lafter_thumb
@@ -144,12 +176,20 @@ banked_register_check:
     .thumb
     .align 1
 .Lthumb_caller:
+    movs r0, #3
+    movs r1, #4
+    lsls r0, r1
+    cmp r0, #48
+    bne .Lthumb_fail
     bl .Lthumb_leaf
     adds r7, #0x22
     bx r5
 .Lthumb_leaf:
     movs r7, #0x55
     bx lr
+.Lthumb_fail:
+    movs r7, #0
+    bx r5
     .arm
     .align 2
 .Lafter_thumb:

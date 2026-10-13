@@ -1,0 +1,132 @@
+{
+  "netlist_sha256": "2be11da7bb2391a6d70d19c2ce6b4bd5f96bafaf1a9e7c4902afc555e37a9b82",
+  "scope": "packing only; no placement, routing or timing acceptance",
+  "command": [
+    "nextpnr-ecp5",
+    "--25k",
+    "--package",
+    "CABGA256",
+    "--speed",
+    "6",
+    "--json",
+    "/tmp/gba-cpu-candidate-wide/top.json",
+    "--seed",
+    "1",
+    "--no-place",
+    "--no-route"
+  ],
+  "resources": {
+    "TRELLIS_IO": {
+      "used": 36,
+      "capacity": 197
+    },
+    "DCCA": {
+      "used": 5,
+      "capacity": 56
+    },
+    "DP16KD": {
+      "used": 47,
+      "capacity": 56
+    },
+    "MULT18X18D": {
+      "used": 21,
+      "capacity": 28
+    },
+    "ALU54B": {
+      "used": 0,
+      "capacity": 14
+    },
+    "EHXPLLL": {
+      "used": 2,
+      "capacity": 2
+    },
+    "EXTREFB": {
+      "used": 0,
+      "capacity": 1
+    },
+    "DCUA": {
+      "used": 0,
+      "capacity": 1
+    },
+    "PCSCLKDIV": {
+      "used": 0,
+      "capacity": 2
+    },
+    "IOLOGIC": {
+      "used": 0,
+      "capacity": 128
+    },
+    "SIOLOGIC": {
+      "used": 0,
+      "capacity": 69
+    },
+    "GSR": {
+      "used": 0,
+      "capacity": 1
+    },
+    "JTAGG": {
+      "used": 0,
+      "capacity": 1
+    },
+    "OSCG": {
+      "used": 1,
+      "capacity": 1
+    },
+    "SEDGA": {
+      "used": 0,
+      "capacity": 1
+    },
+    "DTR": {
+      "used": 0,
+      "capacity": 1
+    },
+    "USRMCLK": {
+      "used": 1,
+      "capacity": 1
+    },
+    "CLKDIVF": {
+      "used": 0,
+      "capacity": 4
+    },
+    "ECLKSYNCB": {
+      "used": 0,
+      "capacity": 10
+    },
+    "DLLDELD": {
+      "used": 0,
+      "capacity": 8
+    },
+    "DDRDLL": {
+      "used": 0,
+      "capacity": 4
+    },
+    "DQSBUFM": {
+      "used": 0,
+      "capacity": 8
+    },
+    "TRELLIS_ECLKBUF": {
+      "used": 0,
+      "capacity": 8
+    },
+    "ECLKBRIDGECS": {
+      "used": 0,
+      "capacity": 2
+    },
+    "DCSC": {
+      "used": 0,
+      "capacity": 2
+    },
+    "TRELLIS_FF": {
+      "used": 11354,
+      "capacity": 24288
+    },
+    "TRELLIS_COMB": {
+      "used": 23488,
+      "capacity": 24288
+    },
+    "TRELLIS_RAMW": {
+      "used": 103,
+      "capacity": 3036
+    }
+  }
+}

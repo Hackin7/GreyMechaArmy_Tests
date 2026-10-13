@@ -38,7 +38,7 @@ def split_args(s):
     return out + [s[start:].strip()]
 
 
-def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False, banked_registers=False, obj_window=False, shared_color=False):
+def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=False, shared_cpu=False, obj_ram=False, banked_registers=False, obj_window=False, shared_color=False, shared_shift_read=False):
     files = list(src.glob('*.vhd'))
     filenames = {p.stem.lower(): p.name for p in files}
     sources = {p.stem.lower(): p.read_text() for p in files}
@@ -63,6 +63,11 @@ def prepare(src, dst, shared_backgrounds=False, no_savestates=False, shared_dma=
     if banked_registers:
         from bank_cpu_registers import bank_cpu_registers
         sources['gba_cpu'] = bank_cpu_registers(sources['gba_cpu'])
+    if shared_shift_read:
+        if not banked_registers:
+            raise ValueError('shared shift read requires banked register RAM')
+        from share_cpu_shift_read import share_shift_read
+        sources['gba_cpu'] = share_shift_read(sources['gba_cpu'])
     if obj_window:
         from block_obj_window import block_obj_window
         sources['gba_gpu_drawer'] = block_obj_window(sources['gba_gpu_drawer'])
@@ -195,5 +200,6 @@ if __name__ == '__main__':
     ap.add_argument('--banked-register-ram', action='store_true')
     ap.add_argument('--obj-window-ram', action='store_true')
     ap.add_argument('--shared-color-arithmetic', action='store_true')
+    ap.add_argument('--shared-cpu-shift-read', action='store_true')
     args = ap.parse_args()
-    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram, args.banked_register_ram, args.obj_window_ram, args.shared_color_arithmetic)
+    prepare(args.source, args.output, args.shared_backgrounds, args.no_savestates, args.shared_dma_arithmetic, args.shared_cpu_arithmetic, args.obj_metadata_ram, args.banked_register_ram, args.obj_window_ram, args.shared_color_arithmetic, shared_shift_read=args.shared_cpu_shift_read)

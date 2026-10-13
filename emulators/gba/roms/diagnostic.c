@@ -141,9 +141,11 @@ void diagnostic(void) {
     save32(44,banking_error);
     if(!banking_error) passed|=1024;
     save32(12,passed);
+#ifndef CPU_FOCUS_DIAGNOSTIC
     for(unsigned y=0;y<160;y++)
         for(unsigned x=0;x<240;x++) VIDEO[y*240+x]=bars[x/30];
-    save32(16,0x600d600d); // RAM checks and full framebuffer fill complete
+#endif
+    save32(16,0x600d600d); // Checks complete; full bar fill except in CPU-focused builds.
     unsigned last=0xffff,counter=0;
     for(;;) {
         unsigned keys=(~REG16(0x04000130))&0x3ff;

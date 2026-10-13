@@ -1,0 +1,23 @@
+{
+  "inputs": {
+    "baseline_sha256": "71f35e224bab043d671a13cc491cdfdcfc87cd5e7107b577a55bec9e2150b1fc",
+    "candidate_sha256": "6545b90c0af15d8a309ccfa4fdda99705a3286aaf041c18c8b4c0659e7d922a6",
+    "mapping_flags": "-noccu2 -nowidelut -no-rw-check",
+    "abc_script_sha256": "a2b9d9b57a130c9145ddc57b0c5d2f06a5820bb848be91ec0c5ccf650fd10921",
+    "scope": "CPU subsystem with unused savestate transfers disabled; not full-board packed sites"
+  },
+  "baseline": {
+    "TRELLIS_FF": 2074,
+    "LUT4": 6423,
+    "$scopeinfo": 51,
+    "MULT18X18D": 4,
+    "TRELLIS_DPR16X4": 64
+  },
+  "candidate": {
+    "TRELLIS_FF": 2074,
+    "LUT4": 6358,
+    "$scopeinfo": 51,
+    "MULT18X18D": 4,
+    "TRELLIS_DPR16X4": 64
+  }
+}

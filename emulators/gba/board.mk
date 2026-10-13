@@ -1,8 +1,11 @@
 # Keep expensive GHDL output on Linux's filesystem until complete.
 BOARD_WORK ?= /tmp/greymecha_gba_board
 PORTABLE ?= $(BOARD_WORK)/portable
-PORTABLE_FLAGS ?= --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram --banked-register-ram --obj-window-ram --shared-color-arithmetic
-MAPPING_FLAGS ?= -noccu2 -nowidelut
+SHARED_CPU_SHIFT_READ ?= 1
+PORTABLE_FLAGS ?= --shared-backgrounds --no-savestates --shared-dma-arithmetic --shared-cpu-arithmetic --obj-metadata-ram --banked-register-ram --obj-window-ram --shared-color-arithmetic $(if $(filter 1,$(SHARED_CPU_SHIFT_READ)),--shared-cpu-shift-read)
+# The CPU reductions save packed area with wider LUTs enabled. Keep carry
+# chains disabled; MAPPING_FLAGS='-noccu2 -nowidelut' retains the old mapper.
+MAPPING_FLAGS ?= -noccu2
 # ECP5 tile flip-flops share reset controls. Put single-user synchronous
 # resets in the data path instead of consuming a separate tile control set.
 MIN_SRST_FANOUT ?= 2
@@ -62,11 +65,15 @@ board-core: portable
 bit: board-core
 
 .PHONY: bit-existing-core
-bit bit-existing-core:
+.PHONY: map-existing-core
+map-existing-core:
 	mkdir -p $(BOARD_WORK) $(BUILD)
 	cp $(GEN)/gba_top_board.v $(BOARD_WORK)/gba_top.v
 	cp tools/ecp5_area.abc $(BOARD_WORK)/area.abc
 	$(YOSYS) -Q -T -p 'read_verilog -Irtl -I$(OLED_RTL) -sv $(BOARD_WORK)/gba_top.v $(BOARD_RTL); chparam -set PSRAM_FAST_READ $(PSRAM_FAST_READ) -set FLASH_QSPI $(FLASH_QSPI) -set FLASH_CYCLES $(FLASH_CYCLES) -set FLASH_RX_REGISTER $(FLASH_RX_REGISTER) -set PLL_CORE_DIV $(PLL_CORE_DIV) -set PLL_FLASH_DIV $(PLL_FLASH_DIV) top; scratchpad -set abc9.script $(BOARD_WORK)/area.abc; synth_ecp5 -top top $(MAPPING_FLAGS) -no-rw-check -run begin:map_ram; write_rtlil $(BOARD_WORK)/pre_ram.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ram:map_gates; write_rtlil $(BOARD_WORK)/pre_gates.il; synth_ecp5 -top top $(MAPPING_FLAGS) -run map_gates:map_ffs; dfflegalize -cell $$_DFF_?_ 01 -cell $$_DFF_?P?_ r -cell $$_SDFF_?P?_ r -cell $$_DFFE_??_ 01 -cell $$_DFFE_?P??_ r -cell $$_SDFFE_?P??_ r -cell $$_DLATCH_?_ x -minsrst $(MIN_SRST_FANOUT); synth_ecp5 -top top $(MAPPING_FLAGS) -run map_ffs:check; hierarchy -check; check -assert; stat; write_rtlil $(BOARD_WORK)/mapped.il; blackbox =A:whitebox; write_json $(BOARD_WORK)/top.json' > $(BUILD)/$(BOARD_LOG_TAG)-yosys.log
+
+bit bit-existing-core:
+	$(MAKE) map-existing-core
 	sed -e 's/FREQUENCY NET "clk_flash" 53.0 MHz/FREQUENCY NET "clk_flash" $(FLASH_MHZ) MHz/' -e 's/FREQUENCY NET "clk_core" 21.0 MHz/FREQUENCY NET "clk_core" $(CORE_CONSTRAINT) MHz/' -e 's/FREQUENCY NET "clk_panel" 85.0 MHz/FREQUENCY NET "clk_panel" $(PANEL_CONSTRAINT) MHz/' -e 's/FREQUENCY NET "clk_ram" 53.0 MHz/FREQUENCY NET "clk_ram" $(RAM_CONSTRAINT) MHz/' pinout.lpf > $(BOARD_WORK)/pins.lpf
 	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(BOARD_WORK)/top.json --lpf $(BOARD_WORK)/pins.lpf --textcfg $(BOARD_WORK)/top.config --report $(BUILD)/$(BOARD_LOG_TAG)-timing.json --seed 1 $(NEXTPNR_FLAGS) > $(BUILD)/$(BOARD_LOG_TAG)-nextpnr.log 2>&1
 	$(ECPPACK) --compress $(BOARD_WORK)/top.config $(BOARD_BIT)
@@ -145,11 +152,20 @@ test-color-arithmetic:
 test-cpu-registers:
 	mkdir -p $(BUILD)/regfile-test
 	$(GHDL) -a --std=08 --workdir=$(BUILD)/regfile-test rtl/vhdl/gba_cpu_regfile.vhd sim/tb_gba_cpu_regfile.vhd
-	$(GHDL) -r --std=08 --workdir=$(BUILD)/regfile-test tb_gba_cpu_regfile --assert-level=error
+	$(GHDL) --elab-run --std=08 --workdir=$(BUILD)/regfile-test -o $(BUILD)/regfile-test/test tb_gba_cpu_regfile --assert-level=error
+
+.PHONY: test-cpu-register-equivalence test-cpu-register-area
+test-cpu-register-equivalence:
+	mkdir -p $(BUILD)/regfile-equivalence
+	$(GHDL) -a --std=08 --workdir=$(BUILD)/regfile-equivalence sim/gba_cpu_regfile_reference.vhd rtl/vhdl/gba_cpu_regfile.vhd sim/tb_gba_cpu_register_equivalence.vhd
+	$(GHDL) --elab-run --std=08 --workdir=$(BUILD)/regfile-equivalence -o $(BUILD)/regfile-equivalence/test tb_gba_cpu_register_equivalence --assert-level=error
+
+test-cpu-register-area:
+	$(PYTHON) tools/measure_cpu_registers.py
 
 diagnostic:
 	mkdir -p $(BUILD)/roms
-	arm-none-eabi-gcc -mcpu=arm7tdmi -marm -O2 -ffreestanding -nostdlib -fno-builtin -T roms/diagnostic.ld roms/diagnostic_start.S roms/diagnostic.c roms/banked_regs.S -o $(BUILD)/roms/diagnostic.elf
+	arm-none-eabi-gcc $(DIAGNOSTIC_CFLAGS) -mcpu=arm7tdmi -marm -O2 -ffreestanding -nostdlib -fno-builtin -T roms/diagnostic.ld roms/diagnostic_start.S roms/diagnostic.c roms/banked_regs.S -o $(BUILD)/roms/diagnostic.elf
 	arm-none-eabi-objcopy -O binary $(BUILD)/roms/diagnostic.elf $(BUILD)/roms/diagnostic.gba
 
 bios:
@@ -167,6 +183,12 @@ test-board-core: diagnostic
 	$(PYTHON) tools/bin_to_hex.py $(BUILD)/roms/diagnostic.gba $(BUILD)/roms/diagnostic.hex
 	verilator --binary --timing -Wno-fatal --top-module tb_gba_board_core --Mdir $(BOARD_WORK)/verilator -j 4 $(BOARD_WORK)/gba_top.v rtl/gba_core_wrapper.sv sim/tb_gba_board_core.sv > $(BUILD)/verilator-build.log 2>&1
 	$(BOARD_WORK)/verilator/Vtb_gba_board_core $(CORE_SIM_ARGS)
+
+# All eleven diagnostics, BIOS, pause and keys; omit only the visual bar fill.
+# The full test-board-core target retains its original framebuffer workload.
+.PHONY: test-cpu-core
+test-cpu-core:
+	$(MAKE) test-board-core DIAGNOSTIC_CFLAGS=-DCPU_FOCUS_DIAGNOSTIC
 
 test-renderer: board-core
 	$(PYTHON) tools/renderer_reference.py $(VENDOR) $(BOARD_WORK)/reference

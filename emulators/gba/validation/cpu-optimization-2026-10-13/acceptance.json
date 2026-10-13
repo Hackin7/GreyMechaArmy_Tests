@@ -1,0 +1,94 @@
+{
+    "baseline_commit":  "880cefb",
+    "branch":  "optimize-gba-cpu",
+    "changes":  [
+                    "Share the asynchronous shift-amount read with the multiply-accumulator/Thumb-LR read",
+                    "Decode register-bank mode once and align private RAM banks to remove FIQ address addition"
+                ],
+    "interfaces":  {
+                       "added_instruction_stages":  0,
+                       "register_reads":  "asynchronous, unchanged",
+                       "normal_build_control":  "SHARED_CPU_SHIFT_READ=1; set to 0 to disable port sharing",
+                       "upstream_vendor_changes":  false
+                   },
+    "checks":  {
+                   "formal_bank_identity":  "PASS: all 16 mode encodings and 16 register indices, modulo private RAM layout",
+                   "register_file":  "PASS: all banks, user transfers, PC and warm reset",
+                   "reference_equivalence":  "PASS: independent ports, all modes/indices, user overrides, collisions, 8192 randomized cycles and periodic reset",
+                   "final_core_direct_start":  {
+                                                   "result":  "PASS: all eleven diagnostics, additional register-shift/FIQ/Rd=Rs cases, MLA/UMLAL, Thumb shift/BL, PPU activity, pause and KEYINPUT",
+                                                   "args":  "+FASTMEM +SMOKEBOOT",
+                                                   "wall_seconds":  77.821
+                                               },
+                   "final_core_open_bios":  {
+                                                "result":  "PASS: same checks through the open BIOS",
+                                                "args":  "+FASTMEM",
+                                                "wall_seconds":  581.498
+                                            },
+                   "first_candidate_full_framebuffer_diagnostic":  {
+                                                                       "result":  "PASS through open BIOS with the original full-screen bar fill",
+                                                                       "wall_seconds":  1765.801,
+                                                                       "note":  "First candidate used sharing and narrower decoding before bank alignment"
+                                                                   }
+               },
+    "diagnostic_scope":  "Final CPU-focused runs omit only the visual bar fill; all eleven checks and pause/input remain. Default test-board-core still fills the full framebuffer.",
+    "cpu_subsystem":  {
+                          "baseline_lut4":  6423,
+                          "candidate_lut4":  6358,
+                          "saved_lut4":  65,
+                          "flip_flops":  2074,
+                          "distributed_ram_primitives":  64,
+                          "dsp":  4,
+                          "note":  "FF/RAM/DSP counts are unchanged. These are subsystem counts, not packed board sites. See cpu-area.json for input hashes."
+                      },
+    "full_board":  {
+                       "status":  "PASS: lower packed area; routing/timing not yet accepted",
+                       "baseline_packed_sites":  23798,
+                       "unchanged_source_wide_packed_sites":  23534,
+                       "selected_candidate_packed_sites":  23488,
+                       "capacity":  24288,
+                       "saved_sites_total":  310,
+                       "saved_sites_cpu_with_matched_wide_mapping":  46,
+                       "saved_sites_from_wide_mapping_on_baseline":  264,
+                       "free_sites":  800,
+                       "utilisation_percent":  96.706,
+                       "bram":  47,
+                       "bram_capacity":  56,
+                       "dsp":  21,
+                       "dsp_capacity":  28,
+                       "flip_flops":  11354,
+                       "settings":  "PSRAM_FAST_READ=1 FLASH_QSPI=1 FLASH_CYCLES=2 FLASH_RX_REGISTER=0 PLL_CORE_DIV=26 PLL_FLASH_DIV=4 MAPPING_FLAGS=\u0027-noccu2\u0027 MIN_SRST_FANOUT=2",
+                       "selected_work":  "/tmp/gba-cpu-candidate-wide",
+                       "rejected_variants":  [
+                                                 {
+                                                     "name":  "CPU aligned with old narrow-LUT mapping",
+                                                     "packed_sites":  23838,
+                                                     "reason":  "40 sites above baseline"
+                                                 },
+                                                 {
+                                                     "name":  "CPU shared with original private layout and narrow decoder, wide LUTs",
+                                                     "packed_sites":  23580,
+                                                     "reason":  "46 sites above unchanged-source wide-LUT baseline and 92 above selected candidate"
+                                                 }
+                                             ]
+                   },
+    "commands":  [
+                     "make test-cpu-registers test-cpu-register-equivalence",
+                     "python3 tools/measure_cpu_registers.py --work /tmp/gba-cpu-final-register-area",
+                     "make board-core BOARD_WORK=/tmp/gba-cpu-final-core BUILD=/tmp/gba-cpu-final-core/build GEN=/tmp/gba-cpu-final-core/generated",
+                     "make bios",
+                     "make test-cpu-core BOARD_WORK=/tmp/gba-cpu-final-core",
+                     "/tmp/gba-cpu-final-core/verilator/Vtb_gba_board_core +FASTMEM +SMOKEBOOT",
+                     "python3 tools/measure_cpu_core.py /tmp/gba-opt-baseline/gba_top.v /tmp/gba-cpu-final-core/gba_top.v --work /tmp/gba-cpu-final-subsystem-area",
+                     "make map-existing-core BOARD_WORK=/tmp/gba-cpu-final-board-map BUILD=/tmp/gba-cpu-final-board-map GEN=/tmp/gba-cpu-final-core/generated PSRAM_FAST_READ=1",
+                     "python3 tools/resume_area_mapping.py /tmp/gba-opt-map-baseline/pre_gates.il --work /tmp/gba-cpu-baseline-wide --wide-luts",
+                     "python3 tools/resume_area_mapping.py /tmp/gba-cpu-final-board-map/pre_gates.il --work /tmp/gba-cpu-candidate-wide --wide-luts",
+                     "python3 tools/measure_packed_board.py /tmp/gba-cpu-candidate-wide/top.json --output validation/cpu-optimization-2026-10-13/candidate-wide-packed.json"
+                 ],
+    "integration":  "Separate checkout based on 880cefb. Merge the new generator flag and make controls alongside the other agent\u0027s memory/LCD changes; retain that agent\u0027s clock-constraint verification.",
+    "pending":  [
+                    "Routing and timing of the combined candidate",
+                    "Hardware throughput acceptance"
+                ],
+    "deployment":  "No upload or saved-bitstream replacement"
+}
