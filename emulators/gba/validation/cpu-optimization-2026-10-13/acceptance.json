@@ -70,7 +70,15 @@
                                                      "packed_sites":  23580,
                                                      "reason":  "46 sites above unchanged-source wide-LUT baseline and 92 above selected candidate"
                                                  }
-                                             ]
+                                             ],
+                       "latest_clean_synthesis":  {
+                                                      "report":  "fresh-synthesis.json",
+                                                      "packed_sites":  23585,
+                                                      "free_sites":  703,
+                                                      "saved_sites_against_original_baseline":  213,
+                                                      "previous_checkpoint_result":  23488,
+                                                      "difference_reason":  "not isolated"
+                                                  }
                    },
     "commands":  [
                      "make test-cpu-registers test-cpu-register-equivalence",
