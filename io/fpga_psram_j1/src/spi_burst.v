@@ -2,7 +2,8 @@
 // One-bit mode-0 bursts: 02 writes, 03 reads or 0B with eight dummy clocks.
 // tx_data is prefetched one byte ahead; no stalls while CE# is asserted.
 module spi_burst #(parameter HALF_PERIOD=2, parameter CS_GAP=8,
-                   parameter FAST_READ=0)(
+                   parameter FAST_READ=0, parameter READ_HALF_PERIOD=HALF_PERIOD,
+                   parameter READ_FALLING=0)(
     input wire clk, reset, start, write,
     input wire [23:0] address, input wire [8:0] length,
     output wire [7:0] tx_index, input wire [7:0] tx_data,
@@ -21,6 +22,10 @@ module spi_burst #(parameter HALF_PERIOD=2, parameter CS_GAP=8,
     reg [6:0] rx_shift;
     reg [8:0] byte_count;
     reg writing;
+    localparam [7:0] WRITE_RELOAD=HALF_PERIOD[7:0]-8'd1;
+    localparam [7:0] READ_RELOAD=READ_HALF_PERIOD[7:0]-8'd1;
+    localparam [7:0] GAP_RELOAD=CS_GAP[7:0]-8'd1;
+    wire [7:0] divider_reload=writing?WRITE_RELOAD:READ_RELOAD;
     wire unused_inputs = ^{dq_in[3:2],dq_in[0],sck_pad,trace_index};
     assign trace_word = 0;
     assign tx_index = state == DATA && writing ? index+1'b1 : index;
@@ -40,20 +45,22 @@ module spi_burst #(parameter HALF_PERIOD=2, parameter CS_GAP=8,
                 header <= {write ? 8'h02 : (FAST_READ != 0 ? 8'h0b : 8'h03),address};
                 bits_left <= 32; writing <= write; byte_count <= length;
                 index <= 0; cs_n <= 0; sck <= 0; busy <= 1;
-                divider <= HALF_PERIOD-1; state <= HEADER;
+                divider <= write?WRITE_RELOAD:READ_RELOAD; state <= HEADER;
             end
             HEADER,DUMMY,DATA: if (divider != 0) divider <= divider-1'b1;
                 else begin
-                    divider <= HALF_PERIOD-1;
-                    if (!sck) begin
-                        sck <= 1;
-                        if (state == DATA && !writing) begin
+                    divider <= divider_reload;
+                    // Falling-edge capture gives a full SCK period for external data
+                    // to settle; the new falling edge reaches the chip after capture.
+                    if (state == DATA && !writing && (READ_FALLING?sck:!sck)) begin
                             rx_shift <= {rx_shift[5:0],dq_in[1]};
                             if (bits_left == 1) begin
                                 rx_data <= {rx_shift,dq_in[1]};
                                 rx_index <= index; rx_valid <= 1;
                             end
-                        end
+                    end
+                    if (!sck) begin
+                        sck <= 1;
                     end else begin
                         sck <= 0;
                         case (state)
@@ -68,7 +75,7 @@ module spi_burst #(parameter HALF_PERIOD=2, parameter CS_GAP=8,
                                    else bits_left <= bits_left-1'b1;
                             DATA: if (bits_left != 1) bits_left <= bits_left-1'b1;
                                   else if ({1'b0,index}+9'd1 == byte_count) begin
-                                      wait_count <= CS_GAP-1; state <= HOLD;
+                                      wait_count <= GAP_RELOAD; state <= HOLD;
                                   end else begin
                                       index <= index+1'b1; bits_left <= 8;
                                       if (writing) tx_byte <= tx_data;
@@ -77,7 +84,7 @@ module spi_burst #(parameter HALF_PERIOD=2, parameter CS_GAP=8,
                     end
                 end
             HOLD: if (wait_count != 0) wait_count <= wait_count-1'b1;
-                  else begin cs_n <= 1; wait_count <= CS_GAP-1; state <= GAP; end
+                  else begin cs_n <= 1; wait_count <= GAP_RELOAD; state <= GAP; end
             GAP: if (wait_count != 0) wait_count <= wait_count-1'b1;
                  else begin busy <= 0; done <= 1; state <= IDLE; end
         endcase

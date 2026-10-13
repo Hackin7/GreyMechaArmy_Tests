@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module tb_gba_psram_burst;
-    parameter FAST=1;
+    parameter FAST=1, WRITE_HALF=1, READ_HALF=WRITE_HALF, READ_FALLING=0, INIT_HALF=1, RAM_GAP=4;
     parameter ASYNC_CLOCK=0, PHY_HALF_NS=10, PHY_PHASE_NS=7;
     reg clk=0,reset=1; always #25 clk=~clk; // Actual 20 MHz fabric clock.
     reg clk_ram=0;
@@ -14,7 +14,8 @@ module tb_gba_psram_burst;
     wire cs,sck; tri [3:0] dq; wire [3:0] dout,oe;
     genvar n;
     generate for(n=0;n<4;n=n+1) assign dq[n]=oe[n]?dout[n]:1'bz; endgenerate
-    gba_psram #(.POWERUP_CYCLES(20),.ASYNC_CLOCK(ASYNC_CLOCK)) dut(
+    gba_psram #(.POWERUP_CYCLES(20),.ASYNC_CLOCK(ASYNC_CLOCK),.HALF_PERIOD(WRITE_HALF),
+        .READ_HALF_PERIOD(READ_HALF),.READ_FALLING(READ_FALLING),.INIT_HALF_PERIOD(INIT_HALF),.CS_GAP(RAM_GAP)) dut(
         .clk(clk),.clk_ram(clk_ram),.reset(reset),.core_req(1'b0),.core_read(1'b0),.core_addr(26'd0),
         .core_wdata(32'd0),.core_rdata(),.core_done(),
         .host_req(request),.host_read(reading),.host_addr(address),

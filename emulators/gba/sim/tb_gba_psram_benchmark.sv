@@ -1,9 +1,9 @@
 `timescale 1ns/1ps
 module OSCG #(parameter DIV=6)(output wire OSC); assign OSC=0; endmodule
-module gba_pll(input wire osc,reset,output reg core_clk=0,panel_clk=0,flash_clk=0,
+module gba_pll #(parameter CORE_DIV=20,FLASH_DIV=8)(input wire osc,reset,output reg core_clk=0,panel_clk=0,flash_clk=0,
                output wire locked);
     always #25 core_clk=~core_clk;
-    always #10 flash_clk=~flash_clk;
+    always #(25.0*FLASH_DIV/CORE_DIV) flash_clk=~flash_clk;
     always #6.25 panel_clk=~panel_clk;
     assign locked=1;
 endmodule

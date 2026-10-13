@@ -1,0 +1,704 @@
+--- a/src/arm/arm.c
++++ b/src/arm/arm.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2014 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -201,6 +202,7 @@
+ 	uint32_t opcode = cpu->prefetch[0];
+ 	cpu->prefetch[0] = cpu->prefetch[1];
+ 	cpu->gprs[ARM_PC] += WORD_SIZE_ARM;
++	gp_access((uint32_t) (cpu->gprs[ARM_PC]), 0, 4);
+ 	LOAD_32(cpu->prefetch[1], cpu->gprs[ARM_PC] & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 
+ 	unsigned condition = opcode >> 28;
+@@ -220,6 +222,7 @@
+ 	uint32_t opcode = cpu->prefetch[0];
+ 	cpu->prefetch[0] = cpu->prefetch[1];
+ 	cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
++	gp_access((uint32_t) (cpu->gprs[ARM_PC]), 0, 2);
+ 	LOAD_16(cpu->prefetch[1], cpu->gprs[ARM_PC] & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	ThumbInstruction instruction = _thumbTable[opcode >> 6];
+ 	instruction(cpu, opcode);
+--- a/src/arm/isa-arm.c
++++ b/src/arm/isa-arm.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2014 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -689,7 +690,9 @@
+ 		cpu->prefetch[1] &= 0xFFFF;
+ 		cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
+ 	} else {
++		gp_access((uint32_t) ((cpu->gprs[ARM_PC] - WORD_SIZE_ARM)), 0, 4);
+ 		LOAD_32(cpu->prefetch[0], (cpu->gprs[ARM_PC] - WORD_SIZE_ARM) & cpu->memory.activeMask, cpu->memory.activeRegion);
++		gp_access((uint32_t) (cpu->gprs[ARM_PC]), 0, 4);
+ 		LOAD_32(cpu->prefetch[1], cpu->gprs[ARM_PC] & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	})
+ 
+@@ -731,7 +734,9 @@
+ 		cpu->prefetch[1] &= 0xFFFF;
+ 		cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
+ 	} else {
++		gp_access((uint32_t) ((cpu->gprs[ARM_PC] - WORD_SIZE_ARM)), 0, 4);
+ 		LOAD_32(cpu->prefetch[0], (cpu->gprs[ARM_PC] - WORD_SIZE_ARM) & cpu->memory.activeMask, cpu->memory.activeRegion);
++		gp_access((uint32_t) (cpu->gprs[ARM_PC]), 0, 4);
+ 		LOAD_32(cpu->prefetch[1], cpu->gprs[ARM_PC] & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	})
+ 
+--- a/include/mgba/internal/arm/isa-inlines.h
++++ b/include/mgba/internal/arm/isa-inlines.h
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2014 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -73,8 +74,10 @@
+ static inline int32_t ARMWritePC(struct ARMCore* cpu) {
+ 	uint32_t pc = cpu->gprs[ARM_PC] & -WORD_SIZE_THUMB;
+ 	cpu->memory.setActiveRegion(cpu, pc);
++	gp_access((uint32_t) (pc), 0, 4);
+ 	LOAD_32(cpu->prefetch[0], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	pc += WORD_SIZE_ARM;
++	gp_access((uint32_t) (pc), 0, 4);
+ 	LOAD_32(cpu->prefetch[1], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	cpu->gprs[ARM_PC] = pc;
+ 	return 2 + cpu->memory.activeNonseqCycles32 + cpu->memory.activeSeqCycles32;
+@@ -83,8 +86,10 @@
+ static inline int32_t ThumbWritePC(struct ARMCore* cpu) {
+ 	uint32_t pc = cpu->gprs[ARM_PC] & -WORD_SIZE_THUMB;
+ 	cpu->memory.setActiveRegion(cpu, pc);
++	gp_access((uint32_t) (pc), 0, 2);
+ 	LOAD_16(cpu->prefetch[0], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	pc += WORD_SIZE_THUMB;
++	gp_access((uint32_t) (pc), 0, 2);
+ 	LOAD_16(cpu->prefetch[1], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+ 	cpu->gprs[ARM_PC] = pc;
+ 	return 2 + cpu->memory.activeNonseqCycles16 + cpu->memory.activeSeqCycles16;
+--- a/src/gba/memory.c
++++ b/src/gba/memory.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2016 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -458,7 +459,7 @@
+ 	return value;
+ }
+ 
+-uint32_t GBALoad32(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++uint32_t GPOriginalGBALoad32(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	uint32_t value = 0;
+@@ -517,7 +518,7 @@
+ 	return ROR(value, rotate);
+ }
+ 
+-uint32_t GBALoad16(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++uint32_t GPOriginalGBALoad16(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	uint32_t value = 0;
+@@ -632,7 +633,7 @@
+ 	return ROR(value, rotate);
+ }
+ 
+-uint32_t GBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++uint32_t GPOriginalGBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	uint32_t value = 0;
+@@ -814,7 +815,7 @@
+ #define STORE_BAD \
+ 	mLOG(GBA_MEM, GAME_ERROR, "Bad memory Store32: 0x%08X", address);
+ 
+-void GBAStore32(struct ARMCore* cpu, uint32_t address, int32_t value, int* cycleCounter) {
++void GPOriginalGBAStore32(struct ARMCore* cpu, uint32_t address, int32_t value, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	int wait = 0;
+@@ -866,7 +867,7 @@
+ 	}
+ }
+ 
+-void GBAStore16(struct ARMCore* cpu, uint32_t address, int16_t value, int* cycleCounter) {
++void GPOriginalGBAStore16(struct ARMCore* cpu, uint32_t address, int16_t value, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	int wait = 0;
+@@ -1008,7 +1009,7 @@
+ 	}
+ }
+ 
+-void GBAStore8(struct ARMCore* cpu, uint32_t address, int8_t value, int* cycleCounter) {
++void GPOriginalGBAStore8(struct ARMCore* cpu, uint32_t address, int8_t value, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	int wait = 0;
+@@ -1410,39 +1411,39 @@
+ 
+ #define LDM_LOOP(LDM) \
+ 	if (UNLIKELY(!mask)) { \
+-		LDM; \
++		gp_memory(cpu, address, 4, 0); LDM; \
+ 		cpu->gprs[ARM_PC] = value; \
+ 		wait += 16; \
+ 		address += 64; \
+ 	} \
+ 	for (i = 0; i < 16; i += 4) { \
+ 		if (UNLIKELY(mask & (1 << i))) { \
+-			LDM; \
++			gp_memory(cpu, address, 4, 0); LDM; \
+ 			cpu->gprs[i] = value; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 		if (UNLIKELY(mask & (2 << i))) { \
+-			LDM; \
++			gp_memory(cpu, address, 4, 0); LDM; \
+ 			cpu->gprs[i + 1] = value; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 		if (UNLIKELY(mask & (4 << i))) { \
+-			LDM; \
++			gp_memory(cpu, address, 4, 0); LDM; \
+ 			cpu->gprs[i + 2] = value; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 		if (UNLIKELY(mask & (8 << i))) { \
+-			LDM; \
++			gp_memory(cpu, address, 4, 0); LDM; \
+ 			cpu->gprs[i + 3] = value; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 	}
+ 
+-uint32_t GBALoadMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
++uint32_t GPOriginalGBALoadMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	uint32_t value;
+@@ -1529,26 +1530,26 @@
+ #define STM_LOOP(STM) \
+ 	if (UNLIKELY(!mask)) { \
+ 		value = cpu->gprs[ARM_PC] + (cpu->executionMode == MODE_ARM ? WORD_SIZE_ARM : WORD_SIZE_THUMB); \
+-		STM; \
++		gp_memory(cpu, address, 4, 1); STM; \
+ 		wait += 16; \
+ 		address += 64; \
+ 	} \
+ 	for (i = 0; i < 16; i += 4) { \
+ 		if (UNLIKELY(mask & (1 << i))) { \
+ 			value = cpu->gprs[i]; \
+-			STM; \
++			gp_memory(cpu, address, 4, 1); STM; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 		if (UNLIKELY(mask & (2 << i))) { \
+ 			value = cpu->gprs[i + 1]; \
+-			STM; \
++			gp_memory(cpu, address, 4, 1); STM; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 		if (UNLIKELY(mask & (4 << i))) { \
+ 			value = cpu->gprs[i + 2]; \
+-			STM; \
++			gp_memory(cpu, address, 4, 1); STM; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+@@ -1557,13 +1558,13 @@
+ 			if (i + 3 == ARM_PC) { \
+ 				value += WORD_SIZE_ARM; \
+ 			} \
+-			STM; \
++			gp_memory(cpu, address, 4, 1); STM; \
+ 			++wait; \
+ 			address += 4; \
+ 		} \
+ 	}
+ 
+-uint32_t GBAStoreMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
++uint32_t GPOriginalGBAStoreMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	struct GBAMemory* memory = &gba->memory;
+ 	uint32_t value;
+@@ -1883,3 +1884,65 @@
+ 	}
+ 	return value;
+ }
++
++uint32_t GBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 1, 0);
++    ++gp_depth;
++    uint32_t result = GPOriginalGBALoad8(cpu, address, cycleCounter);
++    --gp_depth;
++    return result;
++}
++
++uint32_t GBALoad16(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 2, 0);
++    ++gp_depth;
++    uint32_t result = GPOriginalGBALoad16(cpu, address, cycleCounter);
++    --gp_depth;
++    return result;
++}
++
++uint32_t GBALoad32(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 4, 0);
++    ++gp_depth;
++    uint32_t result = GPOriginalGBALoad32(cpu, address, cycleCounter);
++    --gp_depth;
++    return result;
++}
++
++void GBAStore8(struct ARMCore* cpu, uint32_t address, int8_t value, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 1, 1);
++    ++gp_depth;
++    GPOriginalGBAStore8(cpu, address, value, cycleCounter);
++    --gp_depth;
++    
++}
++
++void GBAStore16(struct ARMCore* cpu, uint32_t address, int16_t value, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 2, 1);
++    ++gp_depth;
++    GPOriginalGBAStore16(cpu, address, value, cycleCounter);
++    --gp_depth;
++    
++}
++
++void GBAStore32(struct ARMCore* cpu, uint32_t address, int32_t value, int* cycleCounter) {
++    if (!gp_depth) gp_memory(cpu, address, 4, 1);
++    ++gp_depth;
++    GPOriginalGBAStore32(cpu, address, value, cycleCounter);
++    --gp_depth;
++    
++}
++
++uint32_t GBALoadMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
++    ++gp_depth;
++    uint32_t result = GPOriginalGBALoadMultiple(cpu, address, mask, direction, cycleCounter);
++    --gp_depth;
++    return result;
++}
++
++uint32_t GBAStoreMultiple(struct ARMCore* cpu, uint32_t address, int mask, enum LSMDirection direction, int* cycleCounter) {
++    ++gp_depth;
++    uint32_t result = GPOriginalGBAStoreMultiple(cpu, address, mask, direction, cycleCounter);
++    --gp_depth;
++    return result;
++}
+--- a/src/gba/core.c
++++ b/src/gba/core.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2016 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -703,7 +704,7 @@
+ 	bool forceSkip = gba->mbVf || (core->opts.skipBios && (gba->romVf || gba->memory.rom));
+ 	if (!forceSkip && (gba->romVf || gba->memory.rom) && gba->pristineRomSize >= 0xA0 && gba->biosVf) {
+ 		uint32_t crc = doCrc32(&gba->memory.rom[1], 0x9C);
+-		if (crc != LOGO_CRC32) {
++		if (false && crc != LOGO_CRC32) {
+ 			mLOG(STATUS, WARN, "Invalid logo, skipping BIOS");
+ 			forceSkip = true;
+ 		}
+--- a/src/gba/renderers/software-bg.c
++++ b/src/gba/renderers/software-bg.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2015 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -30,8 +31,8 @@
+ 
+ #define MODE_2_NO_MOSAIC(COORD) \
+ 	COORD \
+-	mapData = screenBase[(localX >> 11) + (((localY >> 7) & 0x7F0) << background->size)]; \
+-	pixelData = charBase[(mapData << 6) + ((localY & 0x700) >> 5) + ((localX & 0x700) >> 8)];
++	mapData = gp_ppu_read8(screenBase, (localX >> 11) + (((localY >> 7) & 0x7F0) << background->size), 6); \
++	pixelData = gp_ppu_read8(charBase, (mapData << 6) + ((localY & 0x700) >> 5) + ((localX & 0x700) >> 8), 5);
+ 
+ #define MODE_2_MOSAIC(COORD) \
+ 		if (!mosaicWait) { \
+@@ -109,7 +110,7 @@
+ 
+ 	uint32_t color = renderer->normalPalette[0];
+ 	if (mosaicWait && localX >= 0 && localY >= 0 && (localX >> 8) < GBA_VIDEO_HORIZONTAL_PIXELS && (localY >> 8) < GBA_VIDEO_VERTICAL_PIXELS) {
+-		LOAD_16(color, ((localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS) << 1, renderer->d.vram);
++		GP_PPU_LOAD_16(7, color, ((localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS) << 1, renderer->d.vram);
+ 		color = mColorFrom555(color);
+ 	}
+ 
+@@ -119,7 +120,7 @@
+ 		BACKGROUND_BITMAP_ITERATE(GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS);
+ 
+ 		if (!mosaicWait) {
+-			LOAD_16(color, ((localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS) << 1, renderer->d.vram);
++			GP_PPU_LOAD_16(7, color, ((localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS) << 1, renderer->d.vram);
+ 			color = mColorFrom555(color);
+ 			mosaicWait = mosaicH;
+ 		} else {
+@@ -152,7 +153,7 @@
+ 		offset = 0xA000;
+ 	}
+ 	if (mosaicWait && localX >= 0 && localY >= 0 && (localX >> 8) < GBA_VIDEO_HORIZONTAL_PIXELS && (localY >> 8) < GBA_VIDEO_VERTICAL_PIXELS) {
+-		color = ((uint8_t*)renderer->d.vram)[offset + (localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS];
++		color = gp_ppu_read8(renderer->d.vram, offset + (localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS, 7);
+ 	}
+ 
+ 	int outX;
+@@ -161,7 +162,7 @@
+ 		BACKGROUND_BITMAP_ITERATE(GBA_VIDEO_HORIZONTAL_PIXELS, GBA_VIDEO_VERTICAL_PIXELS);
+ 
+ 		if (!mosaicWait) {
+-			color = ((uint8_t*)renderer->d.vram)[offset + (localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS];
++			color = gp_ppu_read8(renderer->d.vram, offset + (localX >> 8) + (localY >> 8) * GBA_VIDEO_HORIZONTAL_PIXELS, 7);
+ 
+ 			mosaicWait = mosaicH;
+ 		} else {
+@@ -193,7 +194,7 @@
+ 		offset = 0xA000;
+ 	}
+ 	if (mosaicWait && localX >= 0 && localY >= 0 && (localX >> 8) < 160 && (localY >> 8) < 128) {
+-		LOAD_16(color, offset + (localX >> 8) * 2 + (localY >> 8) * 320, renderer->d.vram);
++		GP_PPU_LOAD_16(7, color, offset + (localX >> 8) * 2 + (localY >> 8) * 320, renderer->d.vram);
+ 		color = mColorFrom555(color);
+ 	}
+ 
+@@ -203,7 +204,7 @@
+ 		BACKGROUND_BITMAP_ITERATE(160, 128);
+ 
+ 		if (!mosaicWait) {
+-			LOAD_16(color, offset + (localX >> 8) * 2 + (localY >> 8) * 320, renderer->d.vram);
++			GP_PPU_LOAD_16(7, color, offset + (localX >> 8) * 2 + (localY >> 8) * 320, renderer->d.vram);
+ 			color = mColorFrom555(color);
+ 			mosaicWait = mosaicH;
+ 		} else {
+--- a/src/gba/renderers/software-mode0.c
++++ b/src/gba/renderers/software-mode0.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2015 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -13,13 +14,13 @@
+ 		xBase += (localX & 0x100) << 5; \
+ 	} \
+ 	screenBase = yBase + (xBase >> 3); \
+-	LOAD_16(mapData, screenBase << 1, vram); \
++	GP_PPU_LOAD_16(6, mapData, screenBase << 1, vram); \
+ 
+ #define DRAW_BACKGROUND_MODE_0_TILE_SUFFIX_16(BLEND, OBJWIN) \
+ 	paletteData = GBA_TEXT_MAP_PALETTE(mapData) << 4; \
+ 	palette = &mainPalette[paletteData]; \
+ 	charBase = (background->charBase + (GBA_TEXT_MAP_TILE(mapData) << 5)) + (localY << 2); \
+-	LOAD_32(tileData, charBase, vram); \
++	GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 	if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 		tileData >>= 4 * mod8; \
+ 		for (; outX < end; ++outX, ++pixel) { \
+@@ -34,7 +35,7 @@
+ 
+ #define DRAW_BACKGROUND_MODE_0_TILE_PREFIX_16(BLEND, OBJWIN) \
+ 	charBase = (background->charBase + (GBA_TEXT_MAP_TILE(mapData) << 5)) + (localY << 2); \
+-	LOAD_32(tileData, charBase, vram); \
++	GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 	paletteData = GBA_TEXT_MAP_PALETTE(mapData) << 4; \
+ 	palette = &mainPalette[paletteData]; \
+ 	pixel = &renderer->row[outX]; \
+@@ -94,7 +95,7 @@
+ 		} else { \
+ 			paletteData = GBA_TEXT_MAP_PALETTE(mapData) << 4; \
+ 			palette = &mainPalette[paletteData]; \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 				tileData >>= 4 * baseX; \
+ 			} else { \
+@@ -124,7 +125,7 @@
+ 				} else { \
+ 					paletteData = GBA_TEXT_MAP_PALETTE(mapData) << 4; \
+ 					palette = &mainPalette[paletteData]; \
+-					LOAD_32(tileData, charBase, vram); \
++					GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 					if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 						tileData >>= x * 4; \
+ 					} else { \
+@@ -160,7 +161,7 @@
+ 			pixel += 8; \
+ 			continue; \
+ 		} \
+-		LOAD_32(tileData, charBase, vram); \
++		GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 		if (tileData) { \
+ 			if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 				BACKGROUND_DRAW_PIXEL_16(BLEND, OBJWIN, 0); \
+@@ -192,7 +193,7 @@
+ 		int shift = inX & 0x3; \
+ 		if (LIKELY(charBase < 0x10000)) { \
+ 			if (end2 > outX) { \
+-				LOAD_32(tileData, charBase, vram); \
++				GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 				tileData >>= 8 * shift; \
+ 				shift = 0; \
+ 				for (; outX < end2; ++outX, ++pixel) { \
+@@ -202,7 +203,7 @@
+ 		} \
+ 		\
+ 		if (LIKELY(charBase < 0x10000)) { \
+-			LOAD_32(tileData, charBase + 4, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 			tileData >>= 8 * shift; \
+ 			for (; outX < end; ++outX, ++pixel) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+@@ -214,7 +215,7 @@
+ 		pixel = &renderer->row[outX]; \
+ 		if (LIKELY(charBase < 0x10000)) { \
+ 			if (end2 > start) { \
+-				LOAD_32(tileData, charBase, vram); \
++				GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 				for (; outX >= end2; --outX, --pixel) { \
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 				} \
+@@ -223,7 +224,7 @@
+ 		} \
+ 		\
+ 		if (LIKELY(charBase < 0x10000)) { \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			for (; outX >= renderer->start; --outX, --pixel) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 			} \
+@@ -241,14 +242,14 @@
+ 	pixel = &renderer->row[outX]; \
+ 	if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 		if (end > 0) { \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			for (; outX < renderer->end - end; ++outX, ++pixel) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 			} \
+ 			charBase += 4; \
+ 		} \
+ 		\
+-		LOAD_32(tileData, charBase, vram); \
++		GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 		for (; outX < renderer->end; ++outX, ++pixel) { \
+ 			BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 		} \
+@@ -258,7 +259,7 @@
+ 		outX = renderer->end - 1; \
+ 		pixel = &renderer->row[outX]; \
+ 		if (end > 0) { \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			tileData >>= 8 * shift; \
+ 			for (; outX >= start + 4; --outX, --pixel) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+@@ -266,7 +267,7 @@
+ 			shift = 0; \
+ 		} \
+ 		\
+-		LOAD_32(tileData, charBase + 4, vram); \
++		GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 		tileData >>= 8 * shift; \
+ 		for (; outX >= start; --outX, --pixel) { \
+ 			BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+@@ -292,7 +293,7 @@
+ 			continue; \
+ 		} \
+ 		if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			if (tileData) { \
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 1); \
+@@ -300,7 +301,7 @@
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 3); \
+ 			} \
+ 			pixel += 4; \
+-			LOAD_32(tileData, charBase + 4, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 			if (tileData) { \
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 					BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 1); \
+@@ -309,7 +310,7 @@
+ 			} \
+ 			pixel += 4; \
+ 		} else { \
+-			LOAD_32(tileData, charBase + 4, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 			if (tileData) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 3); \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 2); \
+@@ -317,7 +318,7 @@
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 0); \
+ 			} \
+ 			pixel += 4; \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			if (tileData) { \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 3); \
+ 				BACKGROUND_DRAW_PIXEL_256(BLEND, OBJWIN, 2); \
+@@ -355,21 +356,21 @@
+ 		if (UNLIKELY(charBase >= 0x10000)) { \
+ 			carryData = 0; \
+ 		} else { \
+-			LOAD_32(tileData, charBase, vram); \
++			GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 			if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 				if (x >= 4) { \
+-					LOAD_32(tileData, charBase + 4, vram); \
++					GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 					tileData >>= (x - 4) * 8; \
+ 				} else { \
+-					LOAD_32(tileData, charBase, vram); \
++					GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 					tileData >>= x * 8; \
+ 				} \
+ 			} else { \
+ 				if (x >= 4) { \
+-					LOAD_32(tileData, charBase, vram); \
++					GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 					tileData >>= (7 - x) * 8; \
+ 				} else { \
+-					LOAD_32(tileData, charBase + 4, vram); \
++					GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 					tileData >>= (3 - x) * 8; \
+ 				} \
+ 			} \
+@@ -394,18 +395,18 @@
+ 				} else { \
+ 					if (!GBA_TEXT_MAP_HFLIP(mapData)) { \
+ 						if (x >= 4) { \
+-							LOAD_32(tileData, charBase + 4, vram); \
++							GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 							tileData >>= (x - 4) * 8; \
+ 						} else { \
+-							LOAD_32(tileData, charBase, vram); \
++							GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 							tileData >>= x * 8; \
+ 						} \
+ 					} else { \
+ 						if (x >= 4) { \
+-							LOAD_32(tileData, charBase, vram); \
++							GP_PPU_LOAD_32(5, tileData, charBase, vram); \
+ 							tileData >>= (7 - x) * 8; \
+ 						} else { \
+-							LOAD_32(tileData, charBase + 4, vram); \
++							GP_PPU_LOAD_32(5, tileData, charBase + 4, vram); \
+ 							tileData >>= (3 - x) * 8; \
+ 						} \
+ 					} \
+--- a/src/gba/renderers/software-obj.c
++++ b/src/gba/renderers/software-obj.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2015 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -74,7 +75,7 @@
+ #define SPRITE_YBASE_16(localY) unsigned yBase = (localY & ~0x7) * stride + (localY & 0x7) * 4 + maskHi;
+ 
+ #define SPRITE_DRAW_PIXEL_16_NORMAL(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 3) << 2)) & 0xF; \
+ 	current = renderer->spriteLayer[outX]; \
+ 	if ((current & FLAG_ORDER_MASK) > flags) { \
+@@ -86,7 +87,7 @@
+ 	}
+ 
+ #define SPRITE_DRAW_PIXEL_16_NORMAL_OBJWIN(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 3) << 2)) & 0xF; \
+ 	current = renderer->spriteLayer[outX]; \
+ 	if ((current & FLAG_ORDER_MASK) > flags) { \
+@@ -99,7 +100,7 @@
+ 	}
+ 
+ #define SPRITE_DRAW_PIXEL_16_OBJWIN(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 3) << 2)) & 0xF; \
+ 	if (tileData) { \
+ 		renderer->row[outX] |= FLAG_OBJWIN; \
+@@ -109,7 +110,7 @@
+ #define SPRITE_YBASE_256(localY) unsigned yBase = (localY & ~0x7) * stride + (localY & 0x7) * 8 + maskHi;
+ 
+ #define SPRITE_DRAW_PIXEL_256_NORMAL(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 1) << 3)) & 0xFF; \
+ 	current = renderer->spriteLayer[outX]; \
+ 	if ((current & FLAG_ORDER_MASK) > flags) { \
+@@ -121,7 +122,7 @@
+ 	}
+ 
+ #define SPRITE_DRAW_PIXEL_256_NORMAL_OBJWIN(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 1) << 3)) & 0xFF; \
+ 	current = renderer->spriteLayer[outX]; \
+ 	if ((current & FLAG_ORDER_MASK) > flags) { \
+@@ -134,7 +135,7 @@
+ 	}
+ 
+ #define SPRITE_DRAW_PIXEL_256_OBJWIN(localX) \
+-	LOAD_16(tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
++	GP_PPU_LOAD_16(8, tileData, (yBase + ((xBase + charBase) & maskLo)) & 0x7FFE, vramBase); \
+ 	tileData = (tileData >> ((localX & 1) << 3)) & 0xFF; \
+ 	if (tileData) { \
+ 		renderer->row[outX] |= FLAG_OBJWIN; \
+@@ -206,10 +207,10 @@
+ 		int totalWidth = width << GBAObjAttributesAGetDoubleSize(sprite->a);
+ 		int totalHeight = height << GBAObjAttributesAGetDoubleSize(sprite->a);
+ 		struct GBAOAMMatrix mat;
+-		LOAD_16(mat.a, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].a);
+-		LOAD_16(mat.b, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].b);
+-		LOAD_16(mat.c, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].c);
+-		LOAD_16(mat.d, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].d);
++		GP_PPU_LOAD_16(8, mat.a, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].a);
++		GP_PPU_LOAD_16(8, mat.b, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].b);
++		GP_PPU_LOAD_16(8, mat.c, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].c);
++		GP_PPU_LOAD_16(8, mat.d, 0, &renderer->d.oam->mat[GBAObjAttributesBGetMatIndex(sprite->b)].d);
+ 
+ 		if (inY < 0) {
+ 			inY += 256;
+--- a/src/gba/renderers/video-software.c
++++ b/src/gba/renderers/video-software.c
+@@ -1,3 +1,4 @@
++#include "gp_hooks.h"
+ /* Copyright (c) 2013-2015 Jeffrey Pfau
+  *
+  * This Source Code Form is subject to the terms of the Mozilla Public
+@@ -109,7 +110,7 @@
+ 	softwareRenderer->blendEffect = BLEND_NONE;
+ 	for (i = 0; i < 1024; i += 2) {
+ 		uint16_t entry;
+-		LOAD_16(entry, i, softwareRenderer->d.palette);
++		GP_PPU_LOAD_16(9, entry, i, softwareRenderer->d.palette);
+ 		GBAVideoSoftwareRendererWritePalette(renderer, i, entry);
+ 	}
+ 	softwareRenderer->blendDirty = false;
+@@ -514,7 +515,7 @@
+ 		softwareRenderer->nextY = y + 1;
+ 	}
+ 
+-	bool dirty = softwareRenderer->scanlineDirty[y >> 5] & (1U << (y & 0x1F));
++	bool dirty = true; /* Profile scanout every frame, including static images. */
+ 	if (memcmp(softwareRenderer->nextIo, softwareRenderer->cache[y].io, sizeof(softwareRenderer->nextIo))) {
+ 		memcpy(softwareRenderer->cache[y].io, softwareRenderer->nextIo, sizeof(softwareRenderer->nextIo));
+ 		dirty = true;

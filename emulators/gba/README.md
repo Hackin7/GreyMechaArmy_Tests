@@ -1,5 +1,17 @@
 # GBA on GreyMechaArmy
 
+The PSRAM controller has an opt-in **`PSRAM_FAST_READ=1`** profile: approximately **51.4 MHz reads**, with writes still at **25.7 MHz**. Full 8 MiB controller tests pass and read throughput rises from **1.14 to 1.91 MB/s**; full-emulator routing/game validation remains separate. See [PSRAM SPI speed results](docs/psram_spi_speed.md).
+
+The isolated priority-memory build now allocates all FPGA block RAM to BIOS
+(16 KiB), IWRAM (32 KiB) and lower VRAM (64 KiB). Upper VRAM, palette/OAM,
+rendering scratch buffers, LCD scanlines and USB staging/readback payloads
+use SPI PSRAM. CPU registers and bounded cache/transport words remain local.
+It includes the red/blue output correction. This source variant is still
+under final simulation/resource checks and has not replaced the saved app
+bitstream. See [the allocation experiment](rtl/bram_priority/README.md).
+
+The cartridge flash reader now has a hardware-tested quad-output option at approximately **79.7 MHz SCK**, reaching **11.56 MB/s** cache-service throughput versus **1.27 MB/s** for the SPI baseline. The result uses the GBA cache in a read-only test image; complete-emulator timing/game acceptance remains pending, and the normal build keeps SPI by default. See [QSPI results and reproduction commands](docs/flash_qspi.md).
+
 The saved **10 MHz SPI, four-byte PSRAM burst image is running on hardware**.
 See `bitstreams/gba_psram_burst_10mhz.bit` and its adjacent controller source,
 checksum and timing manifest. With a warm guest restart, all eleven diagnostic
@@ -291,3 +303,24 @@ physical input enabled after the checks. Existing device GBA images are
 backed up before staging a new candidate, and cartridge flash is replaced
 with the selected demo. `hardware_test.py --bit <path>` selects a separate
 candidate without overwriting the local `build/gba.bit` reference.
+
+
+## Current QSPI clock and hot-RAM investigation (2026-10-13)
+
+The normal board build now selects QSPI with a separate PLL (26/4 divider
+configuration, two PHY clocks per SCK). The read-only controller passed on
+GreyMecha at **66.81 MHz SCK**, verifying 17,664 bytes across repeated/random
+and 8 MiB-boundary reads at **11.99 MB/s cache service throughput**. With the
+specified OSCG +/-15% range, its calculated upper SCK is **77.25 MHz**, below
+79 MHz. This controller test restores the existing GBA image and flash SR2;
+a new full-emulator QSPI image has not been deployed.
+
+The full BIOS/IWRAM/lower-VRAM block-RAM swap is implemented as an isolated
+experiment and passes the BIOS diagnostic and renderer comparisons. It still
+exceeds device capacity: an intermediate optimized mapping uses **33,734
+logic sites**. The generator now keeps the requested three banks in all 56
+EBRs and forces the remaining buffers out of EBR; this adds further LUT
+pressure. Shared palette/OAM read ports and graphics line-buffer storage
+are the next architectural targets. See [the experiment and measured
+tradeoffs](rtl/bram_priority/README.md), and
+[hardware evidence](validation/flash-qspi-below79-2026-10-13.json).

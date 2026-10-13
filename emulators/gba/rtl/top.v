@@ -1,15 +1,23 @@
-module top(
+module top #(parameter FLASH_QSPI=1, FLASH_CYCLES=2, FLASH_RX_REGISTER=0, PLL_CORE_DIV=26, PLL_FLASH_DIV=4, PSRAM_FAST_READ=0)(
     input wire [4:0] btn,input wire btn_grey_n,btn_red_n,
     input wire host_sck,host_mosi,host_cs_n,output wire host_miso,
     inout wire [5:0] pmod_j1,
-    output wire flash_cs_n,flash_mosi,input wire flash_miso,
+    output wire flash_cs_n,inout wire flash_mosi,input wire flash_miso,flash_io2,flash_io3,
     output wire oled_scl,oled_sda,oled_dc,oled_cs,oled_rst,
     output wire [7:0] led,output wire buzzer
 );
-    wire osc,clk_core,clk_panel,clk_flash,locked;
+    wire osc,clk_core,clk_panel,clk_flash,clk_ram,locked,main_locked,quad_locked;
     OSCG #(.DIV(6)) oscillator(.OSC(osc));
-    gba_pll clocks(.osc(osc),.reset(1'b0),.core_clk(clk_core),
-        .panel_clk(clk_panel),.flash_clk(clk_flash),.locked(locked));
+    gba_pll #(.FLASH_DIV(PSRAM_FAST_READ?4:8)) clocks(.osc(osc),.reset(1'b0),.core_clk(clk_core),
+        .panel_clk(clk_panel),.flash_clk(clk_ram),.locked(main_locked));
+    generate if(FLASH_QSPI)begin: quad_clock
+        gba_pll #(.CORE_DIV(PLL_CORE_DIV),.FLASH_DIV(PLL_FLASH_DIV)) clocks(
+            .osc(osc),.reset(1'b0),.core_clk(),.panel_clk(),
+            .flash_clk(clk_flash),.locked(quad_locked));
+    end else begin: spi_clock
+        assign clk_flash=clk_ram;assign quad_locked=1;
+    end endgenerate
+    assign locked=main_locked&&quad_locked;
     reg [7:0] startup=0;
     always @(posedge clk_core) begin
         if(!locked) startup<=0;else if(!(&startup)) startup<=startup+1'b1;
@@ -39,7 +47,12 @@ module top(
     gb_spi_phy phy(.clk(clk_core),.reset(reset),.spi_sck(host_sck),
         .spi_mosi(host_mosi),.spi_csn(host_cs_n),.spi_miso(host_miso),
         .rx_data(rx_data),.rx_valid(rx_valid),.tx_data(tx_data),.tx_valid(tx_valid),.tx_ready(tx_ready));
-    wire ram_ready,ram_idle,ram_fault,panel_ready,overflow;
+    wire ram_ready,ram_idle,ram_fault,panel_ready,overflow,flash_ready,flash_fault;
+    (* async_reg="true" *) reg [1:0] flash_ready_sync=0,flash_fault_sync=0;
+    always @(posedge clk_core)begin
+        flash_ready_sync<={flash_ready_sync[0],flash_ready};
+        flash_fault_sync<={flash_fault_sync[0],flash_fault};
+    end
     wire [23:0] device_id;wire [31:0] pc,frames,flash_misses;
     wire host_mem_req,host_mem_read,host_mem_done;
     wire [22:0] host_mem_addr;wire [31:0] host_mem_wdata,host_mem_rdata;
@@ -47,8 +60,8 @@ module top(
     gba_host host(.clk(clk_core),.reset(reset),.rx_data(rx_data),.rx_valid(rx_valid),
         .tx_data(tx_data),.tx_valid(tx_valid),.tx_ready(tx_ready),
         .run(run),.pause(pause),.reset_pulse(reset_pulse),.max_rom_addr(max_rom_addr),.flash_1m(flash_1m),
-        .inject_enable(inject_enable),.injected(injected),.ram_ready(ram_ready),.ram_idle(ram_idle),
-        .ram_fault(ram_fault),.panel_ready(panel_ready),.overflow(overflow),.device_id(device_id),
+        .inject_enable(inject_enable),.injected(injected),.ram_ready(ram_ready&&flash_ready_sync[1]),.ram_idle(ram_idle),
+        .ram_fault(ram_fault||flash_fault_sync[1]),.panel_ready(panel_ready),.overflow(overflow),.device_id(device_id),
         .pc(pc),.frames(frames),.flash_misses(flash_misses),.physical(physical),.keys(keys),
         .mem_req(host_mem_req),.mem_read(host_mem_read),.mem_addr(host_mem_addr),
         .mem_wdata(host_mem_wdata),.mem_be(host_mem_be),.mem_done(host_mem_done),.mem_rdata(host_mem_rdata),
@@ -63,7 +76,9 @@ module top(
     assign pmod_j1[4]=dq_oe[1] ? dq_out[1]:1'bz;
     assign pmod_j1[5]=dq_oe[2] ? dq_out[2]:1'bz;
     assign pmod_j1[2]=dq_oe[3] ? dq_out[3]:1'bz;
-    gba_psram #(.ASYNC_CLOCK(1)) ram(.clk(clk_core),.clk_ram(clk_flash),.reset(peripheral_reset),
+    gba_psram #(.HALF_PERIOD(PSRAM_FAST_READ?2:1),.READ_HALF_PERIOD(1),
+        .READ_FALLING(PSRAM_FAST_READ),.INIT_HALF_PERIOD(PSRAM_FAST_READ?2:1),
+        .CS_GAP(PSRAM_FAST_READ?8:4),.POWERUP_CYCLES(PSRAM_FAST_READ?40000:20000),.ASYNC_CLOCK(1)) ram(.clk(clk_core),.clk_ram(clk_ram),.reset(peripheral_reset),
         .core_req(ext_req),.core_read(ext_read),.core_addr(ext_addr),.core_wdata(ext_wdata),
         .core_rdata(ext_rdata),.core_done(ext_done),.host_req(host_mem_req),.host_read(host_mem_read),
         .host_addr(host_mem_addr),.host_wdata(host_mem_wdata),.host_be(host_mem_be),
@@ -72,10 +87,12 @@ module top(
         .video_wdata(vram_wdata),.video_be(vram_be),.video_rdata(vram_rdata),.video_done(vram_done),
         .fault(ram_fault),.idle(ram_idle),.cs_n(ram_cs),.sck(ram_sck),.dq_in(dq_in),.dq_out(dq_out),.dq_oe(dq_oe));
     wire rom_read,rom_done;wire [24:0] rom_addr;wire [31:0] rom_data,rom_second;
-    wire flash_clk_wire;
-    gba_flash cartridge(.clk(clk_core),.clk_flash(clk_flash),.reset(core_reset),
+    wire flash_clk_wire,flash_mosi_out,flash_mosi_oe;
+    assign flash_mosi=flash_mosi_oe?flash_mosi_out:1'bz;
+    gba_flash #(.QSPI(FLASH_QSPI),.CLOCK_CYCLES(FLASH_CYCLES),.RX_REGISTER(FLASH_RX_REGISTER)) cartridge(.clk(clk_core),.clk_flash(clk_flash),.reset(FLASH_QSPI?peripheral_reset:core_reset),
         .request(rom_read),.address(rom_addr),.done(rom_done),.data(rom_data),.second_data(rom_second),
-        .flash_clk(flash_clk_wire),.flash_cs_n(flash_cs_n),.flash_mosi(flash_mosi),
+        .flash_clk(flash_clk_wire),.flash_cs_n(flash_cs_n),.flash_mosi(flash_mosi_out),.mosi_oe(flash_mosi_oe),
+        .quad_other({flash_io3,flash_io2,flash_mosi}),.quad_ready(flash_ready),.quad_fault(flash_fault),
         .flash_miso(flash_miso),.misses(flash_misses));
     USRMCLK flash_clock(.USRMCLKI(flash_clk_wire),.USRMCLKTS(1'b0));
     wire [7:0] pixel_x,pixel_y;wire [15:0] pixel_addr;wire [17:0] pixel_data;
@@ -105,6 +122,6 @@ module top(
         .line_ready(line_ready),.line_fitted(line_fitted),.line_number(line_number),.line_done(line_done),
         .rd_addr(rd_addr),.rd_data(rd_data),.initialized(initialized),.displayed_frames(displayed_frames),
         .sclk(oled_scl),.mosi(oled_sda),.dc(oled_dc),.cs_n(oled_cs),.rst_n(oled_rst));
-    assign led={overflow,ram_fault,host_error!=0,frames[0],panel_ready,ram_ready,pause,run};
+    assign led={overflow,(ram_fault||flash_fault_sync[1]),host_error!=0,frames[0],panel_ready,ram_ready,pause,run};
     assign buzzer=1'b0;
 endmodule

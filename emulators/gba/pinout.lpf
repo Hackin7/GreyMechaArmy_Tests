@@ -1,6 +1,7 @@
 FREQUENCY NET "clk_core" 21.0 MHz;
 FREQUENCY NET "clk_panel" 85.0 MHz;
 FREQUENCY NET "clk_flash" 53.0 MHz;
+FREQUENCY NET "clk_ram" 53.0 MHz;
 LOCATE COMP "btn[0]" SITE "B4";
 LOCATE COMP "btn[1]" SITE "A5";
 LOCATE COMP "btn[2]" SITE "B5";
@@ -56,3 +57,9 @@ IOBUF PORT "oled_cs" IO_TYPE=LVCMOS33;
 IOBUF PORT "oled_rst" IO_TYPE=LVCMOS33;
 LOCATE COMP "buzzer" SITE "F16";
 IOBUF PORT "buzzer" IO_TYPE=LVCMOS33;
+
+# FPGA configuration flash quad data inputs (board sd_io2/sd_io3 nets).
+LOCATE COMP "flash_io2" SITE "M7";
+LOCATE COMP "flash_io3" SITE "N7";
+IOBUF PORT "flash_io2" IO_TYPE=LVCMOS33 PULLMODE=UP;
+IOBUF PORT "flash_io3" IO_TYPE=LVCMOS33 PULLMODE=UP;

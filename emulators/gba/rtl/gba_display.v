@@ -2,7 +2,10 @@
 // line streamer. Stream the full 240x240 window: black borders are refreshed
 // with every frame, so changing viewport leaves no stale pixels.
 module gba_display #(
-    parameter CLK_HZ=80000000, parameter SWAP_RB=1
+    // gba_lines already converts the core's {blue,green,red} output to
+    // RGB565. The GreyMecha panel displays that ordering directly; an
+    // additional swap makes the RGB test ROM's red and blue exchange places.
+    parameter CLK_HZ=80000000, parameter SWAP_RB=0
 )(
     input wire clk,resetn,
     input wire line_ready,line_fitted, input wire [7:0] line_number,

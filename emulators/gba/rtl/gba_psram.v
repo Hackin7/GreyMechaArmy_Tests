@@ -4,8 +4,12 @@
 module gba_psram #(
     // At 20 MHz, divider one gives 10 MHz SCK. The 56-clock read-ID
     // must also finish within the chip's 8 us CE# refresh limit.
-    parameter HALF_PERIOD=1, parameter INIT_HALF_PERIOD=1,
-    parameter POWERUP_CYCLES=20000, parameter ASYNC_CLOCK=0
+    parameter HALF_PERIOD=1, parameter READ_HALF_PERIOD=HALF_PERIOD,
+    parameter READ_FALLING=0, parameter CS_GAP=4, parameter INIT_HALF_PERIOD=1,
+    parameter POWERUP_CYCLES=20000, parameter ASYNC_CLOCK=0,
+    // Priority-memory clients retain request attributes until completion.
+    // Their existing registers can serve as the pending descriptor storage.
+    parameter STABLE_CLIENTS=0
 )(
     input wire clk, clk_ram, reset,
     input wire core_req, core_read, input wire [25:0] core_addr,
@@ -24,12 +28,37 @@ module gba_psram #(
 );
     reg cp, hp, vp, read_op;
     reg [1:0] owner,last_owner,grant;
-    reg [22:0] ca, ha, address;
-    reg cr, hr;
-    reg [31:0] cw, hw, word_data;
+    wire [22:0] ca,ha,va;reg [22:0] address;
+    wire cr,hr,vr;wire [31:0] cw,hw,vw;reg [31:0] word_data;
     wire [31:0] result;
-    reg [3:0] hb, byte_enable;
-    reg [22:0] va;reg vr;reg [31:0] vw;reg [3:0] vb;
+    wire [3:0] hb,vb;reg [3:0] byte_enable;
+    generate if(STABLE_CLIENTS)begin: live_descriptors
+      assign ca={core_addr[20:0],2'b00};assign cr=core_read;assign cw=core_wdata;
+      assign ha={host_addr[22:2],2'b00};assign hr=host_read;assign hw=host_wdata;assign hb=host_be;
+      assign va={video_addr[22:2],2'b00};assign vr=video_read;assign vw=video_wdata;assign vb=video_be;
+      // synthesis translate_off
+      reg [55:0] check_core;reg [59:0] check_host,check_video;
+      always @(posedge clk)if(!reset)begin
+        if(cp&&{ca,cr,cw}!==check_core)$fatal(1,"Queued core request attributes changed");
+        if(hp&&{ha,hr,hw,hb}!==check_host)$fatal(1,"Queued host request attributes changed");
+        if(vp&&{va,vr,vw,vb}!==check_video)$fatal(1,"Queued video request attributes changed");
+        if(core_req&&!cp)check_core<={ca,cr,cw};
+        if(host_req&&!hp)check_host<={ha,hr,hw,hb};
+        if(video_req&&!vp)check_video<={va,vr,vw,vb};
+      end
+      // synthesis translate_on
+    end else begin: held_descriptors
+      reg [22:0] caddr,haddr,vaddr;reg cread,hread,vread;
+      reg [31:0] cword,hword,vword;reg [3:0] hmask,vmask;
+      assign ca=caddr;assign cr=cread;assign cw=cword;
+      assign ha=haddr;assign hr=hread;assign hw=hword;assign hb=hmask;
+      assign va=vaddr;assign vr=vread;assign vw=vword;assign vb=vmask;
+      always @(posedge clk)if(!reset)begin
+        if(core_req&&!cp&&core_addr[25:21]==0)begin caddr<={core_addr[20:0],2'b00};cread<=core_read;cword<=core_wdata;end
+        if(host_req&&!hp&&host_addr[1:0]==0)begin haddr<=host_addr;hread<=host_read;hword<=host_wdata;hmask<=host_be;end
+        if(video_req&&!vp&&video_addr[1:0]==0)begin vaddr<=video_addr;vread<=video_read;vword<=video_wdata;vmask<=video_be;end
+      end
+    end endgenerate
     reg [1:0] index;
     reg [2:0] state;
     reg burst_req;
@@ -48,7 +77,8 @@ module gba_psram #(
             default: if(cp)grant=0;else if(hp)grant=1;else grant=2;
         endcase
     end
-    gba_psram_link #(.HALF_PERIOD(HALF_PERIOD),.INIT_HALF_PERIOD(INIT_HALF_PERIOD),
+    gba_psram_link #(.HALF_PERIOD(HALF_PERIOD),.READ_HALF_PERIOD(READ_HALF_PERIOD),
+        .READ_FALLING(READ_FALLING),.CS_GAP(CS_GAP),.INIT_HALF_PERIOD(INIT_HALF_PERIOD),
         .POWERUP_CYCLES(POWERUP_CYCLES),.ASYNC_CLOCK(ASYNC_CLOCK)) link (
         .clk(clk),.clk_ram(clk_ram),.reset(reset),.start(burst_req),.write(!read_op),
         .address({1'b0,address[22:2],index}),.length(full_word ? 9'd4 : 9'd1),
@@ -66,15 +96,15 @@ module gba_psram #(
         end else begin
             if (core_req) begin
                 if (cp || core_addr[25:21] != 0) fault<=1;
-                else begin cp<=1;ca<={core_addr[20:0],2'b00};cr<=core_read;cw<=core_wdata;end
+                else cp<=1;
             end
             if (host_req) begin
                 if (hp || host_addr[1:0] != 0) fault<=1;
-                else begin hp<=1;ha<={host_addr[22:2],2'b00};hr<=host_read;hw<=host_wdata;hb<=host_be;end
+                else hp<=1;
             end
             if(video_req) begin
                 if(vp || video_addr[1:0]!=0)fault<=1;
-                else begin vp<=1;va<={video_addr[22:2],2'b00};vr<=video_read;vw<=video_wdata;vb<=video_be;end
+                else vp<=1;
             end
             if (state != 0) begin
                 timeout_count<=timeout_count+1'b1;
@@ -121,7 +151,8 @@ endmodule
 // that bus time to settle before the core consumes it. tx_index is used only
 // combinationally with the held word_data, entirely in the PHY domain.
 module gba_psram_link #(
-    parameter HALF_PERIOD=1, INIT_HALF_PERIOD=1, POWERUP_CYCLES=20000, ASYNC_CLOCK=0
+    parameter HALF_PERIOD=1, READ_HALF_PERIOD=HALF_PERIOD, READ_FALLING=0, CS_GAP=4,
+              INIT_HALF_PERIOD=1, POWERUP_CYCLES=20000, ASYNC_CLOCK=0
 )(
     input wire clk,clk_ram,reset,start,write,
     input wire [23:0] address,input wire [8:0] length,
@@ -179,7 +210,8 @@ module gba_psram_link #(
         .address(24'd0),.write_data(8'd0),.busy(),.ready(phy_ready),.done(),
         .qpi_mode(),.read_data(),.device_id(device_id),
         .cs_n(init_cs),.sck(init_sck),.dq_in(dq_in),.dq_out(init_out),.dq_oe(init_oe));
-    spi_burst #(.HALF_PERIOD(HALF_PERIOD),.CS_GAP(4),.FAST_READ(1)) burst(
+    spi_burst #(.HALF_PERIOD(HALF_PERIOD),.READ_HALF_PERIOD(READ_HALF_PERIOD),
+        .READ_FALLING(READ_FALLING),.CS_GAP(CS_GAP),.FAST_READ(1)) burst(
         .clk(phy_clk),.reset(phy_reset),.start(phy_start),.write(write),
         .address(address),.length(length),.tx_index(tx_index),.tx_data(tx_data),
         .rx_valid(rx_valid),.rx_index(rx_index),.rx_data(rx_data),

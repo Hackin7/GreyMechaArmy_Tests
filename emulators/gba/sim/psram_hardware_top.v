@@ -1,6 +1,8 @@
 // Small board image for measuring the actual GBA arbiter/PHY independently
 // of the expensive GBA placement. It overwrites all PSRAM, never cartridge flash.
-module top #(parameter ASYNC_CLOCK=1, WORDS=2097152)(
+module top #(parameter ASYNC_CLOCK=1, WORDS=2097152, RAM_CORE_DIV=20, RAM_CLK_DIV=8,
+    WRITE_HALF=1, READ_HALF=WRITE_HALF, READ_FALLING=0, INIT_HALF=1,
+    RAM_GAP=4, POWERUP_CYCLES=20000)(
     input wire [4:0] btn,input wire btn_grey_n,btn_red_n,
     input wire host_sck,host_mosi,host_cs_n,output wire host_miso,
     inout wire [5:0] pmod_j1,
@@ -13,7 +15,7 @@ module top #(parameter ASYNC_CLOCK=1, WORDS=2097152)(
     always @(posedge clk)reference_divider<=reference_divider+1'b1;
     assign clock_ref=reference_divider[15]; // RP2350 GP12: core clock / 65536.
     OSCG #(.DIV(6)) oscillator(.OSC(osc));
-    gba_pll clocks(.osc(osc),.reset(1'b0),.core_clk(clk),
+    gba_pll #(.CORE_DIV(RAM_CORE_DIV),.FLASH_DIV(RAM_CLK_DIV)) clocks(.osc(osc),.reset(1'b0),.core_clk(clk),
         .panel_clk(clk_panel),.flash_clk(clk_ram),.locked(locked));
     reg [7:0] startup=0;
     always @(posedge clk)
@@ -47,7 +49,9 @@ module top #(parameter ASYNC_CLOCK=1, WORDS=2097152)(
     wire cs,sck,cdone;wire [3:0] din,dout,oe;wire [31:0] cq;
     reg crq=0,crd=0;
     wire [31:0] pattern=32'ha55a6789 ^ {11'd0,word_index} ^ {word_index,11'd0};
-    gba_psram #(.ASYNC_CLOCK(ASYNC_CLOCK)) ram(.clk(clk),.clk_ram(clk_ram),.reset(ram_reset),
+    gba_psram #(.ASYNC_CLOCK(ASYNC_CLOCK),.HALF_PERIOD(WRITE_HALF),
+        .READ_HALF_PERIOD(READ_HALF),.READ_FALLING(READ_FALLING),.INIT_HALF_PERIOD(INIT_HALF),
+        .CS_GAP(RAM_GAP),.POWERUP_CYCLES(POWERUP_CYCLES)) ram(.clk(clk),.clk_ram(clk_ram),.reset(ram_reset),
         .core_req(crq),.core_read(crd),.core_addr({5'd0,word_index}),
         .core_wdata(pattern),.core_rdata(cq),.core_done(cdone),
         .host_req(hrq),.host_read(hrd),.host_addr(ha),.host_wdata(hw),.host_be(hb),

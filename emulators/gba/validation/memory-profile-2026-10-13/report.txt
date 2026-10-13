@@ -1,0 +1,75 @@
+GBA software memory profile
+mGBA 0.10.5, pinned revision 26b7884bc25a5933960f3cdcd98bac1ae14d42e2.
+180 frames per ROM; first 30 boot, next 60 baseline, last 90 scripted inputs.
+Each instrumented run is checked against an unhooked control when supplied.
+
+diagnostic
+  PPU VRAM reads/frame: 38400.0; lower bank: 32768.0
+  ROM core miss rates:
+    512 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    2048 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    4096 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    8192 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+  PPU-only lower-VRAM cache, 32-byte lines:
+    512 bytes: 6.250% misses; 65536.0 fetched bytes/frame; 606208.0 SPI read clocks/frame
+    2048 bytes: 6.250% misses; 65536.0 fetched bytes/frame; 606208.0 SPI read clocks/frame
+    4096 bytes: 6.250% misses; 65536.0 fetched bytes/frame; 606208.0 SPI read clocks/frame
+  Software diagnostic status: {'version': 1, 'passed_mask': '0x7bf', 'done': '0x600d600d', 'arithmetic_error': 0, 'shifter_error': 0, 'banking_error': 0}
+
+rgb
+  PPU VRAM reads/frame: 38400.0; lower bank: 38400.0
+  ROM core miss rates:
+    512 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    2048 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    4096 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+    8192 bytes: 0.000% (0 backend 256-byte fills / 60 frames)
+  PPU-only lower-VRAM cache, 32-byte lines:
+    512 bytes: 3.125% misses; 38400.0 fetched bytes/frame; 355200.0 SPI read clocks/frame
+    2048 bytes: 3.125% misses; 38400.0 fetched bytes/frame; 355200.0 SPI read clocks/frame
+    4096 bytes: 3.125% misses; 38400.0 fetched bytes/frame; 355200.0 SPI read clocks/frame
+
+bld_demo
+  PPU VRAM reads/frame: 23667.2; lower bank: 19571.2
+  ROM core miss rates:
+    512 bytes: 13.897% (34138 backend 256-byte fills / 60 frames)
+    2048 bytes: 5.806% (11440 backend 256-byte fills / 60 frames)
+    4096 bytes: 2.680% (5928 backend 256-byte fills / 60 frames)
+    8192 bytes: 1.369% (3146 backend 256-byte fills / 60 frames)
+  PPU-only lower-VRAM cache, 32-byte lines:
+    512 bytes: 28.141% misses; 176243.2 fetched bytes/frame; 1630249.6 SPI read clocks/frame
+    2048 bytes: 26.532% misses; 166163.2 fetched bytes/frame; 1537009.6 SPI read clocks/frame
+    4096 bytes: 6.148% misses; 38506.7 fetched bytes/frame; 356186.7 SPI read clocks/frame
+  BIOS read/fetch cache, 16-byte lines:
+    512 bytes: 0.0024% misses / 8589355 requests
+    2048 bytes: 0.0000% misses / 8589355 requests
+    4096 bytes: 0.0000% misses / 8589355 requests
+  IWRAM read/fetch cache, 16-byte lines:
+    512 bytes: 2.2238% misses / 1186717 requests
+    2048 bytes: 2.0332% misses / 1186717 requests
+    4096 bytes: 2.0178% misses / 1186717 requests
+
+Limitations:
+  Software-renderer fetch order and tilemap/OAM/palette caches differ from FPGA.
+  Unchanged-scanline reuse disabled: every visible frame is rendered.
+  VRAM cache estimates cover the external lower 64 KiB; upper sprite VRAM is on-chip.
+  16-byte four-way LRU is an approximation, not the FPGA four-requester word cache.
+  Cache replay estimates miss rates and fetched bytes, not FPGA FPS or RTL cost.
+  Request counts are logical accesses, not all physical bus beats or read-modify-write operations.
+
+The open-BIOS and internal-BIOS profiles are both retained. Their request totals differ:
+the replacement BIOS executes additional work; this is a workload distinction, not profiler overhead.
+Diagnostic passes 0x7bf in mGBA (upper-VRAM byte-write check differs), rather than the FPGA 0x7ff.
+Profiling results do not establish emulator accuracy or hardware acceptance.
+
+SPI read cost estimate:
+  40 command/address/dummy clocks per fast-read burst plus 8 clocks per payload byte.
+  Excludes chip-select gaps, CDC, arbitration, CPU/DMA writes and other execution; not an FPS prediction.
+  bld_demo at 4 KiB: 16-byte lines cost fewer serial clocks than 32-byte lines despite more misses.
+
+Optimization implications:
+  Bitmap tests stream the framebuffer: line bursts reduce transaction count; 0.5..4 KiB capacity does not retain it across frames.
+  bld_demo: 4 KiB ROM cache reduces misses from 13.897% to 2.680% on this software fetch stream.
+  bld_demo: 4 KiB lower-VRAM cache with 32-byte lines reduces misses to 6.148%, versus 26.532% at 2 KiB.
+  Small BIOS/IWRAM caches also deserve priority: the board replacement BIOS has a concentrated instruction working set.
+  Simulated byte traffic matters alongside miss rate; a longer line can fetch substantially more unused data.
+  Confirm FPGA stall counters, resource cost and cache coherence before adopting any result.

@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-13",
+  "hardware_uploaded": false,
+  "final_source_mapping_complete": false,
+  "bram_bytes": {
+    "BIOS": 16384,
+    "IWRAM": 32768,
+    "lower_VRAM": 65536
+  },
+  "psram_payloads": [
+    "EWRAM",
+    "saves/EEPROM",
+    "upper VRAM",
+    "OAM",
+    "BG/OBJ palettes",
+    "six render line buffers",
+    "sprite priority",
+    "object-window bits",
+    "LCD scanlines",
+    "USB packet/readback buffers"
+  ],
+  "colour_correction": "RGB565 without the second red/blue swap",
+  "checks": {
+    "renderer": "/tmp/greymecha_gba_all_external_reset/tb_priority_renderer.vhd:360:5:@137326610ns:(report note): PASS shared renderer: 34560 matching pixels across all modes, layers, transforms, OBJ, mosaic, windows, alpha, brighten, darken and saturated coefficients",
+    "diagnostic": "PASS board core: BIOS boot, ROM pair prefetch, EWRAM/IWRAM/VRAM subword writes/mirroring, ignored OBJ byte writes, ARM arithmetic/shift flags, all register banks/SPSRs/user transfers, SRAM report, PPU, pause, KEYINPUT",
+    "local_memory": "sim/tb_gba_vram_hi_external.vhd:54:2:@275676ns:(report note): PASS upper VRAM: delayed two-port reads, full/partial writes, cache aliases and reset",
+    "host": "PASS host: SPI framing, CRC, status during fill, upper-address PSRAM read/write, bounds",
+    "display": "PASS display: all 115200 SPI pixels, fitted/native viewports, black borders, RGB565, async backpressure",
+    "arbiter": "PASS scratch arbiter: simultaneous clients, attributes, byte masks, fair completion"
+  },
+  "latest_mapping": {
+    "cells": {
+      "LUT4": 26291,
+      "TRELLIS_FF": 13662,
+      "MULT18X18D": 21,
+      "$_TBUF_": 5,
+      "$scopeinfo": 442,
+      "TRELLIS_DPR16X4": 103,
+      "EHXPLLL": 2,
+      "DCCA": 2,
+      "USRMCLK": 1,
+      "OSCG": 1,
+      "DP16KD": 56
+    },
+    "packed_logic_sites": 26916,
+    "logic_capacity": 24288,
+    "routing_allowed": false,
+    "memory_layout": {
+      "BIOS": 16384,
+      "IWRAM": 32768,
+      "lower_VRAM": 65536
+    },
+    "nominal_qspi_sck_mhz": 67.16666666666666,
+    "maximum_qspi_sck_mhz": 77.24166666666665,
+    "timing_validated": false
+  },
+  "mapping_scope": "Full relocation before final reset-rearm correction; not a fitting/routed hardware image.",
+  "sha256": {
+    "rtl\\bram_priority\\gba_lines_psram.sv": "c6b2498686c9f4c323b46bfab663043b5bbc02a50c41bd5ab9abf564ab4329ab",
+    "rtl\\bram_priority\\gba_local_mem.sv": "94ba630f21874911cccab94b1db7cd482bd9b83165f84d4821df4cd4593bd4a9",
+    "rtl\\bram_priority\\gba_local_mem_packed.sv": "d53d3ff2b36f8803b1986759b71e243f65d6c35011890bcfd2ab552add6aff9d",
+    "rtl\\bram_priority\\gba_memory_fabric.sv": "ba6126a081ea79f5c70184a225af402ed22418b22d756fc7cde98dd87d5836df",
+    "rtl\\bram_priority\\gba_scratch_arbiter.sv": "69600e75331d312c00287713ebe657fd822e556457eb12277068f1e0c85ba89a",
+    "rtl\\bram_priority\\gba_vram_hi_external.vhd": "069337cade5f9f2877a20344f38e7f0ae4b47674f7975e9cf19faf5392489d97",
+    "rtl\\gba_display.v": "b125d2753a48b182b9d4ab3e4df6bc15d151f8b98199a241646d583850167096",
+    "tools\\prepare_bram_priority.py": "98838c33627b00686314b3cd0f4b011eaa2750f0408ca08f49bf663c0443bfe8",
+    "tools\\external_graphics_memories.py": "d7b7dd01d4b64ceea5fe26ed49251beff21e900a44f14f67e878c9c137f93760",
+    "tools\\external_host_buffers.py": "e22bc2db56492ec82423ee883651b224ae98f4720ea5c8f3efddeb53e1ea7ad3",
+    "tools\\external_sprite_metadata.py": "ee69f9d476749af7b47759797d2298becb49a94c67c89468c0fd7523b7e03096",
+    "tools\\remove_duplicate_rom_cache.py": "3fe4dd41cbe0ac65211de1aef20392a1cfe80537b2334cb8c521b49a329fb143",
+    "tools\\map_bram_priority.py": "37614a6d08c17211e5b261d9e4230df76ed05342420f5347c44352e0e9f80358",
+    "tools\\test_bram_priority_core.py": "8a73f556e35ac39097b9d8b843b946f8b8ef48511ff15db4ac342ee3e4e70d93",
+    "tools\\test_bram_priority_renderer.py": "34f33a42cade417faefb9bb87bf17bb680fa9c121ae544dd3fdaf17d89208cd3",
+    "tools\\test_psram_host.py": "797d030ef2249aea9ddf2407abfd102c9092743a8909fe908b3cb7213ff7a69e",
+    "tools\\test_psram_lines.py": "89a496b1cb3c165663d397f7d01a7fd80ebc4957dc6dca639aaf9cf6fd2e1721"
+  }
+}

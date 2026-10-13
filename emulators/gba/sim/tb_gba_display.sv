@@ -2,7 +2,8 @@
 module tb_gba_display #(
     parameter real CORE_HALF_NS=25,
     parameter real PANEL_HALF_NS=6.25,
-    parameter PARTIAL_START=0
+    parameter PARTIAL_START=0,
+    parameter SLOT_BITS=2
 );
     reg cc=0,pc=0,reset=1;
     always #(CORE_HALF_NS) cc=~cc;
@@ -10,7 +11,7 @@ module tb_gba_display #(
     reg we=0,mode=0;reg [7:0] x=0,y=0;reg [17:0] colour=0;
     wire ready,overflow,lr,lf,ld;wire [31:0] captured,displayed;
     wire [7:0] ln,ra;wire [15:0] data;wire initialized,sclk,mosi,dc,cs,rst;
-    gba_lines lines(.core_clk(cc),.core_reset(reset),.pixel_we(we),.pixel_x(x),.pixel_y(y),
+    gba_lines #(.SLOT_BITS(SLOT_BITS)) lines(.core_clk(cc),.core_reset(reset),.pixel_we(we),.pixel_x(x),.pixel_y(y),
         .pixel_data(colour),.mode_toggle(mode),.video_ready(ready),.overflow(overflow),.captured_frames(captured),
         .panel_clk(pc),.panel_reset(reset),.rd_addr(ra),.rd_data(data),.line_ready(lr),
         .line_number(ln),.line_fitted(lf),.line_done(ld));
@@ -33,7 +34,8 @@ module tb_gba_display #(
             expected=0;
             if(col>=x0&&col<x0+w&&row>=y0&&row<y0+h)begin
                 sx=frame==0 ? expand(col-x0) : col-x0;sy=frame==0 ? expand(row-y0) : row-y0;
-                original=source(sx,sy);expected={original[17:13],original[11:6],original[5:1]};
+                // Source is {blue,green,red}; panel input is RGB565.
+                original=source(sx,sy);expected={original[5:1],original[11:6],original[17:13]};
             end
             if(received!==expected)$fatal(1,"Frame %d pixel (%d,%d) = %h expected %h",frame,col,row,received,expected);
             pixels=pixels+1;
@@ -49,8 +51,8 @@ module tb_gba_display #(
             wait(initialized);
             force display.init_owner=1;
             force display.started=0;
-            // Queue two incomplete-frame rows followed by frame-zero's row 0.
-            for(iy=3;iy<5;iy=iy+1)begin
+            // Fill available slots with incomplete rows and frame-zero row 0.
+            for(iy=3;iy<(SLOT_BITS==1 ? 4:5);iy=iy+1)begin
                 for(ix=0;ix<240;ix=ix+1)begin
                     @(negedge cc);we=1;x=ix;y=iy;colour=source(ix,iy);
                 end

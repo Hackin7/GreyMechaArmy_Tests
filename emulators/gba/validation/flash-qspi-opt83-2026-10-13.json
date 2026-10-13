@@ -1,0 +1,47 @@
+{
+  "result": "failed",
+  "modes": [
+    {
+      "mode": "spi",
+      "bytes_verified": 11520,
+      "bit_sha256": "4eb202d041fb399594716eabaae75e361abae2cf99bda54be9b0e26f653cc479",
+      "core_hz": 20565200.0,
+      "sck_hz": 12853250.0,
+      "clock_samples_hz": [
+        20567500.0,
+        20564500.0,
+        20565200.0
+      ],
+      "cache_service_cycles": 186552,
+      "cache_service_mb_s": 1.2699467387109225,
+      "cache_misses": 54
+    }
+  ],
+  "regions": [],
+  "original_status_registers": [
+    0,
+    2,
+    96
+  ],
+  "error": "Mode 1 mismatch at cartridge byte 0x345",
+  "restored_sr2": 2,
+  "restored_status": {
+    "frames": 0,
+    "keys": 0,
+    "error": 0,
+    "ram_ready": true,
+    "sequence": 0,
+    "run": false,
+    "pc": 0,
+    "flash_misses": 0,
+    "device_id": 875859,
+    "panel_ready": true,
+    "ram_idle": true,
+    "ram_fault": false,
+    "busy": false,
+    "overflow": false,
+    "pause": true,
+    "physical": 0
+  },
+  "restored_bit_sha256": "03940a393b584ed898978c66b8114e982f80737cd454903858fe9d83d770c183"
+}

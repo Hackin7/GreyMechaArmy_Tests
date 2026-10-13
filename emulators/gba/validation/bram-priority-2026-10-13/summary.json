@@ -1,0 +1,87 @@
+{
+  "hardware_image_updated": false,
+  "qspi": {
+    "nominal_sck_mhz": 67.16666666666666,
+    "measured_controller_sck_hz": 66807650.0,
+    "controller_hardware_report": "../flash-qspi-below79-2026-10-13.json",
+    "full_emulator_image_tested": false,
+    "maximum_sck_mhz": 77.24166666666665,
+    "pll_core_div": 26,
+    "pll_flash_div": 4,
+    "phy_constraint_mhz": 155,
+    "earlier_28_div_controller_sck_hz": 71946350,
+    "bytes_verified": 17664,
+    "cache_service_mb_s": 11.990777253814148
+  },
+  "full_mappings": {
+    "baseline": {
+      "cells": {
+        "LUT4": 27172,
+        "TRELLIS_FF": 12210,
+        "MULT18X18D": 21,
+        "$_TBUF_": 5,
+        "$scopeinfo": 450,
+        "TRELLIS_DPR16X4": 1112,
+        "EHXPLLL": 2,
+        "DCCA": 1,
+        "USRMCLK": 1,
+        "DP16KD": 58,
+        "OSCG": 1
+      },
+      "memory_layout": {
+        "BIOS": 16384,
+        "IWRAM": 32768,
+        "lower_VRAM": 65536
+      },
+      "nominal_qspi_sck_mhz": 70,
+      "phy_timing_constraint_mhz": 148,
+      "packed_logic_sites": 33851,
+      "hardware_validated": false,
+      "note": "Intermediate allocation; host read buffer and LCD pixels still occupied two EBRs. Generator subsequently forces these into distributed RAM. Neither allocation fits the device."
+    },
+    "fast": {
+      "cells": {
+        "LUT4": 27055,
+        "TRELLIS_FF": 12155,
+        "MULT18X18D": 21,
+        "$_TBUF_": 5,
+        "$scopeinfo": 450,
+        "TRELLIS_DPR16X4": 1112,
+        "EHXPLLL": 2,
+        "DCCA": 1,
+        "USRMCLK": 1,
+        "DP16KD": 58,
+        "OSCG": 1
+      },
+      "memory_layout": {
+        "BIOS": 16384,
+        "IWRAM": 32768,
+        "lower_VRAM": 65536
+      },
+      "nominal_qspi_sck_mhz": 70,
+      "phy_timing_constraint_mhz": 148,
+      "packed_logic_sites": 33734,
+      "hardware_validated": false,
+      "note": "Intermediate allocation; host read buffer and LCD pixels still occupied two EBRs. Generator subsequently forces these into distributed RAM. Neither allocation fits the device."
+    }
+  },
+  "controls": {
+    "independent_debounce_LUT4": 283,
+    "shared_debounce_LUT4": 104,
+    "independent_debounce_FF": 165,
+    "shared_debounce_FF": 70,
+    "four_distributed_scanlines_sites": 2709,
+    "two_distributed_scanlines_sites": 1477
+  },
+  "packed_hot_banks": {
+    "EBRs": 51,
+    "LUT4": 1636,
+    "FF": 498,
+    "selected": false
+  },
+  "next_targets": [
+    "Palette/OAM read-port sharing",
+    "Shared graphics line storage",
+    "Reduce double caching only after measuring 70 MHz QSPI performance"
+  ]
+}
