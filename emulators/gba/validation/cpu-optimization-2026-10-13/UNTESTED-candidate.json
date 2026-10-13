@@ -1,0 +1,38 @@
+{
+  "status": "UNTESTED",
+  "description": "RTL checkpoint for the CPU candidate whose bitstream build is currently in progress. Not accepted for deployment.",
+  "branch": "optimize-gba-cpu",
+  "synthesized_rtl_commit": "8b2baf1",
+  "checkpoint_parent_commit": "84a6127",
+  "rtl_matches_synthesized_commit": true,
+  "hardware_tested": false,
+  "routing_complete": false,
+  "routed_timing_accepted": false,
+  "bitstream_accepted": false,
+  "completed_checks": "Functional RTL checks, clean synthesis and packing passed; these do not establish hardware or routed-timing acceptance.",
+  "packed_logic_sites": 23585,
+  "logic_capacity": 24288,
+  "synthesis_settings": {
+    "PSRAM_FAST_READ": 1,
+    "FLASH_QSPI": 1,
+    "FLASH_CYCLES": 2,
+    "FLASH_RX_REGISTER": 0,
+    "PLL_CORE_DIV": 26,
+    "PLL_FLASH_DIV": 4,
+    "MAPPING_FLAGS": "-noccu2"
+  },
+  "routing_settings": {
+    "device": "ECP5-25K CABGA256 speed 6",
+    "seed": 1,
+    "router": "router1",
+    "core_constraint_mhz": 24,
+    "panel_constraint_mhz": 97,
+    "ram_constraint_mhz": 120,
+    "flash_phy_constraint_mhz": 155
+  },
+  "routing_log": "build/cpu-8b2baf1-route/board-nextpnr.log",
+  "mapped_netlist_sha256": "a353e79fca01d2b4465d839896579b057e2af9582db6d5b4d22cac4f0d43513f",
+  "deployment": "Not uploaded; saved working hardware bitstreams are preserved.",
+  "scope": "CPU optimizations and wider-LUT mapping. Other agent's LCD/button/memory-selector changes are not merged into this candidate.",
+  "snapshot_note": "Acceptance fields describe this checkpoint, not any future routing or hardware result."
+}
