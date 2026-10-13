@@ -74,9 +74,18 @@ map-existing-core:
 
 bit bit-existing-core:
 	$(MAKE) map-existing-core
-	sed -e 's/FREQUENCY NET "clk_flash" 53.0 MHz/FREQUENCY NET "clk_flash" $(FLASH_MHZ) MHz/' -e 's/FREQUENCY NET "clk_core" 21.0 MHz/FREQUENCY NET "clk_core" $(CORE_CONSTRAINT) MHz/' -e 's/FREQUENCY NET "clk_panel" 85.0 MHz/FREQUENCY NET "clk_panel" $(PANEL_CONSTRAINT) MHz/' -e 's/FREQUENCY NET "clk_ram" 53.0 MHz/FREQUENCY NET "clk_ram" $(RAM_CONSTRAINT) MHz/' pinout.lpf > $(BOARD_WORK)/pins.lpf
-	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(BOARD_WORK)/top.json --lpf $(BOARD_WORK)/pins.lpf --textcfg $(BOARD_WORK)/top.config --report $(BUILD)/$(BOARD_LOG_TAG)-timing.json --seed 1 $(NEXTPNR_FLAGS) > $(BUILD)/$(BOARD_LOG_TAG)-nextpnr.log 2>&1
+	$(MAKE) route-existing-map
 	$(ECPPACK) --compress $(BOARD_WORK)/top.config $(BOARD_BIT)
+
+.PHONY: route-existing-map test-clock-constraints
+route-existing-map:
+	mkdir -p $(BUILD)
+	$(PYTHON) tools/bind_board_clocks.py $(BOARD_WORK)/top.json pinout.lpf --output-json $(BOARD_WORK)/clocked.json --output-lpf $(BOARD_WORK)/pins.lpf --manifest $(BUILD)/$(BOARD_LOG_TAG)-clocks.json --core $(CORE_CONSTRAINT) --panel $(PANEL_CONSTRAINT) --ram $(RAM_CONSTRAINT) --flash $(FLASH_MHZ)
+	$(NEXTPNR) --25k --package CABGA256 --speed $(FPGA_SPEED) --json $(BOARD_WORK)/clocked.json --lpf $(BOARD_WORK)/pins.lpf --textcfg $(BOARD_WORK)/top.config --report $(BUILD)/$(BOARD_LOG_TAG)-timing.json --seed 1 $(NEXTPNR_FLAGS) > $(BUILD)/$(BOARD_LOG_TAG)-nextpnr.log 2>&1
+	$(PYTHON) tools/check_board_timing.py $(BUILD)/$(BOARD_LOG_TAG)-clocks.json $(BUILD)/$(BOARD_LOG_TAG)-nextpnr.log --report $(BUILD)/$(BOARD_LOG_TAG)-timing.json
+
+test-clock-constraints:
+	$(PYTHON) sim/test_clock_constraints.py
 
 test-board: test-flash test-qspi test-qspi-fast test-vram test-psram test-dma-arithmetic test-cpu-arithmetic test-cpu-shifter test-cpu-registers test-color-arithmetic test-host test-buttons test-display
 
