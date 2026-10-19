@@ -1,0 +1,66 @@
+# GreyMecha ECP5-25K CABGA256. Verify +3V3 I/O-bank supply on board revision.
+LOCATE COMP "debug_sck" SITE "A15"; # RP2350 GP8
+LOCATE COMP "debug_miso" SITE "B16"; # RP2350 GP10
+LOCATE COMP "debug_cs_n" SITE "C15"; # RP2350 GP11
+IOBUF PORT "debug_sck" IO_TYPE=LVCMOS33 PULLMODE=DOWN;
+IOBUF PORT "debug_miso" IO_TYPE=LVCMOS33;
+IOBUF PORT "debug_cs_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+# Pad numbers below are physical KiCad connector pads, NOT generic PMOD order.
+# J1/J2 pads 1,2: +3V3; pads 3,4: GND (verify board before connecting).
+# User camera harness: J2 SCL,VS,PLK,D7,D5,D3,D1,RET;
+# J1 SDA,HS,XLK,D6,D4,D2,D0,PWDN, in the supplied FPGA-ball order.
+LOCATE COMP "cam_data[0]" SITE "B9"; # J1 pad 8
+LOCATE COMP "cam_data[1]" SITE "B13"; # J2 pad 8
+LOCATE COMP "cam_data[2]" SITE "B8"; # J1 pad 10
+LOCATE COMP "cam_data[3]" SITE "B12"; # J2 pad 10
+LOCATE COMP "cam_data[4]" SITE "A4"; # J1 pad 12
+LOCATE COMP "cam_data[5]" SITE "B11"; # J2 pad 12
+LOCATE COMP "cam_data[6]" SITE "A3";  # J1 pad 11
+LOCATE COMP "cam_data[7]" SITE "A11"; # J2 pad 11
+LOCATE COMP "cam_pclk" SITE "A12";  # J2 pad 9 (PLK)
+LOCATE COMP "cam_vsync" SITE "A13"; # J2 pad 7
+LOCATE COMP "cam_href" SITE "A9";   # J1 pad 7 (HS)
+LOCATE COMP "cam_xclk" SITE "A8";   # J1 pad 9 (XLK)
+LOCATE COMP "cam_sioc" SITE "A14";  # J2 pad 5 (SCL)
+LOCATE COMP "cam_siod" SITE "A10";  # J1 pad 5 (SDA)
+LOCATE COMP "cam_reset_n" SITE "B14"; # J2 pad 6 (RET / RESET#)
+LOCATE COMP "cam_pwdn" SITE "B10"; # J1 pad 6
+IOBUF PORT "cam_data[*]" IO_TYPE=LVCMOS33;
+IOBUF PORT "cam_pclk" IO_TYPE=LVCMOS33;
+IOBUF PORT "cam_vsync" IO_TYPE=LVCMOS33;
+IOBUF PORT "cam_href" IO_TYPE=LVCMOS33;
+IOBUF PORT "cam_xclk" IO_TYPE=LVCMOS33 DRIVE=8 SLEWRATE=FAST;
+IOBUF PORT "cam_sioc" IO_TYPE=LVCMOS33 DRIVE=4;
+IOBUF PORT "cam_siod" IO_TYPE=LVCMOS33 PULLMODE=UP;
+IOBUF PORT "cam_reset_n" IO_TYPE=LVCMOS33;
+IOBUF PORT "cam_pwdn" IO_TYPE=LVCMOS33;
+LOCATE COMP "btn[0]" SITE "B4";
+LOCATE COMP "btn[1]" SITE "A5";
+LOCATE COMP "btn[2]" SITE "B5";
+LOCATE COMP "btn[3]" SITE "A6";
+LOCATE COMP "btn[4]" SITE "B6";
+LOCATE COMP "btn_grey_n" SITE "D12";
+LOCATE COMP "btn_rst_n" SITE "C12";
+IOBUF PORT "btn[*]" IO_TYPE=LVCMOS33 PULLMODE=UP;
+IOBUF PORT "btn_grey_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+IOBUF PORT "btn_rst_n" IO_TYPE=LVCMOS33 PULLMODE=UP;
+LOCATE COMP "led[0]" SITE "C3";
+LOCATE COMP "led[1]" SITE "D3";
+LOCATE COMP "led[2]" SITE "C4";
+LOCATE COMP "led[3]" SITE "D4";
+LOCATE COMP "led[4]" SITE "C5";
+LOCATE COMP "led[5]" SITE "D5";
+LOCATE COMP "led[6]" SITE "C6";
+LOCATE COMP "led[7]" SITE "D6";
+IOBUF PORT "led[*]" IO_TYPE=LVCMOS33;
+LOCATE COMP "oled_scl" SITE "C14";
+LOCATE COMP "oled_sda" SITE "C13";
+LOCATE COMP "oled_dc" SITE "E14";
+LOCATE COMP "oled_cs" SITE "D14";
+LOCATE COMP "oled_rst" SITE "D13";
+IOBUF PORT "oled_scl" IO_TYPE=LVCMOS33;
+IOBUF PORT "oled_sda" IO_TYPE=LVCMOS33;
+IOBUF PORT "oled_dc" IO_TYPE=LVCMOS33;
+IOBUF PORT "oled_cs" IO_TYPE=LVCMOS33;
+IOBUF PORT "oled_rst" IO_TYPE=LVCMOS33;
+FREQUENCY PORT "cam_pclk" 12.5 MHz;
