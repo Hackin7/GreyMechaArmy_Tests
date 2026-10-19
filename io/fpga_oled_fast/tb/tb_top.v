@@ -39,13 +39,30 @@ module ODDRX1F (input SCLK, RST, D0, D1, output Q);
     assign Q = SCLK ? d0_r : d1_r;
 endmodule
 
+// Clock ratio and lock latency are irrelevant to this pin-level test.
+module EHXPLLL #(
+    parameter PLLRST_ENA = "DISABLED", INTFB_WAKE = "DISABLED",
+    STDBY_ENABLE = "DISABLED", DPHASE_SOURCE = "DISABLED",
+    OUTDIVIDER_MUXA = "DIVA", OUTDIVIDER_MUXB = "DIVB",
+    OUTDIVIDER_MUXC = "DIVC", OUTDIVIDER_MUXD = "DIVD",
+    CLKI_DIV = 2, CLKOP_ENABLE = "ENABLED", CLKOP_DIV = 8,
+    CLKOP_CPHASE = 4, CLKOP_FPHASE = 0,
+    FEEDBK_PATH = "CLKOP", CLKFB_DIV = 3
+) (
+    input RST, STDBY, CLKI, CLKFB, PHASESEL0, PHASESEL1,
+    PHASEDIR, PHASESTEP, PHASELOADREG, PLLWAKESYNC, ENCLKOP,
+    output CLKOP, CLKINTFB, LOCK
+);
+    assign CLKOP = CLKI;
+    assign CLKINTFB = CLKI;
+    assign LOCK = 1'b1;
+endmodule
+
 // ====================== DUT wiring ======================
 
 module tb_top;
     reg       clk_ext   = 1'b0;
-    reg [4:0] btn       = 5'b11111; // active-low; all unpressed
-    reg       btn_grey_n = 1'b1;
-    reg       btn_rst_n  = 1'b1;
+    reg [6:0] btn       = 7'b1111111; // active-low; all unpressed
 
     wire [7:0] led;
     wire [7:0] interconnect;
@@ -56,8 +73,6 @@ module tb_top;
     top u_top (
         .clk_ext      (clk_ext),
         .btn          (btn),
-        .btn_grey_n   (btn_grey_n),
-        .btn_rst_n    (btn_rst_n),
         .led          (led),
         .interconnect (interconnect),
         .pmod_j1      (pmod_j1),
@@ -73,15 +88,15 @@ module tb_top;
     // Override init_module's CLK_HZ for faster sim. Reset/wait cycles
     // become small. Pause counts in the ROM are absolute and unaffected;
     // they are zeroed by the force below.
-    defparam u_top.u_init.CLK_HZ      = 100_000;
-    defparam u_top.u_init.SPI_CLK_DIV = 8'd1;
+    defparam u_top.u_oled.u_init.CLK_HZ      = 100_000;
+    defparam u_top.u_oled.u_init.SPI_CLK_DIV = 8'd1;
 
     // Skip init-ROM pauses for fast sim. S_INIT_PAUSE = 4'd6 in oled_init.v.
-    always @(u_top.u_init.st) begin
-        if (u_top.u_init.st == 4'd6)
-            force u_top.u_init.pause_cnt = 24'd0;
+    always @(u_top.u_oled.u_init.st) begin
+        if (u_top.u_oled.u_init.st == 4'd6)
+            force u_top.u_oled.u_init.pause_cnt = 24'd0;
         else
-            release u_top.u_init.pause_cnt;
+            release u_top.u_oled.u_init.pause_cnt;
     end
 
     // ====================== Pin-level SPI sniffer ======================
@@ -118,21 +133,21 @@ module tb_top;
     end
 
     // Detect streaming start (init_done + first stream byte after RAMWR)
-    always @(posedge u_top.u_init.init_done) begin
+    always @(posedge u_top.u_oled.u_init.init_done) begin
         $display("[%9t] === init_done ASSERTED (sniffed %0d bytes so far) ===",
                  $time, byte_count);
     end
 
-    always @(posedge u_top.u_stream.sclk_active) begin
+    always @(posedge u_top.u_oled.streaming) begin
         if (!streaming_started) begin
             streaming_started = 1'b1;
-            $display("[%9t] === stream sclk_active RISING (first stream cycle) ===",
+            $display("[%9t] === streaming RISING (first stream cycle) ===",
                      $time);
         end
     end
 
     // Watch for the post-frame RAMWR rearm
-    always @(posedge u_top.u_init.ramwr_pulse)
+    always @(posedge u_top.u_oled.u_init.ramwr_pulse)
         $display("[%9t] === ramwr_pulse (rearm) ===", $time);
 
     initial begin

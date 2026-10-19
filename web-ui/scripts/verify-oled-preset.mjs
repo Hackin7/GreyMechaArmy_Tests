@@ -19,6 +19,10 @@ for (const name of names) {
   assert.equal(content, await readFile(new URL(originalPath, source), 'utf8'), `${name} differs from fpga_oled_fast`);
   demo[name] = content;
 }
+assert.match(demo['pinout.lpf'], /LOCATE COMP "btn\[5\]" SITE "D12";/);
+assert.match(demo['pinout.lpf'], /LOCATE COMP "btn\[6\]" SITE "C12";/);
+assert.match(demo['top.v'], /input\s+wire\s+\[6:0\] btn/);
+assert.doesNotMatch(demo['top.v'], /btn_mecha/);
 
 const initial = get(files);
 const added = addWorkspaceFiles(initial, modules.map((name) => [name, demo[name]]));

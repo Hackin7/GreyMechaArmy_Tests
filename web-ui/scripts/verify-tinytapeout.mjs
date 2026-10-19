@@ -12,23 +12,23 @@ assert.equal(original.summary.format, 'Tiny Tapeout');
 assert.equal(original.summary.gates, 4);
 const buttonNet = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~btn\[(\d)\];/g)]
   .map((match) => [Number(match[2]), match[1]]));
-const mechaNet = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~btn_mecha\[(\d)\];/g)]
-  .map((match) => [Number(match[2]), match[1]]));
 const inverters = new Map([...original.verilog.matchAll(/assign (net_\d+) = ~(net_\d+);/g)]
   .map((match) => [match[1], match[2]]));
 const ledNet = new Map([...original.verilog.matchAll(/assign led\[(\d)\] = (net_\d+);/g)]
   .map((match) => [Number(match[1]), match[2]]));
-assert.equal(buttonNet.size, 5);
-assert.equal(mechaNet.size, 2);
+assert.equal(buttonNet.size, 7);
 assert.equal(original.summary.buttons, 7);
 for (let index = 0; index < 4; index++) {
   assert.equal(inverters.get(ledNet.get(index)), buttonNet.get(index), `OUT${index} must invert IN${index}`);
 }
 assert.equal(ledNet.get(4), buttonNet.get(4), 'OUT4 must follow IN4');
-assert.equal(ledNet.get(5), mechaNet.get(0), 'OUT5 must follow Mecha button 0');
-assert.equal(ledNet.get(6), mechaNet.get(1), 'OUT6 must follow Mecha button 1');
+assert.equal(ledNet.get(5), buttonNet.get(5), 'OUT5 must follow Mecha button 0');
+assert.equal(ledNet.get(6), buttonNet.get(6), 'OUT6 must follow Mecha button 1');
 assert.match(original.verilog, /assign led\[7\] = 1'b0;/);
-assert.match(original.verilog, /input \[1:0\] btn_mecha/);
+assert.match(original.verilog, /module top\(input \[6:0\] btn/);
+assert.doesNotMatch(original.verilog, /btn_mecha/);
+assert.match(get(files)['pinout.lpf'], /LOCATE COMP "btn\[5\]" SITE "D12";/);
+assert.match(get(files)['pinout.lpf'], /LOCATE COMP "btn\[6\]" SITE "C12";/);
 assert.equal((original.verilog.match(/wokwi-gate-not/g) ?? []).length, 4);
 assert.doesNotMatch(original.verilog, /OSCG oscillator|pmod_j1/);
 

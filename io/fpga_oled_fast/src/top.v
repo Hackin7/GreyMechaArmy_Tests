@@ -3,9 +3,9 @@
 // reset, buttons, image BRAM + stretcher, and the pixel-source mux.
 //
 // Mecha buttons:
-//   btn_mecha[0] (was btn_grey, D12) — press to cycle aspect mode
+//   btn[5] (was btn_grey, D12) — press to cycle aspect mode
 //                                       (FULL → ASPECT → CIRCLE → FULL ...)
-//   btn_mecha[1] (was btn_rst,  C12) — held LOW = system reset
+//   btn[6] (was btn_rst,  C12) — held LOW = system reset
 //
 // Image / color buttons (priority high → low):
 //   btn[4] → solid pink
@@ -16,8 +16,7 @@
 //   none   → solid white
 module top (
     input  wire       clk_ext,
-    input  wire [4:0] btn,
-    input  wire [1:0] btn_mecha,        // [0]=grey (aspect cycle), [1]=rst
+    input  wire [6:0] btn,              // [5]=grey (aspect cycle), [6]=rst
     output wire [7:0] led,
     inout  wire [7:0] interconnect,
     inout  wire [7:0] pmod_j1,
@@ -47,8 +46,8 @@ module top (
 
     wire unused_clk_ext = clk_ext;
 
-    // ---- Reset (btn_mecha[1] held LOW; sync + counter; gated by PLL lock) ----
-    wire reset_button = ~btn_mecha[1];
+    // ---- Reset (btn[6] held LOW; sync + counter; gated by PLL lock) ----
+    wire reset_button = ~btn[6];
     reg  [1:0] reset_sync = 2'b11;
     reg  [7:0] reset_counter = 0;
     wire reset_request = reset_sync[1];
@@ -66,13 +65,13 @@ module top (
     wire [4:0] btn_press;
     wire       grey_press;
     btn_debounce #(.WIDTH(5), .STABLE_CYCLES(4096)) u_deb (
-        .clk(sys_clk), .resetn(resetn), .btn_n(btn), .btn_press(btn_press)
+        .clk(sys_clk), .resetn(resetn), .btn_n(btn[4:0]), .btn_press(btn_press)
     );
     btn_debounce #(.WIDTH(1), .STABLE_CYCLES(4096)) u_grey (
-        .clk(sys_clk), .resetn(resetn), .btn_n(btn_mecha[0]), .btn_press(grey_press)
+        .clk(sys_clk), .resetn(resetn), .btn_n(btn[5]), .btn_press(grey_press)
     );
 
-    // ---- Aspect mode cycle on btn_mecha[0] press edge ----
+    // ---- Aspect mode cycle on btn[5] press edge ----
     // Detect rising edge of `grey_press` (debounced press signal).
     reg  grey_press_d;
     always @(posedge sys_clk) grey_press_d <= grey_press;

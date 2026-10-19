@@ -32,7 +32,7 @@ $(SIM_DIR):
 	mkdir -p $@
 
 sim_init: | $(SIM_DIR)
-	iverilog -o $(SIM_DIR)/sim_init.vvp -I src tb/tb_oled_init.v src/oled_init.v
+	iverilog -o $(SIM_DIR)/sim_init.vvp -I src tb/tb_oled_init.v src/oled_init.v src/simple_spi_master.v
 	cd tb && vvp build/sim_init.vvp
 
 sim_stream: | $(SIM_DIR)
@@ -41,12 +41,7 @@ sim_stream: | $(SIM_DIR)
 
 # sim_top runs vvp from project root so top.v's $readmemh("stonks.mem") resolves.
 sim_top: | $(SIM_DIR)
-	iverilog -o $(SIM_DIR)/sim_top.vvp -I src \
-		tb/tb_top.v \
-		src/top.v \
-		src/oled_init.v \
-		src/oled_stream.v \
-		src/btn_debounce.v
+	iverilog -o $(SIM_DIR)/sim_top.vvp -I src tb/tb_top.v $(RTL_ORDER)
 	vvp $(SIM_DIR)/sim_top.vvp
 
 sim: sim_init sim_stream sim_top

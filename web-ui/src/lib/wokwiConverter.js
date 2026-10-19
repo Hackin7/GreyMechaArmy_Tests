@@ -550,7 +550,6 @@ function convertTinyTapeoutDiagram(diagram, clockHz) {
 
   const clockUsed = [...activeRoots].some((root) => drivers.get(root)?.[0]?.kind === 'clock');
   const resetUsed = [...activeRoots].some((root) => drivers.get(root)?.[0]?.kind === 'reset');
-  const mechaUsed = [...activeRoots].some((root) => drivers.get(root)?.[0]?.kind === 'mecha-button');
   if (clockUsed) {
     const generators = [...parts.values()].filter((part) => part.type === 'wokwi-clock-generator');
     if (generators.length !== 1) report('Badge clock logic requires exactly one Wokwi clock generator in the template.');
@@ -564,7 +563,7 @@ function convertTinyTapeoutDiagram(diagram, clockHz) {
   const flopName = new Map(flops.map((flop, index) => [flop.id, `q_${index}`]));
   const lines = [
     '// Generated from a Tiny Tapeout Wokwi diagram.',
-    `module top(input [4:0] btn, ${mechaUsed ? 'input [1:0] btn_mecha, ' : ''}${resetUsed ? 'input [7:0] pmod_j1, ' : ''}output [7:0] led);`,
+    `module top(input [6:0] btn, ${resetUsed ? 'input [7:0] pmod_j1, ' : ''}output [7:0] led);`,
     ...roots.map((root) => `  wire ${names.get(root)};`)
   ];
   if (clockUsed) {
@@ -590,7 +589,7 @@ function convertTinyTapeoutDiagram(diagram, clockHz) {
     if (!source) continue;
     const target = names.get(root);
     if (source.kind === 'button') lines.push(`  // ${inputBlock.id}:IN${source.value} -> pressed badge button`, `  assign ${target} = ~btn[${source.value}];`);
-    if (source.kind === 'mecha-button') lines.push(`  // ${inputBlock.id}:IN${source.value} -> pressed Mecha button`, `  assign ${target} = ~btn_mecha[${source.value - 5}];`);
+    if (source.kind === 'mecha-button') lines.push(`  // ${inputBlock.id}:IN${source.value} -> pressed Mecha button`, `  assign ${target} = ~btn[${source.value}];`);
     if (source.kind === 'ignored-input') lines.push(`  assign ${target} = 1'b0; // ignored IN${source.value}`);
     if (source.kind === 'constant') lines.push(`  assign ${target} = 1'b${source.value};`);
     if (source.kind === 'clock') lines.push(`  assign ${target} = board_clk;`);
