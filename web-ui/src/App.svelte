@@ -3,7 +3,7 @@
     import { uploadToDevice, rebootDevice } from './lib/filesystem.js';
     import NetlistView from './lib/NetlistView.svelte';
     import WokwiImport from './lib/WokwiImport.svelte';
-    import { oledModules, oledDemo } from './lib/oledPreset.js';
+    import { oledModules, oledSimple, oledDemo } from './lib/oledPreset.js';
     import { addWorkspaceFiles, removeWorkspaceFile } from './lib/workspaceFiles.js';
     import { onMount, onDestroy, afterUpdate } from 'svelte';
     import { basicSetup, EditorView } from 'codemirror';
@@ -135,9 +135,9 @@
         sourceRevision += 1;
     }
 
-    function loadOledDemo() {
+    function loadOledPreset(preset) {
         if (isSynthesizing || isAddingFiles) return;
-        files.set({ ...oledDemo });
+        files.set({ ...preset });
         activeFile.set('top.v');
         sourceRevision += 1;
         otherError = '';
@@ -449,10 +449,11 @@
                 <div class:panel-hidden={activePanel !== 'other'} class="panel-layer other-panel" aria-hidden={activePanel !== 'other'}>
                     <section>
                         <h2>OLED presets</h2>
-                        <p>Add the supporting modules to the current design, or load the complete OLED demo as the current design.</p>
+                        <p>Add modules to your design, or replace it with an OLED starter. OLED displays solid green; OLED (Advanced) includes an image, color buttons, and aspect modes.</p>
                         <div class="other-actions">
                             <button on:click={addOledModules} disabled={isSynthesizing || isAddingFiles}>Add OLED Modules</button>
-                            <button on:click={loadOledDemo} disabled={isSynthesizing || isAddingFiles}>Load OLED Demo</button>
+                            <button on:click={() => loadOledPreset(oledSimple)} disabled={isSynthesizing || isAddingFiles}>Load OLED</button>
+                            <button on:click={() => loadOledPreset(oledDemo)} disabled={isSynthesizing || isAddingFiles}>Load OLED (Advanced)</button>
                         </div>
                         {#if otherError}<p class="file-error" role="alert">{otherError}</p>{/if}
                     </section>

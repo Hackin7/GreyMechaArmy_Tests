@@ -24,6 +24,19 @@ assert.match(demo['pinout.lpf'], /LOCATE COMP "btn\[6\]" SITE "C12";/);
 assert.match(demo['top.v'], /input\s+wire\s+\[6:0\] btn/);
 assert.doesNotMatch(demo['top.v'], /btn_mecha/);
 
+const simple = {
+  'top.v': await readFile(new URL('../src/lib/presets/oled-simple/top.v', import.meta.url), 'utf8'),
+  ...Object.fromEntries(modules
+    .filter((name) => !['btn_debounce.v', 'image_stretch.v'].includes(name))
+    .map((name) => [name, demo[name]])),
+  'pinout.lpf': demo['pinout.lpf']
+};
+assert.equal(Object.keys(simple).length, 8);
+assert.match(simple['top.v'], /input\s+wire\s+\[6:0\] btn/);
+assert.match(simple['top.v'], /assign pixel_data = 16'h07E0;/);
+assert.match(simple['top.v'], /wire \[15:0\] pixel_index;/);
+assert.doesNotMatch(simple['top.v'], /aspect_idx|\$readmem|image_stretch|btn_debounce/);
+
 const initial = get(files);
 const added = addWorkspaceFiles(initial, modules.map((name) => [name, demo[name]]));
 assert.deepEqual(added.errors, []);
@@ -45,6 +58,7 @@ try {
   console.log = console.info = console.warn = () => {};
   await self.onmessage({ data: { type: 'SYNTHESIZE', runId: 87, files: added.files } });
   await self.onmessage({ data: { type: 'SYNTHESIZE', runId: 88, files: demo } });
+  await self.onmessage({ data: { type: 'SYNTHESIZE', runId: 89, files: simple } });
 } finally {
   Object.assign(console, originalConsole);
 }
@@ -53,10 +67,10 @@ if (error) {
   const logs = messages.filter((message) => message.runId === error.runId && message.type === 'LOG').map((message) => message.message).join('\n');
   throw new Error(`${error.stage}: ${error.error}\n${logs.slice(-6000)}`);
 }
-for (const runId of [87, 88]) {
+for (const runId of [87, 88, 89]) {
   for (const type of ['MAPPED_READY', 'LOGICAL_READY', 'ROUTED_READY', 'DONE']) {
     assert.ok(messages.some((message) => message.runId === runId && message.type === type), `Build ${runId} missing ${type}`);
   }
+  assert.ok(messages.find((message) => message.runId === runId && message.type === 'DONE').bitstream.byteLength > 0);
 }
-assert.ok(messages.find((message) => message.runId === 88 && message.type === 'DONE').bitstream.byteLength > 0);
-console.log('OLED preset files match source; modules-only and complete demo built through Yosys, nextpnr, ecppack.');
+console.log('OLED snapshot matches source; modules-only, OLED, and OLED (Advanced) built through Yosys, nextpnr, ecppack.');

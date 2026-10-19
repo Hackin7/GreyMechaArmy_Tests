@@ -4,7 +4,7 @@ import { defaultPinout } from './defaultPinout.js';
 export const files = writable({
   'top.v': `module top(
 	input clk_ext,
-	input [4:0] btn,
+        input [6:0] btn,
 	output [7:0] led,
 	inout [7:0] interconnect,
 	inout [7:0] pmod_j1,

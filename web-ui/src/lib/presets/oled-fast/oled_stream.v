@@ -23,6 +23,7 @@ module oled_stream (
     reg        streaming;
     reg        phase;        // 0 = SCLK currently low, 1 = SCLK currently high
     reg        done_latched; // prevents spurious frame restart before sequencer drops enable
+    reg [15:0] current_pixel; // pixel being shifted; pixel_index already prefetches the next one
 
     always @(posedge clk) begin
         frame_done <= 1'b0;
@@ -38,6 +39,7 @@ module oled_stream (
             cs           <= 1'b1;
             dc           <= 1'b1;
             done_latched <= 1'b0;
+            current_pixel <= 16'd0;
         end else if (!streaming && !done_latched) begin
             // First cycle after enable rising. Load pixel 0 (already valid in
             // pixel_data via BRAM+mux from idle), set MSB on MOSI, SCLK starts
@@ -51,6 +53,7 @@ module oled_stream (
             phase       <= 1'b0;
             streaming   <= 1'b1;
             pixel_index <= 16'd0;
+            current_pixel <= 16'd0;
         end else if (streaming) begin
             if (phase == 1'b0) begin
                 // SCLK low → high (rising edge: slave samples current MOSI bit).
@@ -66,13 +69,13 @@ module oled_stream (
                     bit_cnt <= 4'd15;
                     shift   <= pixel_data;
                     mosi    <= pixel_data[15];
-                    if (pixel_index == LAST_PIX) begin
+                    if (current_pixel == LAST_PIX) begin
                         streaming    <= 1'b0;
                         cs           <= 1'b1;
                         sclk         <= 1'b0;
                         frame_done   <= 1'b1;
                         done_latched <= 1'b1;
-                    end
+                    end else current_pixel <= current_pixel + 16'd1;
                 end else begin
                     shift   <= {shift[14:0], 1'b0};
                     mosi    <= shift[14];
