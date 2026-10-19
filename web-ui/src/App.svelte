@@ -3,6 +3,7 @@
     import { uploadToDevice, rebootDevice } from './lib/filesystem.js';
     import NetlistView from './lib/NetlistView.svelte';
     import WokwiImport from './lib/WokwiImport.svelte';
+    import Simulator from './lib/Simulator.svelte';
     import { oledModules, oledSimple, oledDemo } from './lib/oledPreset.js';
     import { addWorkspaceFiles, removeWorkspaceFile } from './lib/workspaceFiles.js';
     import { onMount, onDestroy, afterUpdate } from 'svelte';
@@ -436,10 +437,14 @@
                 <button class:active={activePanel === 'mapped'} disabled={!$buildArtifacts.mappedJson} on:click={() => (activePanel = 'mapped')}>Mapped ECP5</button>
                 <button class:active={activePanel === 'pandr'} disabled={!$buildArtifacts.placementJson || !$buildArtifacts.reportJson} on:click={() => (activePanel = 'pandr')}>P&amp;R Export</button>
                 <button class:active={activePanel === 'wokwi'} on:click={() => (activePanel = 'wokwi')}>Wokwi Import</button>
+                <button class:active={activePanel === 'simulator'} on:click={() => { activePanel = 'simulator'; panelSize = Math.max(panelSize, 65); }}>Simulator</button>
                 <button class:active={activePanel === 'other'} on:click={() => (activePanel = 'other')}>Other</button>
                 {#if buildIsOutdated}<span class="outdated-label">Outdated</span>{/if}
             </nav>
             <div class="panel-content">
+                <div class:panel-hidden={activePanel !== 'simulator'} class="panel-layer" aria-hidden={activePanel !== 'simulator'}>
+                    <Simulator files={$files} {sourceRevision} {isSynthesizing} active={activePanel === 'simulator'} />
+                </div>
                 <div class:panel-hidden={activePanel !== 'terminal'} class="panel-layer terminal" bind:this={terminalContainer} aria-hidden={activePanel !== 'terminal'}>
                     <pre>{$terminalLogs}</pre>
                 </div>

@@ -1,0 +1,45 @@
+name: GreyMecha simulator checks
+
+on:
+  push:
+    branches: [feature/greymecha-fpga-simulator]
+  pull_request:
+    paths: ['web-ui/**', '.github/workflows/simulator.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web-ui
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y iverilog
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build -- --base=/GreyMechaArmy_Tests/
+      - run: npm run verify:simulator
+      - run: npm run verify:toolchain
+      - run: npm run verify:wokwi
+      - run: npm run verify:tinytapeout
+      - run: npm run verify:oled-preset
+      - run: npm run test:simulator:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: greymecha-simulator-preview-${{ github.sha }}
+          retention-days: 7
+          path: |
+            web-ui/dist
+            web-ui/playwright-report
+            web-ui/test-results

@@ -13,10 +13,15 @@
     "verify:wokwi": "node scripts/verify-wokwi.mjs",
     "verify:tinytapeout": "node scripts/verify-tinytapeout.mjs",
     "sync:oled-preset": "node scripts/sync-oled-preset.mjs",
-    "verify:oled-preset": "node scripts/verify-oled-preset.mjs"
+    "verify:oled-preset": "node scripts/verify-oled-preset.mjs",
+    "sync:simulator": "node scripts/sync-simulator-vendor.mjs",
+    "verify:simulator": "node scripts/verify-simulator.mjs",
+    "test:simulator:browser": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "esbuild": "0.28.2",
     "svelte": "^5.55.4",
     "vite": "^8.0.10"
   },
