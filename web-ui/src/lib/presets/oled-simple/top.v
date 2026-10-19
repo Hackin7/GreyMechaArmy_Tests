@@ -40,11 +40,13 @@ module top (
             reset_counter <= reset_counter + 1;
     end
 
-    // RGB565: 5 red bits, 6 green bits, 5 blue bits. 16'h07E0 is green.
+    // RGB565: 5 red bits, 6 green bits, 5 blue bits.
     // pixel_index is the current linear pixel address (0..57599).
     wire [15:0] pixel_index;
-    wire [15:0] pixel_data;
-    assign pixel_data = 16'h07E0;
+    reg [15:0] pixel_data;
+    always @(*) begin
+        pixel_data = {5'b00000, 6'b11111, 5'b00000};
+    end
 
     wire init_done, streaming;
     oled_gc9a01 #(

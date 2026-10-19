@@ -33,7 +33,8 @@ const simple = {
 };
 assert.equal(Object.keys(simple).length, 8);
 assert.match(simple['top.v'], /input\s+wire\s+\[6:0\] btn/);
-assert.match(simple['top.v'], /assign pixel_data = 16'h07E0;/);
+assert.match(simple['top.v'], /reg \[15:0\] pixel_data;/);
+assert.match(simple['top.v'], /always @\(\*\) begin\s+pixel_data = \{5'b00000, 6'b11111, 5'b00000\};\s+end/);
 assert.match(simple['top.v'], /wire \[15:0\] pixel_index;/);
 assert.doesNotMatch(simple['top.v'], /aspect_idx|\$readmem|image_stretch|btn_debounce/);
 
