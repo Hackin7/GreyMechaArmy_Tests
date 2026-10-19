@@ -7,7 +7,9 @@ module ov7670_config #(
     parameter integer RESET_CYCLES=CLK_HZ/200,
     parameter integer SETTLE_CYCLES=CLK_HZ/50,
     parameter integer BAR_CYCLES=CLK_HZ*2,
-    parameter integer HOLD_COLOR_BARS=0
+    parameter integer HOLD_COLOR_BARS=0,
+    // 0: working bring-up, 1: divider removed, 2: divider removed + PLL x4.
+    parameter integer TIMING_PROFILE=0
 )(
     input wire clk, resetn, sda_in,
     output wire scl_low, sda_low,
@@ -18,11 +20,11 @@ module ov7670_config #(
     output reg [7:0] last_register, last_result,
     output reg [3:0] last_nacks
 );
-    localparam TABLE_LEN=74;
+    localparam TABLE_LEN=87;
     function [15:0] setting(input [6:0] index);
         case(index)
-            0: setting=16'h1101; // CLKRC /2, conservative PCLK
-            1: setting=16'h6b0a; // bypass internal PLL
+            0: setting=TIMING_PROFILE==0 ? 16'h1101 : 16'h1100;
+            1: setting=TIMING_PROFILE==2 ? 16'h6b4a : 16'h6b0a;
             2: setting=16'h1204; // RGB, full VGA window before DCW
             3: setting=16'h0c04; // enable DCW
             4: setting=16'h3e1a; // manual scaling, PCLK /4
@@ -43,12 +45,14 @@ module ov7670_config #(
             19: setting=16'h3dc0; // COM13 gamma + UV saturation
             20: setting=16'h8c00; // disable RGB444
             21: setting=16'h1418; // AGC ceiling
-            22: setting=16'h4f80; // RGB colour matrix
-            23: setting=16'h5080;
+            // Linux ov7670_fmt_rgb565 coefficients. The common 80/80/00/
+            // 22/5e/80 table is for YUV; test bars do not validate this stage.
+            22: setting=16'h4fb3;
+            23: setting=16'h50b3;
             24: setting=16'h5100;
-            25: setting=16'h5222;
-            26: setting=16'h535e;
-            27: setting=16'h5480;
+            25: setting=16'h523d;
+            26: setting=16'h53a7;
+            27: setting=16'h54e4;
             28: setting=16'h589e;
             29: setting=16'h7a20; // gamma curve
             30: setting=16'h7b10;
@@ -89,12 +93,27 @@ module ov7670_config #(
             65: setting=16'h4658;
             66: setting=16'h4728;
             67: setting=16'h483a;
-            68: setting=16'h6a40;
-            69: setting=16'h0100; // blue gain (AWB will update)
-            70: setting=16'h0200; // red gain
-            71: setting=16'h4108; // COM16 AWB gain
-            72: setting=16'h13e7; // enable AEC/AGC/AWB
-            73: setting=16'h4208; // COM17 sensor colour bars
+            // Complete the OmniVision/Linux AWB setup before enabling it.
+            // Zero red/blue gains can leave live images dominated by green.
+            68: setting=16'h5988;
+            69: setting=16'h5a88;
+            70: setting=16'h5b44;
+            71: setting=16'h5c67;
+            72: setting=16'h5d49;
+            73: setting=16'h5e0e;
+            74: setting=16'h6c0a;
+            75: setting=16'h6d55;
+            76: setting=16'h6e11;
+            77: setting=16'h6f9f;
+            78: setting=16'hb084; // OmniVision reserved color-processing default
+            79: setting=16'h6a40;
+            80: setting=16'h0140; // initial blue gain; AWB may update
+            81: setting=16'h0260; // initial red gain
+            82: setting=16'h4108; // COM16 AWB gain
+            83: setting=16'h13e7; // enable AEC/AGC/AWB
+            84: setting=16'h3b12; // COM11: AEC + auto banding, night mode OFF
+            85: setting=TIMING_PROFILE==0 ? 16'h1101 : 16'h1100; // reapply after RGB setup
+            86: setting=16'h4208; // COM17 sensor colour bars
             default: setting=16'h4200;
         endcase
     endfunction

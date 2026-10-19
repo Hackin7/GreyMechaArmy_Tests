@@ -102,11 +102,16 @@ module oled_init #(
     reg [23:0] rom_pause_r;
     reg        rom_pause_nz_r;     // pre-registered (rom_pause_r != 0) to break the wide compare out of the critical path
     reg        pause_cnt_nz_r;     // same for the in-pause decrement check
+    // Evaluate decode only when its address changes (also keeps long SPI
+    // simulations from repeatedly evaluating the explicit logic ROM).
+    wire [7:0] rom_byte_decoded=gc9a01_init_byte(init_idx);
+    wire rom_dc_decoded=gc9a01_init_is_data(init_idx);
+    wire [23:0] rom_pause_decoded=gc9a01_init_pause(init_idx);
     always @(posedge clk) begin
-        rom_byte_r     <= gc9a01_init_byte(init_idx);
-        rom_dc_r       <= gc9a01_init_is_data(init_idx);
-        rom_pause_r    <= gc9a01_init_pause(init_idx);
-        rom_pause_nz_r <= (gc9a01_init_pause(init_idx) != 24'd0);
+        rom_byte_r     <= rom_byte_decoded;
+        rom_dc_r       <= rom_dc_decoded;
+        rom_pause_r    <= rom_pause_decoded;
+        rom_pause_nz_r <= (rom_pause_decoded != 24'd0);
         pause_cnt_nz_r <= (pause_cnt != 24'd0);
     end
 

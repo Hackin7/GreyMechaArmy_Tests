@@ -1,6 +1,7 @@
 module top #(
     parameter integer HOLD_COLOR_BARS=0,
-    parameter integer PANEL_SWAP_RB=0
+    parameter integer PANEL_SWAP_RB=1,
+    parameter integer TIMING_PROFILE=2
 )(
     input wire [4:0] btn,
     input wire btn_grey_n, btn_rst_n,
@@ -58,45 +59,57 @@ module top #(
         .clk(clk),.resetn(resetn),.enable(scan_enable),.sda_in(cam_siod),
         .scl_low(scan_scl_low),.sda_low(scan_sda_low),.complete(scan_complete),
         .address(scan_address),.first_ack(scan_first),.ack_count(scan_count));
-    ov7670_config #(.CLK_HZ(CLK_HZ),.HOLD_COLOR_BARS(HOLD_COLOR_BARS)) config_sensor(
+    ov7670_config #(.CLK_HZ(CLK_HZ),.HOLD_COLOR_BARS(HOLD_COLOR_BARS),.TIMING_PROFILE(TIMING_PROFILE)) config_sensor(
         .clk(clk),.resetn(resetn),.sda_in(cam_siod),.scl_low(scl_low),
         .sda_low(sda_low),.sensor_reset_n(cam_reset_n),.configured(configured),
         .live(live),.error_code(config_error),.product_id(product_id),.version(version),
         .last_register(last_register),.last_result(last_result),.last_nacks(last_nacks));
 
-    wire request_toggle, ack_toggle, write_enable, write_bank, malformed;
-    wire [14:0] write_address, read_address;
-    wire [15:0] write_data, read_data;
-    camera_capture capture(
-        .pclk(cam_pclk),.resetn(pclk_reset_sync[2]),.configured(configured),
-        .data(cam_data),.href(cam_href),.vsync(cam_vsync),.ack_toggle(ack_toggle),
-        .request_toggle(request_toggle),.write_enable(write_enable),
-        .write_bank(write_bank),.write_address(write_address),
-        .write_data(write_data),.malformed(malformed));
-    wire frame_boundary, frame_valid, frame_accepted;
-    camera_framebuffer framebuffer(
-        .pclk(cam_pclk),.write_enable(write_enable),.write_bank(write_bank),
-        .write_address(write_address),.write_data(write_data),.clk(clk),
-        .resetn(resetn),.request_toggle(request_toggle),.frame_boundary(frame_boundary),
-        .read_address(read_address),.read_data(read_data),.ack_toggle(ack_toggle),
-        .valid(frame_valid),.frame_accepted(frame_accepted));
+    wire [2:0] ready_toggle,release_toggle;
+    wire write_enable,malformed;
+    wire [1:0] write_bank,read_bank;
+    wire [14:0] write_address,read_address;
+    wire [15:0] write_data,read_data;
+    wire [31:0] valid_pclk,malformed_pclk,dropped_pclk;
+    wire [31:0] valid_frames,malformed_frames,dropped_frames,replaced_frames;
+    camera_capture3 capture(.pclk(cam_pclk),.resetn(pclk_reset_sync[2]),
+        .configured(configured),.data(cam_data),.href(cam_href),.vsync(cam_vsync),
+        .release_toggle(release_toggle),.ready_toggle(ready_toggle),
+        .write_enable(write_enable),.write_bank(write_bank),.write_address(write_address),
+        .write_data(write_data),.malformed(malformed),.valid_frames(valid_pclk),
+        .malformed_frames(malformed_pclk),.dropped_frames(dropped_pclk));
+    camera_counter_sync valid_counter(.source_clk(cam_pclk),.source_resetn(pclk_reset_sync[2]),
+        .clk(clk),.resetn(resetn),.binary(valid_pclk),.value(valid_frames));
+    camera_counter_sync malformed_counter(.source_clk(cam_pclk),.source_resetn(pclk_reset_sync[2]),
+        .clk(clk),.resetn(resetn),.binary(malformed_pclk),.value(malformed_frames));
+    camera_counter_sync dropped_counter(.source_clk(cam_pclk),.source_resetn(pclk_reset_sync[2]),
+        .clk(clk),.resetn(resetn),.binary(dropped_pclk),.value(dropped_frames));
+    wire frame_boundary,frame_start,frame_valid,frame_accepted,pending_valid,display_busy;
+    camera_queue3 ownership(.clk(clk),.resetn(resetn),.ready_toggle(ready_toggle),
+        .display_start(frame_start),.display_done(frame_boundary),
+        .release_toggle(release_toggle),.pending_valid(pending_valid),
+        .display_busy(display_busy),.read_bank(read_bank),.valid(frame_valid),
+        .frame_accepted(frame_accepted),.replaced_frames(replaced_frames));
+    camera_ram3 framebuffer(.pclk(cam_pclk),.write_enable(write_enable),
+        .write_bank(write_bank),.write_address(write_address),.write_data(write_data),
+        .clk(clk),.read_bank(read_bank),.read_address(read_address),.read_data(read_data));
     wire enabled;
     wire [6:0] offset;
     camera_controls #(.DEBOUNCE_CYCLES(CLK_HZ/50)) controls(
-        .clk(clk),.resetn(resetn),.frame_boundary(frame_boundary),
+        .clk(clk),.resetn(resetn),.frame_boundary(frame_start),
         .buttons_n({btn[4],btn[0],btn_grey_n}),.enabled(enabled),.offset(offset));
-    wire [15:0] pixel_index, pixel_data;
-    camera_viewport viewport(
-        .clk(clk),.resetn(resetn),.pixel_index(pixel_index),.ram_data(read_data),
-        .frame_valid(frame_valid),.enabled(enabled),.offset(offset),
-        .ram_address(read_address),.pixel_data(pixel_data));
+    wire [15:0] pixel_index,corrected;
+    reg [15:0] pixel_data;
+    assign read_address=pixel_index[14:0];
+    rgb_offset correction(.pixel(read_data),.enabled(enabled),.offset(offset),.corrected(corrected));
+    always @(posedge clk) pixel_data<=corrected;
     wire display_ready, streaming;
-    oled_gc9a01 #(.CLK_HZ(CLK_HZ),.SWAP_RB(PANEL_SWAP_RB)) display(
-        .clk(clk),.resetn(resetn),.pixel_index(pixel_index),.pixel_data(pixel_data),
+    camera_panel #(.CLK_HZ(CLK_HZ),.SWAP_RB(PANEL_SWAP_RB)) display(
+        .clk(clk),.resetn(resetn),.frame_available(pending_valid && !display_busy),
+        .pixel_index(pixel_index),.pixel_data(pixel_data),.frame_start(frame_start),
         .oled_scl(oled_scl),.oled_sda(oled_sda),.oled_dc(oled_dc),
         .oled_cs(oled_cs),.oled_rst(oled_rst),.init_done(display_ready),
-        .streaming(streaming),.frame_boundary(frame_boundary));
-
+        .streaming(streaming),.frame_done(frame_boundary));
     (* async_reg = "true" *) reg [1:0] malformed_sync;
     reg [26:0] idle_cycles;
     wire active_camera=frame_valid && idle_cycles<CLK_HZ;
@@ -145,7 +158,14 @@ module top #(
     camera_pin_monitor all_inputs(.clk(clk),.resetn(resetn),
         .pins({cam_siod,cam_data,cam_href,cam_vsync,cam_pclk}),
         .counts(pin_counts),.levels(pin_levels),.changed(pin_changed));
-    camera_debug #(.STATUS_BITS(512)) debug_port(.clk(clk),.resetn(resetn),.sck(debug_sck),
+    wire [255:0] rate_status={32'h46505331,32'd0 | TIMING_PROFILE,valid_frames,
+        malformed_frames,dropped_frames,replaced_frames,accepted_frames,displayed_frames};
+    wire [127:0] color_samples;
+    camera_color_probe color_probe(.pclk(cam_pclk),.presetn(pclk_reset_sync[2]),
+        .clk(clk),.resetn(resetn),.write_enable(write_enable),
+        .write_address(write_address),.write_data(write_data),
+        .frame_toggle(valid_pclk[0]),.samples(color_samples));
+    camera_debug #(.STATUS_BITS(928)) debug_port(.clk(clk),.resetn(resetn),.sck(debug_sck),
         .cs_n(debug_cs_n),.status({debug_status,32'h50494e31,4'd0,pin_levels,
-        4'd0,pin_changed,pin_counts}),.miso(debug_miso));
+        4'd0,pin_changed,pin_counts,rate_status,32'h434f4c31,color_samples}),.miso(debug_miso));
 endmodule

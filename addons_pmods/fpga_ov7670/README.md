@@ -143,54 +143,74 @@ in simulation/debug; the board LED combines initialization failures.
 ## Pixel and clock behavior
 
 ```text
-OV7670 -> PCLK capture -> two RGB565 block-RAM banks -> viewport
-       -> RGB offset / bypass -> GC9A01 SPI
-              Grey / left / right -> frame-latched settings
+OV7670 -> PCLK capture -> three RGB565 buffers -> image-only GC9A01 SPI
+              Grey / left / right -> frame-latched RGB offset correction
 ```
 
-SCCB uses 7-bit device address 0x21 (wire bytes 0x42/0x43), STOP-separated
-register reads and a final master NACK. Boot resets and identifies the sensor,
-programs a 640x480 window downsampled by four in each dimension, and enables
-RGB565 with the high byte first. It enables sensor color bars for two nominal
-seconds, then clears COM17's test-pattern bit for live video.
+The default build targets approximately 30 distinct images/s; it is not a
+hardware-qualified frame-rate guarantee. Select a timing profile explicitly:
 
-D0..D7, HREF and VSYNC are sampled together on rising PCLK, using the sensor's
-default polarity; they are not independently synchronized. Exact 320-byte
-lines and 120-line frames are required. Odd/truncated/long lines and extra or
-missing rows are rejected at VSYNC; capture resumes on a new frame boundary.
+| `TIMING_PROFILE` | CLKRC (0x11) | DBLV (0x6b) | Purpose |
+| --- | --- | --- | --- |
+| 0 | 0x01, divide by 2 | 0x0a, bypass | Previously working sensor timing |
+| 1 | 0x00, divide by 1 | 0x0a, bypass | Intermediate clock qualification |
+| 2 (default) | 0x00, divide by 1 | 0x4a, PLL x4 | Approximately 30 FPS candidate |
 
-Two banks hold 76,800 image bytes. A completed bank stays immutable until
-the display acknowledges its request between LCD frames. Capture then writes
-the old display bank, starting at a later camera frame boundary. If the
-display cannot accept a frame, incoming frames are skipped, never partially
-overwritten. Cross-domain handshakes have two synchronization stages;
-reset asserts asynchronously and releases synchronously in each clock domain.
-Before the first complete frame, scanout shows red/green/blue/white test bars
-inside the viewport. These are FPGA-generated diagnostic bars, not camera
-video. A complete camera frame replaces them automatically.
+Example: `make bit TIMING_PROFILE=1 BUILD=build/profile1`. The Makefile tracks
+profile changes. CLKRC is reapplied after RGB setup. COM11 is explicitly 0x12:
+AEC and automatic banding remain enabled, but night-mode frame-length extension
+is disabled. AEC, AGC, AWB and the normal internal RGB processing remain on.
+Limited exposure time can make dim scenes darker or noisier. Register definitions
+were checked against the [Linux OV7670 driver](https://github.com/torvalds/linux/blob/master/drivers/media/i2c/ov7670.c)
+(DBLV_BYPASS/DBLV_X4, CLKRC and COM11_NIGHT).
 
-The viewport uses counters with the streamer's sequential pixel requests.
-Its counter, three-stage RAM read and correction stages fit within the streamer's
-six-clock prefetch interval. The local streamer fixes a copied-demo endpoint
-bug: completion tracks the transmitted last pixel rather than its look-ahead
-address. It always transmits all 57,600 panel pixels, including black borders.
+System clock and panel SPI remain nominally 50 and 25 MHz. XCLK remains the
+working divide-by-four output, approximately 12.9 MHz in the nextpnr oscillator
+model. Internal oscillator tolerance affects all clocks and timers. PCLK has its
+own conservative 12.5 MHz timing constraint. External camera data setup/hold,
+clock duty cycle and wire signal integrity still need hardware verification;
+internal Fmax checks alone do not establish input timing.
 
-Correction expands each RGB565 channel through bit replication, subtracts
-the shared 8-bit-domain offset with a floor of zero, and quantizes back to
-RGB565. Bypass preserves every original bit. Offset 0 with correction enabled
-also preserves every original pixel.
+Boot resets the sensor, verifies PID 0x76 / VER 0x73 at SCCB address 0x21,
+programs RGB565 QQVGA, displays sensor color bars for two nominal seconds,
+then switches to live video. Exact 320-byte lines and 120-line frames are
+required. Malformed frames are discarded without publishing partial images.
 
-The bring-up build uses a nominal 50 MHz system clock (51.669 MHz in the
-nextpnr oscillator model) and nominal 25 MHz panel SPI. Camera XCLK remains
-nominally 12.5 MHz using a divide-by-four counter. Internal oscillator
-tolerance affects real clocks and timers.
-PCLK is constrained independently at a conservative 12.5 MHz, above the
-configured divided camera clock rate. Hardware acceptance must also check
-camera data setup/hold at the FPGA inputs, XCLK duty/voltage, actual PCLK and
-wire signal integrity: internal place-and-route clock checks alone do not
-prove the external camera timing. The default panel color swap is disabled;
-if measured red/blue bars are reversed after checking sensor byte/data order,
-rebuild with `PANEL_SWAP_RB=1`.
+Live color processing uses the Linux OV7670 RGB565 matrix and reference AWB
+setup, including nonzero initial red/blue gains. Sensor-generated bars bypass
+parts of live processing: validate actual red, green and blue objects as well
+as bars after changing this configuration. Final panel transport exchanges
+red/blue fields to match this panel's observed bar order; RAM and ISP use RGB.
+
+Three images contain 115,200 bytes. Buffers use 19 + 19 + 18 block-RAM blocks;
+the third buffer's last 768 pixels (1,536 bytes) use distributed RAM. The
+initialization ROM is decoded in logic, reserving all 56 block-RAM blocks for
+images. Each bank has independent completion/release toggles, synchronized in
+the receiving clock domain. Capture cannot reuse a bank until it is released.
+The display keeps its bank until the final SPI pixel finishes. A newer complete
+pending image replaces an older pending image; it never replaces the image
+being transmitted. If all banks are occupied, complete incoming frames are
+counted as dropped without writing occupied memory.
+
+The display clears all 240x240 pixels to black once. It then programs columns
+40..199 and rows 60..179, and sends 19,200 pixels only when a new image is ready.
+Each image takes approximately 12 ms at the modeled SPI clock. Borders and the
+last complete image remain in the panel's GRAM when capture stops. Before the
+first image the panel stays black. Legacy full-screen/fallback-bar modules remain
+for regression tests; the top-level uses the image-only path.
+
+The badge panel's observed channel order requires `PANEL_SWAP_RB=1` (now the
+default). Raw camera buffers and ISP arithmetic remain RGB565. Only the final
+panel transport exchanges the five-bit red and blue fields; green stays intact.
+With the correction disabled, sensor bars appeared gray/cyan/yellow/green/
+magenta/blue/red/dark gray. A passive PIO capture confirmed the camera words
+arrive unchanged at the panel connector, identifying a panel red/blue reversal.
+Use `PANEL_SWAP_RB=0` only for a panel verified to accept the unswapped order.
+RAM reads have three clock stages. A registered correction stage fits within
+the streamer's six-clock prefetch. Correction settings commit at image-transfer
+start, and remain constant through that image. RGB565 channels expand through
+bit replication, subtract the shared offset with saturation at zero, then
+quantize back to RGB565. Bypass preserves the original pixel exactly.
 
 ## Verification and hardware acceptance
 
@@ -223,14 +243,16 @@ Hardware checks still require the actual badge and module:
    display frames per second, malformed frames and visible tearing/artifacts.
 
 No hardware frame rate is promised. Display scanout, sensor exposure timing,
-and the two-bank handoff all affect fresh-frame rate. Use a logic analyzer
+and buffer availability all affect fresh-frame rate. Use a logic analyzer
 on VSYNC/HREF/PCLK and panel CS/SCLK to distinguish camera and display rates.
 See [VALIDATION.md](VALIDATION.md) for the checks actually run.
 
 ## USB diagnostics
 
 The read-only diagnostic SPI port uses RP2350 GP8 as clock, GP10 as MISO,
-and GP11 as CS. Each selection snapshots 32 bytes beginning with `CAM2`.
+and GP11 as CS. Each selection snapshots 116 bytes beginning with `CAM2`.
+The original prefix and the `PIN1`/`FPS1` extensions are preserved. Bytes
+96..115 add `COL1` and eight raw RGB565 words from row 0, x=10,30,..150.
 `badge/status.py` decodes the flags, sensor ID, last register/result, NACK
 bitmap, PCLK/VSYNC activity, accepted/displayed frames and line geometry.
 NACK bitmap bits 0, 1 and 2 refer to device address, register address and
@@ -249,3 +271,59 @@ programmer's configuration-status check to succeed, then prints three
 diagnostic snapshots. It preserves root `code.py`, firmware and NVM.
 `badge/probe_fpga.py` separately reads JTAG DONE/FAIL and shared LCD-pin
 activity without reprogramming. Adjust the COM port for the connected badge.
+
+### Rate qualification
+
+The `FPS1` extension at bytes 64..95 contains eight big-endian words: magic,
+timing profile, valid captured frames, malformed frames, no-free-bank drops,
+replaced pending frames, image transfers started, image transfers completed.
+Valid/malformed/drop counters originate in PCLK and cross through registered
+Gray codes. The original VSYNC counter remains a sensor-activity indicator;
+it is not the same as a complete validated image.
+
+Copy `badge/measure.py` alongside `status.py` on the badge. From a clean raw REPL:
+
+```python
+duration_seconds=60  # then repeat with 600
+exec(open('/apps/ov7670/measure.py').read())
+```
+
+Alternatively use PowerShell from the demo directory:
+
+```powershell
+.\tools\measure_device.ps1 -Port COM3 -DurationSeconds 60
+.\tools\measure_device.ps1 -Port COM3 -DurationSeconds 600
+```
+
+These commands save serial output under `build/` without resetting the FPGA.
+The script prints ten-second checkpoints and elapsed-time-based rates.
+It excludes sensor startup, validates identity and geometry, checks for stalls,
+and passes only with 28..33 valid and displayed images/s, no malformed frames,
+and no capture drops or replaced pending images during the interval.
+
+Qualify profiles 0, 1, then 2 using separate build directories. Check sensor ID,
+color bars, geometry and errors at every step. Keep the earlier verified
+bitstream before replacing `/fpga/app_bitstreams/fpga_ov7670.bit`. Restore that
+bitstream if the faster candidate fails; preserve all measurement logs.
+Screen color order, tearing and the correction controls still need a visual
+hardware check even when counter-based qualification passes.
+
+### Direct RAM loading and physical SPI sampling
+
+If Windows mounts CIRCUITPY read-only, `tools/program_ram.ps1 -Source <bitstream>`
+loads FPGA SRAM through the existing JTAG programmer, without disk writes. It
+checks the expected badge UID, byte count, SUM32 and FPGA configuration status,
+and records the host source SHA256 separately. This does not update the saved
+bitstream file on CIRCUITPY. Optional `-ProbePanel` passively captures a SPI line
+one second after programming, during the startup sensor bars.
+
+`badge/sniff_panel.py` samples only inputs GP2/GP3/GP4/GP5 using PIO and RX DMA.
+It prints the actual transmitted 16-bit words for comparison with the raw
+`COL1` samples. Its PIO loop has explicit wrap bounds and a three-second timeout.
+
+For a persistent install onto a Windows read-only badge disk,
+`tools/install_bitstream.ps1 -Source <verified-bitstream>` requests Windows UAC
+administrator approval. It matches the badge disk by serial number, temporarily
+clears only that disk's read-only attribute, writes/verifies the camera bitstream
+and helper scripts, then restores the original attribute. It performs no disk
+repair or formatting. Inspect `build/badge-install-result.json` for the result.

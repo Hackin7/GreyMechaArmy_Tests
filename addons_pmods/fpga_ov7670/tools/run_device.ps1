@@ -3,17 +3,24 @@ param(
     [Parameter(Mandatory=$true)][string]$File,
     [string]$LogPath,
     [int]$TimeoutSeconds = 60,
-    [switch]$SoftReset
+    [switch]$SoftReset,
+    [switch]$LiveOutput
 )
 $ErrorActionPreference = 'Stop'
 $cameraSerial = [System.IO.Ports.SerialPort]::new($Port,115200,[System.IO.Ports.Parity]::None,8,[System.IO.Ports.StopBits]::One)
 $cameraSerial.DtrEnable = $true
 $cameraSerial.WriteTimeout = 5000
 $script:cameraReceiveBuffer = ''
-function Read-CameraUntil([string]$Marker, [int]$Seconds) {
+$cameraOutput=''
+$cameraError=''
+function Read-CameraUntil([string]$Marker, [int]$Seconds, [switch]$Echo) {
     $cameraDeadline = [DateTime]::UtcNow.AddSeconds($Seconds)
     while ([DateTime]::UtcNow -lt $cameraDeadline) {
-        $script:cameraReceiveBuffer += $cameraSerial.ReadExisting()
+        $cameraChunk=$cameraSerial.ReadExisting()
+        $script:cameraReceiveBuffer += $cameraChunk
+        if($Echo -and $cameraChunk) {
+            Write-Host -NoNewline ($cameraChunk.Replace([string][char]4,''))
+        }
         $cameraEnd = $script:cameraReceiveBuffer.IndexOf($Marker,[StringComparison]::Ordinal)
         if ($cameraEnd -ge 0) {
             $cameraReply = $script:cameraReceiveBuffer.Substring(0,$cameraEnd)
@@ -48,13 +55,21 @@ try {
     }
     $cameraSerial.Write([byte[]](4),0,1)
     $null = Read-CameraUntil 'OK' 5
-    $cameraOutput = Read-CameraUntil ([string][char]4) $TimeoutSeconds
+    $cameraOutput = Read-CameraUntil ([string][char]4) $TimeoutSeconds -Echo:$LiveOutput
     $cameraError = Read-CameraUntil ([string][char]4) 5
     $null = Read-CameraUntil '>' 5
     if ($LogPath) { [IO.File]::WriteAllText($LogPath,$cameraOutput+"`n"+$cameraError) }
-    Write-Output $cameraOutput
+    if(-not $LiveOutput) { Write-Output $cameraOutput }
     if ($cameraError) { throw $cameraError }
+} catch {
+    if($LogPath) {
+        [IO.File]::WriteAllText($LogPath,$cameraOutput+$cameraError+$script:cameraReceiveBuffer+"`nRUN_ERROR: "+$_)
+    }
+    throw
 } finally {
-    if ($cameraSerial.IsOpen) { $cameraSerial.Write([byte[]](2),0,1); $cameraSerial.Close() }
+    if ($cameraSerial.IsOpen) {
+        try { $cameraSerial.Write([byte[]](2),0,1) } catch { }
+        $cameraSerial.Close()
+    }
     $cameraSerial.Dispose()
 }

@@ -8,7 +8,7 @@ report = json.loads(pathlib.Path(sys.argv[2]).read_text())
 log = pathlib.Path(sys.argv[3]).read_text()
 cells = netlist["modules"]["top"]["cells"].values()
 ram_count = sum(cell["type"] == "DP16KD" for cell in cells)
-assert 38 <= ram_count <= 56, f"Unexpected ECP5 RAM count: {ram_count}"
+assert ram_count == 56, f"Expected 56 image RAM blocks, got {ram_count}"
 fmax = report.get("fmax", {})
 assert len(fmax) >= 2, f"Missing system or PCLK timing: {fmax}"
 assert any("cam_pclk" in clock for clock in fmax), fmax

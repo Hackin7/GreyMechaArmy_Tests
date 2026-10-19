@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_sccb #(parameter HOLD=0);
+module tb_sccb #(parameter HOLD=0, PROFILE=0);
     reg clk=0; always #5 clk=~clk;
     reg resetn=0;
     tri1 sda, scl;
@@ -11,7 +11,7 @@ module tb_sccb #(parameter HOLD=0);
     assign scl=scl_low ? 1'b0 : 1'bz;
     ov7670_config #(.CLK_HZ(10000),.QUARTER_CYCLES(4),
         .RESET_CYCLES(5),.SETTLE_CYCLES(10),.BAR_CYCLES(2000),
-        .HOLD_COLOR_BARS(HOLD)) dut(
+        .HOLD_COLOR_BARS(HOLD),.TIMING_PROFILE(PROFILE)) dut(
         .clk(clk),.resetn(resetn),.sda_in(sda),.scl_low(scl_low),.sda_low(sda_low),
         .sensor_reset_n(sensor_reset_n),.configured(configured),.live(live),
         .error_code(error_code),.product_id(product_id),.version(version));
@@ -80,6 +80,16 @@ module tb_sccb #(parameter HOLD=0);
         if(registers[8'h12]!=4 || registers[8'h40]!=8'hd0 || registers[8'h72]!=8'h22)
             $fatal(1,"RGB565 QQVGA configuration missing");
         if(registers[8'h13]!=8'he7 || !last_was_bars || live) $fatal(1,"Colour bars/AEC/AGC/AWB");
+        if(registers[8'h4f]!=8'hb3 || registers[8'h50]!=8'hb3 ||
+           registers[8'h51]!=0 || registers[8'h52]!=8'h3d ||
+           registers[8'h53]!=8'ha7 || registers[8'h54]!=8'he4 ||
+           registers[8'h58]!=8'h9e) $fatal(1,"RGB565 colour matrix/signs");
+        if(registers[8'h01]!=8'h40 || registers[8'h02]!=8'h60 ||
+           registers[8'h6f]!=8'h9f || registers[8'hb0]!=8'h84)
+            $fatal(1,"Live color/AWB initialization");
+        if(registers[8'h11] !== (PROFILE==0 ? 8'h01:8'h00) ||
+           registers[8'h6b] !== (PROFILE==2 ? 8'h4a:8'h0a) ||
+           registers[8'h3b] !== 8'h12) $fatal(1,"Timing/exposure profile");
         if(HOLD) begin
             repeat(4000) @(negedge clk);
             if(!configured || live || saw_live_write) $fatal(1,"Colour bars not held");

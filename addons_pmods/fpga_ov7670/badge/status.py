@@ -2,7 +2,7 @@
 import board
 import digitalio
 import time
-def camera_status():
+def camera_status(verbose=True):
     pins=[]
     try:
         sck=digitalio.DigitalInOut(board.GP8); pins.append(sck)
@@ -13,8 +13,8 @@ def camera_status():
         cs.switch_to_output(value=True)
         cs.value=False
         time.sleep(0.001)
-        received=bytearray(64)
-        for n in range(64):
+        received=bytearray(116)
+        for n in range(116):
             value=0
             for _ in range(8):
                 sck.value=True
@@ -24,7 +24,15 @@ def camera_status():
         cs.value=True
         assert received[:4]==b'CAM2', 'Camera diagnostic bitstream not running: '+repr(received)
         flags=received[7]
-        if received[32:36]==b'PIN1':
+        rates={}
+        if received[96:100]==b'COL1':
+            rates['raw_color_samples']=[hex(int.from_bytes(received[pos:pos+2],'big'))
+                for pos in range(100,116,2)]
+        if received[64:68]==b'FPS1':
+            for n,key in enumerate(('timing_profile','valid_frames','malformed_frames',
+                    'capture_drops','replaced_frames','accepted_frames','display_frames')):
+                rates[key]=int.from_bytes(received[68+n*4:72+n*4],'big')
+        if verbose and received[32:36]==b'PIN1':
             levels=int.from_bytes(received[36:38],'big')
             changed=int.from_bytes(received[38:40],'big')
             names=('PCLK_A12','VSYNC_A13','HREF_A9','D0_B9','D1_B13',
@@ -34,7 +42,7 @@ def camera_status():
                 print('CAMERA_PIN',name,'level',(levels>>bit)&1,
                     'changed',bool(changed&(1<<bit)),
                     'rising_mod65536',int.from_bytes(received[pos:pos+2],'big'))
-        return {'led_bits':hex(received[11]),'reset_released':bool(flags&128),
+        result={'led_bits':hex(received[11]),'reset_released':bool(flags&128),
             'pll_locked':bool(flags&64),'display_ready':bool(flags&32),
             'configured':bool(flags&16),'live':bool(flags&8),
             'frame_valid':bool(flags&4),'malformed':bool(flags&2),
@@ -53,8 +61,11 @@ def camera_status():
             'display_frames':int.from_bytes(received[24:28],'big'),
             'last_frame_lines':None if received[10] else int.from_bytes(received[28:32],'big')>>22,
             'last_line_bytes':None if received[10] else int.from_bytes(received[28:32],'big')&4095}
+        result.update(rates)
+        return result
     finally:
         for p in pins: p.deinit()
-for _ in range(3):
-    print('CAMERA_STATUS',camera_status())
-    time.sleep(1)
+if __name__=='__main__':
+    for _ in range(3):
+        print('CAMERA_STATUS',camera_status())
+        time.sleep(1)

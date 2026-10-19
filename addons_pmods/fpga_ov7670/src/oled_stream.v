@@ -4,7 +4,7 @@
 // (bit transitions on MOSI), phase 1 = SCLK high (rising edge — slave
 // samples MOSI here). top.v drives the oled_scl pin directly from `sclk`,
 // no ODDR primitive involved. Effective SCLK rate = sys_clk / 2.
-module oled_stream (
+module oled_stream #(parameter integer PIXELS=57600)(
     input  wire        clk,
     input  wire        resetn,
     input  wire        enable,
@@ -16,7 +16,7 @@ module oled_stream (
     output reg         dc,
     output reg         frame_done
 );
-    localparam [15:0] LAST_PIX = 16'd57599;   // 240*240 - 1
+    localparam [15:0] LAST_PIX = PIXELS-1;
 
     reg [15:0] shift;
     reg [3:0]  bit_cnt;
