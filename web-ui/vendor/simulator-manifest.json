@@ -1,0 +1,85 @@
+{
+  "engine": "09d99f2c3028e27b397df8471baec29975ec154b",
+  "badge": "3ce9bfbf0061ee36e17dca1274c2f65ae9a5bb07",
+  "compilerVersion": "Verilator 4.205 devel rev UNKNOWN.REV (mod)",
+  "files": [
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/hdl/hdltypes.ts",
+      "path": "vendor/8bitworkshop/hdl/hdltypes.ts",
+      "upstreamSha256": "f2e8152309bb654c5ed03127815cc83f4f590ce19bb0f4540f98c792dd1b98b0",
+      "sha256": "f2e8152309bb654c5ed03127815cc83f4f590ce19bb0f4540f98c792dd1b98b0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/hdl/hdlruntime.ts",
+      "path": "vendor/8bitworkshop/hdl/hdlruntime.ts",
+      "upstreamSha256": "69e415d4c7df11c3fa92bcb7d7c72c48cf47d21f6a07b782586f961d2bf89a79",
+      "sha256": "3f23be610a6f6e7c50596715ccb66e8629fc25c232f9a68a4e46b91706d418ef"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/hdl/vxmlparser.ts",
+      "path": "vendor/8bitworkshop/hdl/vxmlparser.ts",
+      "upstreamSha256": "03d65b28c9ead81c79e2c75cf523e31cc6b21930cec74226adae6c13aa9359ec",
+      "sha256": "470f8e7018a657d25852c2b995d28bb5e5ec4f1047dda70e6fb5aafd62b934f4"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/util.ts",
+      "path": "vendor/8bitworkshop/util.ts",
+      "upstreamSha256": "bd31dcc54027094b0dac87e3ddd1654e554deaee74f13ae8663270a1a149ac1c",
+      "sha256": "bd31dcc54027094b0dac87e3ddd1654e554deaee74f13ae8663270a1a149ac1c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/workertypes.ts",
+      "path": "vendor/8bitworkshop/workertypes.ts",
+      "upstreamSha256": "8b433c8d085ddde49f44404cd461501e51ed44b529399c3fd593cdfb6567a436",
+      "sha256": "8b433c8d085ddde49f44404cd461501e51ed44b529399c3fd593cdfb6567a436"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/worker/wasm/verilator_bin.js",
+      "path": "public/simulator/verilator_bin.js",
+      "upstreamSha256": "6559fd0a0892148ef5cfd1d4c90e52d9ec1108fd333249b2ad91c825cbce1346",
+      "sha256": "6559fd0a0892148ef5cfd1d4c90e52d9ec1108fd333249b2ad91c825cbce1346"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/worker/wasm/verilator_bin.wasm",
+      "path": "public/simulator/verilator_bin.wasm",
+      "upstreamSha256": "b8bdb791c8eeb4820175c7ec42e01a40a47766bbb319137e999400f2a6a734c8",
+      "sha256": "b8bdb791c8eeb4820175c7ec42e01a40a47766bbb319137e999400f2a6a734c8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/LICENSE",
+      "path": "vendor/8bitworkshop/LICENSE",
+      "upstreamSha256": "589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2",
+      "sha256": "589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/NUSGreyhats/greybadge25/3ce9bfbf0061ee36e17dca1274c2f65ae9a5bb07/hardware/artwork/greymecha.png",
+      "path": "public/simulator/art/greymecha.png",
+      "upstreamSha256": "a05cb477702c8f4799344b8cbb659218dc5faeb09295733ec9ce55d144a82d21",
+      "sha256": "a05cb477702c8f4799344b8cbb659218dc5faeb09295733ec9ce55d144a82d21"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/NUSGreyhats/greybadge25/3ce9bfbf0061ee36e17dca1274c2f65ae9a5bb07/hardware/fpga_placement.svg",
+      "path": "public/simulator/art/fpga_placement.svg",
+      "upstreamSha256": "d96491af9897cd8044b7bf47daf7e15885eef7f7046d7a52af3e3c93e5227f0b",
+      "sha256": "d96491af9897cd8044b7bf47daf7e15885eef7f7046d7a52af3e3c93e5227f0b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/8bitworkshop/verilator/6c3efcd5d869ba772e4ed1365727e155fd9210da/LICENSE",
+      "path": "public/simulator/VERILATOR-LICENSE",
+      "upstreamSha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop-compilers/b5c38a4ca090434e1ee2304e8b2b0dee0ffa9c2f/oldemsrc/verilator/verilator.txt",
+      "path": "vendor/verilator-build.txt",
+      "upstreamSha256": "0937040911ea346db64f7a650db84075810c12112250af0002cef28ad8431a4d",
+      "sha256": "0937040911ea346db64f7a650db84075810c12112250af0002cef28ad8431a4d"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop-compilers/b5c38a4ca090434e1ee2304e8b2b0dee0ffa9c2f/oldemsrc/verilator/Makefile.local",
+      "path": "vendor/verilator-Makefile.local",
+      "upstreamSha256": "1087661122aab32faa064d51b8f3a938c9ed24787f3e34df265ec976fb80b33c",
+      "sha256": "1087661122aab32faa064d51b8f3a938c9ed24787f3e34df265ec976fb80b33c"
+    }
+  ]
+}

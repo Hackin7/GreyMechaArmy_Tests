@@ -3,6 +3,7 @@
     import { uploadToDevice, rebootDevice } from './lib/filesystem.js';
     import NetlistView from './lib/NetlistView.svelte';
     import WokwiImport from './lib/WokwiImport.svelte';
+    import Simulator from './lib/Simulator.svelte';
     import { oledModules, oledSimple, oledDemo } from './lib/oledPreset.js';
     import { addWorkspaceFiles, removeWorkspaceFile } from './lib/workspaceFiles.js';
     import { onMount, onDestroy, afterUpdate } from 'svelte';
@@ -26,6 +27,10 @@
     let fileError = '';
     let otherError = '';
     let isAddingFiles = false;
+    let workbenchContainer;
+    let simulatorOpen = false;
+    let simulatorWidth = 46;
+    let isResizingSimulator = false;
 
     let savedDirHandle = null;
 
@@ -73,6 +78,28 @@
 
     function selectFile(filename) {
         activeFile.set(filename);
+    }
+
+    function resizeSimulator(event) {
+        if (!isResizingSimulator) return;
+        const bounds = workbenchContainer.getBoundingClientRect();
+        simulatorWidth = Math.max(30, Math.min(70, (bounds.right - event.clientX) / bounds.width * 100));
+    }
+    function beginSimulatorResize(event) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        isResizingSimulator = true;
+        resizeSimulator(event);
+    }
+    function endSimulatorResize(event) {
+        isResizingSimulator = false;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    function resizeSimulatorByKeyboard(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        simulatorWidth = event.key === 'Home' ? 30 : event.key === 'End' ? 70 : Math.max(30, Math.min(70, simulatorWidth + (event.key === 'ArrowLeft' ? 3 : -3)));
     }
 
     function createVerilogFile() {
@@ -366,7 +393,7 @@
     }
 </script>
 
-<div class:resizing={isResizingPanel} class="layout">
+<div class:resizing={isResizingPanel} class:resizing-simulator={isResizingSimulator} class="layout">
     <aside class="sidebar">
         <h2>Files</h2>
         <ul class="file-list">
@@ -395,6 +422,7 @@
         <div class="actions">
             <button class="run-all-btn" on:click={runAll} disabled={isSynthesizing}>Run All (Synthesize → Program)</button>
             <button class="synth-btn" on:click={synthesize} disabled={isSynthesizing}>{isSynthesizing ? 'Building…' : 'Synthesize'}</button>
+            <button class="simulator-btn" class:active={simulatorOpen} aria-expanded={simulatorOpen} aria-controls="simulator-panel" on:click={() => (simulatorOpen = true)}>Simulator</button>
         </div>
         {#if buildIsOutdated}
             <p class="outdated">Source changed after this build. Synthesize again before uploading or programming.</p>
@@ -410,6 +438,7 @@
         </div>
     </aside>
 
+    <div class="workbench" bind:this={workbenchContainer}>
     <main class="main" bind:this={mainContainer}>
         <div class="editor" bind:this={editorContainer}></div>
         <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
@@ -495,6 +524,18 @@
             </div>
         </section>
     </main>
+    {#if simulatorOpen}
+        <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <div class="simulator-resize" role="separator" tabindex="0" aria-label="Resize simulator panel" aria-orientation="vertical"
+            aria-valuemin="30" aria-valuemax="70" aria-valuenow={Math.round(simulatorWidth)}
+            on:pointerdown={beginSimulatorResize} on:pointermove={resizeSimulator} on:pointerup={endSimulatorResize} on:pointercancel={endSimulatorResize} on:lostpointercapture={() => (isResizingSimulator = false)} on:keydown={resizeSimulatorByKeyboard}></div>
+    {/if}
+    <aside id="simulator-panel" class="simulator-pane" class:closed={!simulatorOpen} style={`flex-basis:${simulatorWidth}%`} aria-label="FPGA simulator panel" aria-hidden={!simulatorOpen}>
+        <header class="simulator-heading"><h2>Simulator</h2><button aria-label="Close simulator panel" title="Close simulator panel" on:click={() => (simulatorOpen = false)}>×</button></header>
+        <div class="simulator-content"><Simulator files={$files} {sourceRevision} {isSynthesizing} active={simulatorOpen} /></div>
+    </aside>
+    </div>
 </div>
 
 <style>
@@ -520,6 +561,9 @@
     button:disabled { opacity: .45; cursor: not-allowed; }
     .run-all-btn { background: #e33e5a; color: white; }
     .synth-btn { background: #007acc; color: white; }
+    .simulator-btn { background: #3b566a; color: white; }
+    .simulator-btn.active { background: #37373d; box-shadow: inset 0 0 0 1px #007acc; }
+    .simulator-btn:focus-visible { outline: 2px solid #4fc1ff; outline-offset: 2px; }
     .upload-btn { background: #28a745; color: white; }
     .reboot-btn { background: #6f42c1; color: white; }
     .download-btn { background: #d97d0d; color: white; }
@@ -530,6 +574,20 @@
     .instructions p { margin: 7px 0 0; color: #858585; }
     .outdated { margin: 0 0 10px; padding: 8px; color: #ffd28a; background: #493b23; border-radius: 4px; font-size: 12px; }
     .main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+    .workbench { display:flex; flex:1; min-width:0; min-height:0; position:relative; }
+    .simulator-pane { display:flex; flex-direction:column; flex-shrink:0; min-width:280px; max-width:calc(100% - 260px); min-height:0; background:#1e1e1e; }
+    .simulator-pane.closed { display:none; }
+    .simulator-heading { display:flex; align-items:center; justify-content:space-between; height:36px; flex-shrink:0; padding:0 10px 0 14px; background:#252526; border-bottom:1px solid #333; }
+    .simulator-heading h2 { margin:0; font-size:12px; color:#bbb; }
+    .simulator-heading button { padding:2px 8px; font-size:20px; color:#bbb; background:transparent; }
+    .simulator-heading button:hover { background:#3b3b3b; color:#fff; }
+    .simulator-heading button:focus-visible { outline:2px solid #4fc1ff; outline-offset:1px; }
+    .simulator-content { flex:1; min-height:0; }
+    .simulator-resize { flex:0 0 8px; cursor:col-resize; touch-action:none; background:#252526; border-left:1px solid #333; border-right:1px solid #333; position:relative; }
+    .simulator-resize::after { content:''; position:absolute; height:36px; width:2px; top:50%; left:50%; transform:translate(-50%,-50%); background:#666; }
+    .simulator-resize:hover::after,.simulator-resize:focus-visible::after { background:#4fc1ff; }
+    .simulator-resize:focus-visible { outline:1px solid #4fc1ff; outline-offset:-1px; }
+    .layout.resizing-simulator { user-select:none; cursor:col-resize; }
     .editor { flex: 1 1 0; min-height: 120px; overflow: hidden; }
     :global(.cm-editor) { height: 100%; }
     .resize-handle { z-index: 1; flex: 0 0 8px; position: relative; cursor: row-resize; touch-action: none; background: #252526; border-top: 1px solid #333; border-bottom: 1px solid #333; }
@@ -538,8 +596,8 @@
     .resize-handle:focus-visible { outline: 1px solid #4fc1ff; outline-offset: -1px; }
     .layout.resizing { user-select: none; cursor: row-resize; }
     .lower-panel { display: flex; flex: 0 0 auto; flex-direction: column; min-height: 120px; border-top: 1px solid #333; }
-    .panel-tabs { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; min-height: 39px; padding: 4px 8px; background: #252526; }
-    .panel-tabs button { padding: 7px 10px; color: #bbb; background: transparent; border-radius: 3px; font-size: 12px; }
+    .panel-tabs { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; min-height: 39px; padding: 4px 8px; background: #252526; overflow-x:auto; }
+    .panel-tabs button { padding: 7px 10px; color: #bbb; background: transparent; border-radius: 3px; font-size: 12px; flex-shrink:0; white-space:nowrap; }
     .panel-tabs button.active { color: #fff; background: #3b3b3b; }
     .panel-tabs button:disabled { opacity: .4; }
     .outdated-label { margin-left: auto; padding: 4px 7px; color: #ffd28a; font: 11px monospace; }
@@ -570,5 +628,9 @@
         .sidebar { flex-basis: 205px; }
         .panel-tabs { overflow-x: auto; }
         .panel-tabs button { white-space: nowrap; }
+    }
+    @media (max-width:760px) {
+        .simulator-pane { position:absolute; top:0; right:0; bottom:0; width:min(100%,440px); max-width:100%; min-width:0; z-index:5; box-shadow:-8px 0 18px #0008; }
+        .simulator-resize { display:none; }
     }
 </style>

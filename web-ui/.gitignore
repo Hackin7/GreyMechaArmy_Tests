@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 public/vendor
+.sim-test
+test-results
+playwright-report
+!vendor/simulator-manifest.json
 *.local
 
 # Editor directories and files
@@ -23,3 +27,6 @@ public/vendor
 *.njsproj
 *.sln
 *.sw?
+!vendor/verilator-Makefile.local
+!vendor/greybadge26-display-calibration.json
+!src/lib/simulator/boardLayout.json

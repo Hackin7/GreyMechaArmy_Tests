@@ -1,0 +1,9 @@
+*.js -text
+*.mjs -text
+*.wasm -text
+VERILATOR-LICENSE -text
+art/*.png -text
+art/*.svg -text
+board/*.svg -text
+COPYING text eol=lf
+*.md text eol=lf
