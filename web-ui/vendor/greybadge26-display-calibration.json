@@ -1,0 +1,16 @@
+{
+  "description": "Assembled front photo supplied by the badge owner. Pixel landmarks are manually measured; this is visual registration, not a manufacturing dimension.",
+  "photoSize": [571, 756],
+  "photoSha256": "6fa645c514187183086fe990238d38d3dd49ae4e4e3417abd4dcb56d69a6722e",
+  "switchCenters": {
+    "SW4": [115, 543], "SW1": [165, 493], "SW5": [165, 544],
+    "SW7": [165, 594], "SW3": [211, 544], "SW2": [394, 533], "SW6": [458, 503]
+  },
+  "displayCenter": [365, 355],
+  "displayRim": [[365, 240], [483, 355], [365, 475], [245, 355]],
+  "placement": "art-face-contour",
+  "faceContourPointsMm": [[69.236281, 39.997922], [49.999532, 59.557382], [30.726798, 40.041601]],
+  "faceContourDescription": "Midpoints of the large character's circular white face border, sampled from the PCB silkscreen at right, bottom, and left. Board-local millimetres. Display enlarged and centered to this contour at the owner's request.",
+  "activeDiameterRatio": 0.985,
+  "displayHorizontalAxis": [[312, 482], [443, 451]]
+}

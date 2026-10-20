@@ -28,3 +28,5 @@ playwright-report
 *.sln
 *.sw?
 !vendor/verilator-Makefile.local
+!vendor/greybadge26-display-calibration.json
+!src/lib/simulator/boardLayout.json

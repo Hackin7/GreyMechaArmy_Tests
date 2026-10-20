@@ -10,4 +10,6 @@ The FPGA compiler/frontend also uses Yosys through YoWASP, retaining its existin
 
 Official badge artwork and FPGA pin reference: NUSGreyhats/greybadge25, commit 3ce9bfbf0061ee36e17dca1274c2f65ae9a5bb07; artwork credited by upstream to Shuqing.
 
+The simulator's assembled front uses the owner's Greybadge26 KiCad PCB at commit 4d1c15e5273b7a51a31050a6c7ff121232df1747. Artwork: Shuqing. PCB credits from its silkscreen: hackin7, itsme-zeix, sayo. The generated board SVG and layout record the source PCB and export checksums. Display rotation is visually registered from a front photo supplied by the owner; its enlarged opening follows the artwork's circular face contour. The photo is not distributed. See web-ui/SIMULATOR.md and scripts/sync-simulator-board.mjs on the feature branch for the refresh workflow.
+
 User Verilog projects retain their own licensing.

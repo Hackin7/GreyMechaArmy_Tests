@@ -1,11 +1,17 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
+  import boardLayout from './simulator/boardLayout.json';
   export let files = {};
   export let sourceRevision = 0;
   export let isSynthesizing = false;
   export let active = false;
 
   const assetBase = `${import.meta.env.BASE_URL}simulator/`;
+  const pixelsPerMm = 6;
+  const boardWidth = boardLayout.outline.width * pixelsPerMm;
+  const boardHeight = boardLayout.outline.height * pixelsPerMm;
+  const componentStyle = part => `left:${part.x * pixelsPerMm}px;top:${part.y * pixelsPerMm}px;--angle:${part.rotation}deg;--part-width:${part.width * pixelsPerMm}px;--part-height:${part.height * pixelsPerMm}px;`;
+  const display = boardLayout.display;
   let mode = 'pixel', externalHz = 10000000, status = 'idle', message = '';
   let worker, simulationId = 0, compiledRevision = -1, watchdog;
   let info, frame, canvas, panel, zoom = 1, buttons = 127, pmodResetn = 1;
@@ -14,11 +20,7 @@
   const heldKeys = new Set(), heldPointers = new Set();
   $: ready = Boolean(worker && info && compiledRevision === sourceRevision && ['running', 'paused'].includes(status));
   $: if (worker && compiledRevision !== sourceRevision) stop('outdated');
-  $: if (isSynthesizing || (!active && previousActive)) {
-    if (isSynthesizing && status === 'compiling') stop(); else pause();
-    releaseAll();
-  }
-  $: previousActive = active;
+  $: syncVisibility(active, isSynthesizing);
   $: if (canvas && frame?.pixels) draw(frame.pixels);
 
   function draw(pixels) {
@@ -48,7 +50,9 @@
           command('INPUT', { buttons, pmodResetn });
           if (active && !isSynthesizing) command('RUN');
           break;
-        case 'RUNNING': status = 'running'; break;
+        case 'RUNNING':
+          if (!active || isSynthesizing) pause(); else status = 'running';
+          break;
         case 'PAUSED': status = 'paused'; break;
         case 'FRAME': frame = { ...data, pixels: data.pixels ?? frame?.pixels }; break;
         case 'ERROR': error = data.error; stop('error'); break;
@@ -57,7 +61,15 @@
     worker.postMessage({ type: 'COMPILE', simulationId, sourceRevision: compiledRevision, files: { ...files }, mode, externalHz: Number(externalHz), baseUrl: new URL(import.meta.env.BASE_URL, window.location.href).href });
   }
   export function pause() {
-    if (status === 'running') { command('PAUSE'); status = 'paused'; }
+    // Queue PAUSE even if RUNNING has not arrived yet from a preceding RUN.
+    if (worker && info && status !== 'compiling') { command('PAUSE'); status = 'paused'; }
+  }
+  function syncVisibility(visible, building) {
+    if (building || (!visible && previousActive)) {
+      if (building && status === 'compiling') stop(); else pause();
+      releaseAll();
+    }
+    previousActive = visible;
   }
   function stop(nextStatus = 'stopped') {
     clearTimeout(watchdog); worker?.terminate(); worker = undefined; buttons = 127; pmodResetn = 1;
@@ -90,7 +102,11 @@
   function blur(event) { if (!panel.contains(event.relatedTarget)) releaseAll(); }
   function togglePmod() { pmodResetn = pmodResetn ? 0 : 1; command('INPUT', { buttons, pmodResetn }); }
   function frequency(value) { return value >= 1000000 ? `${(value / 1000000).toFixed(2)} MHz` : `${value.toFixed(1)} Hz`; }
-  function fit() { fitted = true; if (boardViewport?.clientWidth) zoom = Math.min(1, Math.max(.3, (boardViewport.clientWidth - 16) / 650)); }
+  function fit() {
+    fitted = true;
+    if (boardViewport?.clientWidth && boardViewport.clientHeight)
+      zoom = Math.min(1.5, Math.max(.25, Math.min((boardViewport.clientWidth - 36) / boardWidth, (boardViewport.clientHeight - 36) / boardHeight)));
+  }
   onMount(() => { const observer = new ResizeObserver(() => { if (fitted) fit(); }); observer.observe(boardViewport); return () => observer.disconnect(); });
   onDestroy(() => stop());
 </script>
@@ -118,34 +134,34 @@
   {#if status === 'outdated'}<p class="notice">Source changed. Compile again to simulate the current design.</p>{/if}
   <div class="workspace">
     <div class="board-scroll" bind:this={boardViewport}>
-      <div class="board" style={`width:${650 * zoom}px;height:${440 * zoom}px`}>
-        <div class="board-face" style={`transform:scale(${zoom})`}>
-          <img class="badge-art" src={`${assetBase}art/greymecha.png`} alt="Official GreyMecha badge artwork" />
-          <div class="screen-shell">
+      <div class="board" data-testid="pcb-board" style={`width:${boardWidth * zoom}px;height:${boardHeight * zoom}px`}>
+        <div class="board-face" data-testid="pcb-face" style={`width:${boardWidth}px;height:${boardHeight}px;transform:scale(${zoom})`}>
+          <img class="pcb-image" src={`${assetBase}board/front.svg`} alt="Greybadge26 front PCB outline, silkscreen artwork, and exposed pads exported from KiCad" draggable="false" />
+          <div class="screen-shell" data-testid="pcb-screen" style={`left:${display.x * pixelsPerMm}px;top:${display.y * pixelsPerMm}px;width:${display.diameter * pixelsPerMm}px;height:${display.diameter * pixelsPerMm}px;--display-angle:${display.rotation}deg;--active-size:${display.activeDiameter * pixelsPerMm}px`}>
             <canvas bind:this={canvas} width="240" height="240" aria-label="OLED display" data-testid="oled-display"></canvas>
-            <span>240 × 240 · RGB565</span>
           </div>
-          <div class="led-strip" aria-label="Badge LEDs">
-            {#each Array(8) as _, index}
-              <div class="led-unit"><span class:lit={Boolean((frame?.led ?? 0) & (1 << index))} class="led" data-testid={`led-${index}`} data-value={((frame?.led ?? 0) >> index) & 1}></span><small>LED {index}</small></div>
-            {/each}
-          </div>
-          <div class="button-bank" aria-label="Badge buttons">
-            {#each Array(7) as _, index}
-              <button class:pressed={!(buttons & (1 << index))} disabled={Boolean(info && index >= info.btnWidth)} aria-label={`BTN ${index}`} aria-pressed={!(buttons & (1 << index))}
-                on:pointerdown={event => pointerDown(event, index)} on:pointerup={() => input(index, false)} on:pointercancel={() => input(index, false)} on:lostpointercapture={() => input(index, false)}
-                on:keydown={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); input(index, true, 'keyboard'); } }}
-                on:keyup={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); input(index, false, 'keyboard'); } }}>
-                <span>{index}</span><small>BTN {index}</small>
-              </button>
-            {/each}
-          </div>
-          <div class="board-brand"><strong>GREYMECHA / ARMY</strong><span>FPGA · interactive digital simulation</span></div>
+          {#each boardLayout.leds as part}
+            <span class:lit={Boolean((frame?.led ?? 0) & (1 << part.index))} class="pcb-led" role="img"
+              aria-label={`LED ${part.index} (${part.reference}): ${((frame?.led ?? 0) >> part.index) & 1 ? 'on' : 'off'}`}
+              title={`LED ${part.index} · ${part.reference} · ${part.net}`} data-testid={`led-${part.index}`} data-value={((frame?.led ?? 0) >> part.index) & 1}
+              data-reference={part.reference} data-net={part.net} style={componentStyle(part)}></span>
+          {/each}
+          {#each boardLayout.buttons as part}
+            <button class="pcb-button" class:pressed={!(buttons & (1 << part.index))} disabled={Boolean(info && part.index >= info.btnWidth)} aria-label={`BTN ${part.index}`} aria-pressed={!(buttons & (1 << part.index))}
+              title={`BTN ${part.index} · ${part.reference} · ${part.net} · Key ${part.index + 1}`} data-reference={part.reference} data-net={part.net}
+              style={`${componentStyle(part)}--body-size:${Math.min(part.width, part.height) * pixelsPerMm}px`}
+              on:pointerdown={event => pointerDown(event, part.index)} on:pointerup={() => input(part.index, false)} on:pointercancel={() => input(part.index, false)} on:lostpointercapture={() => input(part.index, false)}
+              on:keydown={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); input(part.index, true, 'keyboard'); } }}
+              on:keyup={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); input(part.index, false, 'keyboard'); } }}>
+              <span class="switch-body"><span class="switch-cap"></span></span>
+            </button>
+          {/each}
         </div>
       </div>
     </div>
     <aside class="details">
       <h3>Simulation</h3>
+      <p class="board-caption">Greybadge26 · assembled front<br />240 × 240 RGB565 display</p>
       <dl>
         <div><dt>Cycles</dt><dd data-testid="sim-cycles">{(frame?.cycles ?? 0).toLocaleString()}</dd></div>
         <div><dt>Simulated time</dt><dd>{((frame?.seconds ?? 0) * 1000).toFixed(3)} ms</dd></div>
@@ -163,16 +179,50 @@
       {#if info && !info.hasDisplay}<p>{info.hasOledPins ? 'No compatible pixel wrapper detected. Choose SPI Simulation to use the OLED pins.' : 'No OLED interface detected. Buttons and LEDs remain available.'}</p>{/if}
       <p class="limits">Functional, two-state simulation. No electrical timing, metastability, or peripheral emulation.</p>
       <details><summary>Compiler diagnostics</summary><pre>{logs || 'No compiler diagnostics.'}</pre></details>
-      <a href="https://github.com/NUSGreyhats/greybadge25" target="_blank" rel="noreferrer">Official artwork · GreyCTF 2025</a>
-      <p><a href={`${assetBase}art/fpga_placement.svg`} target="_blank" rel="noreferrer">Official FPGA pin placement reference</a></p>
+      <details class="pin-legend"><summary>Board controls and pin mapping</summary>
+        <ul>{#each boardLayout.buttons as part}<li>Key {part.index + 1}: btn[{part.index}] · {part.reference} · {part.net}</li>{/each}</ul>
+        <ul>{#each boardLayout.leds as part}<li>led[{part.index}] · {part.reference} · {part.net}: {((frame?.led ?? 0) >> part.index) & 1}</li>{/each}</ul>
+      </details>
+      <p><a href={`${assetBase}board/front.svg`} target="_blank" rel="noreferrer">KiCad front PCB export · art by Shuqing</a></p>
       <p><a href={`${assetBase}NOTICE.md`} target="_blank" rel="noreferrer">Simulator source and licenses</a></p>
     </aside>
   </div>
 </section>
 
 <style>
-  .simulator{height:100%;overflow:auto;color:#dce6f2;background:#10161f;outline:none}.simulator:focus-visible{box-shadow:inset 0 0 0 2px #7ccabd}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #2e3b4a;background:#18212c}.title{margin-right:12px}h2{margin:3px 0 0;font-size:17px;color:#f0f4f8}.eyebrow{font-size:10px;letter-spacing:2px;color:#91cdbc}.toolbar label{font-size:11px;display:grid;gap:4px}button,select,input{border:1px solid #465568;border-radius:5px;background:#263344;color:#e8edf3;padding:7px 10px;font:inherit;font-size:12px}button{cursor:pointer}button:hover:not(:disabled){background:#364a5f}button:disabled{opacity:.4;cursor:default}select,input{max-width:180px}.state{font:12px monospace;color:#bdc7d4;margin-left:auto}.state.running{color:#8ee4aa}.workspace{display:grid;grid-template-columns:minmax(300px,1fr) 245px;gap:16px;padding:16px}.board-scroll{overflow:auto;min-height:300px;border:1px solid #293746;border-radius:12px;background:radial-gradient(ellipse at 45% 45%,#2e3f4a,#111923)}.board{position:relative;margin:auto}.board-face{width:650px;height:440px;transform-origin:top left;position:relative;overflow:hidden}.badge-art{position:absolute;width:370px;height:350px;object-fit:contain;left:5px;top:10px;opacity:.95;pointer-events:none}.screen-shell{position:absolute;left:375px;top:25px;text-align:center}.screen-shell canvas{display:block;width:240px;height:240px;border-radius:50%;background:#000;border:7px solid #080c11;box-shadow:0 0 0 2px #71816a,0 9px 35px #0009;image-rendering:pixelated}.screen-shell span{display:block;font:10px monospace;color:#9caebe;margin-top:9px}.led-strip{position:absolute;left:35px;top:306px;display:flex;gap:14px}.led-unit{display:grid;gap:8px;text-align:center}.led{display:block;width:17px;height:17px;margin:auto;border:2px solid #42634b;border-radius:5px;background:#182b20}.led.lit{background:#a5ff87;box-shadow:0 0 13px #8eff55b0;border-color:#d5ffb9}.led-unit small{font:10px monospace;color:#a4b4be}.button-bank{position:absolute;left:31px;top:354px;display:flex;gap:12px}.button-bank button{display:grid;gap:3px;width:52px;height:52px;padding:6px;border-radius:9px;background:#111922;border:2px solid #4b5969;box-shadow:0 3px 0 #060b10}.button-bank button span{font-weight:700;font-size:16px}.button-bank button small{font:8px monospace;color:#b6c3d3}.button-bank button.pressed{background:#9cdec1;border-color:#c1f8d2;color:#15241d;transform:translateY(2px);box-shadow:none}.board-brand{position:absolute;left:450px;top:365px;display:grid;gap:5px;max-width:170px}.board-brand strong{font:11px monospace;letter-spacing:1px;color:#dfedbe}.board-brand span{font-size:10px;color:#879cac}.details{font-size:12px;line-height:1.5}.details h3{font-size:13px;margin:0 0 12px;color:#b7c9d9}.details dl{margin:0 0 12px}.details dl div{display:flex;justify-content:space-between;border-bottom:1px solid #293442;padding:4px 0}.details dt{color:#a0adbb}.details dd{margin:0;font-family:monospace}.details label{display:grid;gap:4px}.pmod{margin-top:10px;width:100%}.zoom{display:flex;gap:4px;margin-top:12px}.clock-info,.mode-note{color:#bddec6}.limits{color:#929fae}.details pre,.error{white-space:pre-wrap;overflow-wrap:anywhere;font:11px monospace;max-height:180px;overflow:auto}.details a{color:#91cdbc;font-size:10px}.error{margin:12px 18px;padding:12px;background:#432525;color:#ffcdcd;border-radius:5px}.notice,.progress{margin:12px 18px;color:#dbe9a8;font-size:12px}@media(max-width:900px){.workspace{grid-template-columns:1fr}.details{max-width:650px}.board-scroll{min-height:440px}}
-  .badge-art{width:550px;height:550px;left:-140px;top:-100px;object-fit:contain}
-  .board-brand{left:490px;max-width:130px}
-  .button-bank button{touch-action:none}
+  .simulator{height:100%;overflow:auto;display:flex;flex-direction:column;container-type:inline-size;color:#dce6f2;background:#10161f;outline:none}
+  .simulator:focus-visible{box-shadow:inset 0 0 0 2px #7ccabd}
+  .toolbar{display:flex;flex-shrink:0;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #2e3b4a;background:#18212c}
+  .title{margin-right:12px}h2{margin:3px 0 0;font-size:17px;color:#f0f4f8}
+  .eyebrow{font-size:10px;letter-spacing:2px;color:#91cdbc}
+  .toolbar label{font-size:11px;display:grid;gap:4px}
+  button,select,input{border:1px solid #465568;border-radius:5px;background:#263344;color:#e8edf3;padding:7px 10px;font:inherit;font-size:12px}
+  button{cursor:pointer}button:hover:not(:disabled){background:#364a5f}button:disabled{opacity:.4;cursor:default}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #9ce1ed;outline-offset:3px}
+  select,input{max-width:180px}.state{font:12px monospace;color:#bdc7d4;margin-left:auto}.state.running{color:#8ee4aa}
+  .workspace{display:grid;flex:1;min-height:0;grid-template-columns:minmax(0,1fr) 245px;grid-template-rows:minmax(0,1fr);gap:16px;padding:16px;overflow:auto}
+  .board-scroll{height:100%;min-height:300px;overflow:auto;padding:16px;box-sizing:border-box;border:1px solid #293746;border-radius:12px;background:radial-gradient(ellipse at 50% 45%,#2b3740,#111923)}
+  .board{position:relative;margin:auto;filter:drop-shadow(0 9px 11px #0008)}
+  .board-face{transform-origin:top left;position:relative}
+  .pcb-image{display:block;position:absolute;inset:0;width:100%;height:100%;user-select:none;pointer-events:none}
+  .screen-shell{position:absolute;display:grid;place-items:center;transform:translate(-50%,-50%) rotate(var(--display-angle));border-radius:50%;background:linear-gradient(130deg,#84827d,#45494b 30%,#95958d 55%,#333a3d 80%);box-shadow:0 1px 3px #0009;pointer-events:none}
+  .screen-shell canvas{display:block;width:var(--active-size);height:var(--active-size);border-radius:50%;background:#030405;image-rendering:pixelated}
+  .pcb-led{position:absolute;display:block;width:var(--part-width);height:var(--part-height);transform:translate(-50%,-50%) rotate(var(--angle));border:1px solid #867d6b;border-radius:1px;box-sizing:border-box;background:linear-gradient(90deg,#b6b7b3 0 16%,#d8b8a0 17% 83%,#b6b7b3 84%);z-index:2}
+  .pcb-led.lit{background:linear-gradient(90deg,#d9b8a9 0 16%,#fff2e6 24% 76%,#d9b8a9 84%);border-color:#ff9a89;box-shadow:0 0 4px 2px #ff3029,0 0 13px 5px #ff140b99,0 0 25px 10px #ff140b44}
+  .pcb-button{position:absolute;width:var(--part-width);height:var(--part-height);transform:translate(-50%,-50%) rotate(var(--angle));padding:0;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;touch-action:none;z-index:3}
+  .pcb-button:hover:not(:disabled){background:transparent}
+  .switch-body{display:grid;place-items:center;width:var(--body-size);height:var(--body-size);box-sizing:border-box;border:2px solid #90989a;border-radius:4px;background:linear-gradient(125deg,#e5e4db,#969b98 32%,#535d5e 56%,#d2d7d1);box-shadow:0 2px 2px #000b,inset 0 0 0 2px #bfc3b2}
+  .switch-cap{display:block;width:55%;height:55%;border-radius:50%;box-sizing:border-box;background:radial-gradient(circle at 38% 32%,#e5d78f,#ab9860 57%,#7a744b 68%,#d7d2a9 75%,#6d7164 90%);box-shadow:0 1px 1px #363e39}
+  .pcb-button.pressed .switch-cap{background:radial-gradient(circle,#817343,#a6995c 65%,#bdb893 78%,#4f574a);box-shadow:inset 0 2px 3px #2229;transform:scale(.93)}
+  .pcb-button:hover .switch-body{border-color:#d9e2d3}
+  .pcb-button:focus-visible{outline:2px solid #9ce1ed;outline-offset:4px}
+  .details{font-size:12px;line-height:1.5;overflow:auto;min-height:0}.details h3{font-size:13px;margin:0 0 12px;color:#b7c9d9}
+  .board-caption{color:#92a9b4;margin-top:-6px;font-size:11px}
+  .details dl{margin:0 0 12px}.details dl div{display:flex;justify-content:space-between;border-bottom:1px solid #293442;padding:4px 0}
+  .details dt{color:#a0adbb}.details dd{margin:0;font-family:monospace}.details label{display:grid;gap:4px}
+  .pmod{margin-top:10px;width:100%}.zoom{display:flex;gap:4px;margin-top:12px}.clock-info,.mode-note{color:#bddec6}.limits{color:#929fae}
+  .details pre,.error{white-space:pre-wrap;overflow-wrap:anywhere;font:11px monospace;max-height:180px;overflow:auto}
+  .details a{color:#91cdbc;font-size:10px}.error{margin:12px 18px;padding:12px;background:#432525;color:#ffcdcd;border-radius:5px}
+  .notice,.progress{margin:12px 18px;color:#dbe9a8;font-size:12px}.pin-legend{margin-top:12px}.pin-legend ul{padding-left:15px;font:11px/1.8 monospace}
+  @container(max-width:700px){.workspace{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:start}.details{max-width:650px;overflow:visible}.board-scroll{height:640px;max-height:70vh}}
 </style>

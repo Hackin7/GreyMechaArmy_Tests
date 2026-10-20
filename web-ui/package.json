@@ -15,6 +15,8 @@
     "sync:oled-preset": "node scripts/sync-oled-preset.mjs",
     "verify:oled-preset": "node scripts/verify-oled-preset.mjs",
     "sync:simulator": "node scripts/sync-simulator-vendor.mjs",
+    "sync:simulator-board": "node scripts/sync-simulator-board.mjs",
+    "verify:simulator-board": "node scripts/verify-simulator-board.mjs",
     "verify:simulator": "node scripts/verify-simulator.mjs",
     "test:simulator:browser": "playwright test"
   },

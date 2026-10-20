@@ -1,0 +1,1303 @@
+{
+  "source": {
+    "project": "greybadge26",
+    "path": "greymechaarmy_v2/hardware/greybadge_pcb/greybadge_pcb.kicad_pcb",
+    "revision": "4d1c15e5273b7a51a31050a6c7ff121232df1747",
+    "sha256": "724388533bea246aad761373ebb334cb9befe05943d60dbc43bbef8746ce39f9",
+    "kiCad": "10.0.4",
+    "artwork": "Shuqing; PCB: hackin7, itsme-zeix, sayo",
+    "calibrationSha256": "947dc6a3e01de7421de1e6acb61a67ae5ae7b6b0f42df47fb2b6834e18195bc9",
+    "frontSvgSha256": "c7bb68ce5c834d76dd1a04c840635183825c2b8655bbef3bda97bc4383aca369"
+  },
+  "outline": {
+    "origin": [
+      81.749979,
+      50.985092
+    ],
+    "width": 75,
+    "height": 99,
+    "path": "M 5 99 A 4.999991 4.999991 0 0 1 0 94 L 0 5 A 4.999952 4.999952 0 0 1 5 0 L 70 0 A 4.999959 4.999959 0 0 1 75 5 L 75 94 A 5.000056 5.000056 0 0 1 70 99 L 5 99 Z M 39.102384 4.762451 L 45.631021 4.767908 L 45.631021 7.409508 L 29.578221 7.384108 L 29.578221 4.763955 L 36.197347 4.778824 A 1.452542 1.452542 0 1 1 39.102384 4.76245 Z",
+    "loops": 2
+  },
+  "buttons": [
+    {
+      "reference": "SW4",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 10.755532,
+      "y": 69.729323,
+      "rotation": 90,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 0,
+      "net": "B4"
+    },
+    {
+      "reference": "SW1",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 18.12352,
+      "y": 62.134193,
+      "rotation": -90,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 1,
+      "net": "A5"
+    },
+    {
+      "reference": "SW5",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 18.12352,
+      "y": 69.729323,
+      "rotation": -90,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 2,
+      "net": "B5"
+    },
+    {
+      "reference": "SW7",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 18.12352,
+      "y": 77.622794,
+      "rotation": -90,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 3,
+      "net": "A6"
+    },
+    {
+      "reference": "SW3",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 25.412492,
+      "y": 69.729323,
+      "rotation": 90,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 4,
+      "net": "B6"
+    },
+    {
+      "reference": "SW2",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 53.512397,
+      "y": 68.147526,
+      "rotation": 0,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 5,
+      "net": "D12"
+    },
+    {
+      "reference": "SW6",
+      "footprint": "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A",
+      "layer": "F.Cu",
+      "x": 63.149831,
+      "y": 63.436292,
+      "rotation": -180,
+      "width": 6.5,
+      "height": 5.1,
+      "index": 6,
+      "net": "C12"
+    }
+  ],
+  "leds": [
+    {
+      "reference": "D1",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 12.547319,
+      "y": 77.504063,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 0,
+      "net": "C3"
+    },
+    {
+      "reference": "D3",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 13.25814,
+      "y": 61.020714,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 1,
+      "net": "D3"
+    },
+    {
+      "reference": "D5",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 21.29692,
+      "y": 51.458206,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 2,
+      "net": "C4"
+    },
+    {
+      "reference": "D8",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 32.059722,
+      "y": 75.68074,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 3,
+      "net": "D4"
+    },
+    {
+      "reference": "D2",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 30.985693,
+      "y": 60.445745,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 4,
+      "net": "C5"
+    },
+    {
+      "reference": "D4",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 38.40016,
+      "y": 68.931263,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 5,
+      "net": "D5"
+    },
+    {
+      "reference": "D6",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 38.383977,
+      "y": 67.292053,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 6,
+      "net": "C6"
+    },
+    {
+      "reference": "D7",
+      "footprint": "LED_SMD:LED_0603_1608Metric_Pad1.05x0.95mm_HandSolder",
+      "layer": "F.Cu",
+      "x": 41.767478,
+      "y": 75.872213,
+      "rotation": 0,
+      "width": 1.6,
+      "height": 0.8,
+      "index": 7,
+      "net": "D6"
+    }
+  ],
+  "display": {
+    "alignment": "art-face-contour",
+    "x": 49.981858,
+    "y": 40.300588,
+    "diameter": 38.513603,
+    "activeDiameter": 37.935899,
+    "rotation": -13.433323,
+    "photoCenter": [
+      47.587661,
+      41.840497
+    ],
+    "registrationErrorPixels": 0.772469
+  },
+  "pads": [
+    {
+      "x": 22.950021,
+      "y": 37.474908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 21.990021,
+      "y": 37.474908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 40.892478,
+      "y": 75.872213,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 42.642478,
+      "y": 75.872213,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 20.550021,
+      "y": 35.639908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 19.590021,
+      "y": 35.639908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 12.38314,
+      "y": 61.020714,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 14.13314,
+      "y": 61.020714,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 65.134193,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 59.134193,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 65.134193,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 59.134193,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 20.42192,
+      "y": 51.458206,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 22.17192,
+      "y": 51.458206,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 80.622794,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 16.24852,
+      "y": 74.622794,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 80.622794,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 19.99852,
+      "y": 74.622794,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 20.900021,
+      "y": 38.609908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -270,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 20.900021,
+      "y": 39.569908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -270,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 21.780021,
+      "y": 35.304908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -270,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 21.780021,
+      "y": 36.264908,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -270,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 30.110693,
+      "y": 60.445745,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 31.860693,
+      "y": 60.445745,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 12.630532,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 12.630532,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 8.880532,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 8.880532,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 66.149831,
+      "y": 65.311292,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -180,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 60.149831,
+      "y": 65.311292,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -180,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 66.149831,
+      "y": 61.561292,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -180,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 60.149831,
+      "y": 61.561292,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -180,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 37.508977,
+      "y": 67.292053,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 39.258977,
+      "y": 67.292053,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 27.287492,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 27.287492,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 23.537492,
+      "y": 66.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 23.537492,
+      "y": 72.729323,
+      "width": 1,
+      "height": 0.75,
+      "rotation": -270,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 37.52516,
+      "y": 68.931263,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 39.27516,
+      "y": 68.931263,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 25.684631,
+      "y": 36.338083,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 24.724631,
+      "y": 36.338083,
+      "width": 0.56,
+      "height": 0.62,
+      "rotation": -180,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 11.672319,
+      "y": 77.504063,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 13.422319,
+      "y": 77.504063,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 50.512397,
+      "y": 66.272526,
+      "width": 1,
+      "height": 0.75,
+      "rotation": 0,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 56.512397,
+      "y": 66.272526,
+      "width": 1,
+      "height": 0.75,
+      "rotation": 0,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 50.512397,
+      "y": 70.022526,
+      "width": 1,
+      "height": 0.75,
+      "rotation": 0,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 56.512397,
+      "y": 70.022526,
+      "width": 1,
+      "height": 0.75,
+      "rotation": 0,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 31.184722,
+      "y": 75.68074,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 32.934722,
+      "y": 75.68074,
+      "width": 1.05,
+      "height": 0.95,
+      "rotation": 0,
+      "shape": "roundrect",
+      "drill": []
+    },
+    {
+      "x": 66.654901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 66.654901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 64.114901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 64.114901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 61.574901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 61.574901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 59.034901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 59.034901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 56.494901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 56.494901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 53.954901,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 53.954901,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 60.759021,
+      "y": 6.624575,
+      "width": 0.65,
+      "height": 0.65,
+      "rotation": 0,
+      "shape": "circle",
+      "drill": [
+        0.65
+      ]
+    },
+    {
+      "x": 66.539021,
+      "y": 6.624575,
+      "width": 0.65,
+      "height": 0.65,
+      "rotation": 0,
+      "shape": "circle",
+      "drill": [
+        0.65
+      ]
+    },
+    {
+      "x": 59.329021,
+      "y": 2.974575,
+      "width": 1,
+      "height": 1.6,
+      "rotation": 0,
+      "shape": "oval",
+      "drill": [
+        0.6,
+        1.2
+      ]
+    },
+    {
+      "x": 59.329021,
+      "y": 7.154576,
+      "width": 1,
+      "height": 2.1,
+      "rotation": 0,
+      "shape": "oval",
+      "drill": [
+        0.6,
+        1.7
+      ]
+    },
+    {
+      "x": 67.969021,
+      "y": 2.974575,
+      "width": 1,
+      "height": 1.6,
+      "rotation": 0,
+      "shape": "oval",
+      "drill": [
+        0.6,
+        1.2
+      ]
+    },
+    {
+      "x": 67.969021,
+      "y": 7.154576,
+      "width": 1,
+      "height": 2.1,
+      "rotation": 0,
+      "shape": "oval",
+      "drill": [
+        0.6,
+        1.7
+      ]
+    },
+    {
+      "x": 43.75972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 43.75972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 41.21972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 41.21972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 38.67972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 38.67972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 36.13972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 36.13972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 33.59972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 33.59972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 31.05972,
+      "y": 86.232156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 31.05972,
+      "y": 88.772156,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 56.380302,
+      "y": 50.327174,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 55.704154,
+      "y": 50.508349,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 55.028005,
+      "y": 50.689521,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 54.351858,
+      "y": 50.870695,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 53.675711,
+      "y": 51.051868,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 52.999561,
+      "y": 51.233041,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 52.323413,
+      "y": 51.414215,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 51.647266,
+      "y": 51.595388,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 50.971117,
+      "y": 51.77656,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 50.294969,
+      "y": 51.957735,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 49.618821,
+      "y": 52.138908,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 48.942672,
+      "y": 52.320081,
+      "width": 0.35,
+      "height": 2.5,
+      "rotation": -195,
+      "shape": "rect",
+      "drill": []
+    },
+    {
+      "x": 51.150021,
+      "y": 3.159908,
+      "width": 0.9,
+      "height": 0.9,
+      "rotation": 0,
+      "shape": "circle",
+      "drill": [
+        0.9
+      ]
+    },
+    {
+      "x": 54.150021,
+      "y": 3.159908,
+      "width": 0.9,
+      "height": 0.9,
+      "rotation": 0,
+      "shape": "circle",
+      "drill": [
+        0.9
+      ]
+    },
+    {
+      "x": 20.935764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "rect",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 20.935764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 18.395764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 18.395764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 15.855764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 15.855764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 13.315764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 13.315764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 10.775764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 10.775764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 8.235764,
+      "y": 86.328885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    },
+    {
+      "x": 8.235764,
+      "y": 88.868885,
+      "width": 1.7,
+      "height": 1.7,
+      "rotation": -90,
+      "shape": "oval",
+      "drill": [
+        1
+      ]
+    }
+  ]
+}

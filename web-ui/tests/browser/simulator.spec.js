@@ -18,6 +18,7 @@ function referenceHash(mode=0) {
   return hash;
 }
 const imageHashes=[0,1,2].map(referenceHash);
+const boardLayout=JSON.parse(await readFile(new URL('../../src/lib/simulator/boardLayout.json',import.meta.url),'utf8'));
 async function canvasHash(page) {
   return page.getByTestId('oled-display').evaluate(canvas=>{
     let hash=2166136261;
@@ -107,6 +108,74 @@ test('both unmodified OLED presets render in Pixel Preview', async ({ page }, te
   await pause(page);
   await page.screenshot({ path: testInfo.outputPath('advanced-pixel-preview.png'), fullPage: true });
   await page.keyboard.up('1');
+});
+
+test('PCB overlays remain aligned and interactive through zoom, fit and a narrow viewport',async({page},testInfo)=>{
+  await page.goto('./');
+  await editTop(page,"module top(input [6:0] btn,output [7:0] led);assign led={1'b0,~btn};endmodule");
+  await openSimulator(page);await compile(page);await pause(page);
+  const pane=page.getByRole('complementary',{name:'FPGA simulator panel'});
+  const editorRect=await page.locator('.editor').boundingBox(),paneRect=await pane.boundingBox();
+  expect(paneRect.x).toBeGreaterThanOrEqual(editorRect.x+editorRect.width);
+  const divider=page.getByRole('separator',{name:'Resize simulator panel'});
+  await divider.focus();await divider.press('ArrowLeft');
+  expect((await pane.boundingBox()).width).toBeGreaterThan(paneRect.width);
+  await divider.press('ArrowRight');
+  const handle=await divider.boundingBox();
+  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(handle.x-40,handle.y+handle.height/2);await page.mouse.up();
+  expect((await pane.boundingBox()).width).toBeGreaterThan(paneRect.width+20);
+  await page.getByRole('button',{name:'Resume',exact:true}).click();
+  const keyboardPanel=page.getByRole('region',{name:'GreyMecha simulator keyboard controls'});
+  await keyboardPanel.focus();await page.keyboard.down('1');
+  await page.getByRole('button',{name:'Close simulator panel',exact:true}).click();
+  await expect(pane).toBeHidden();await page.keyboard.up('1');
+  await openSimulator(page);await expect(page.getByTestId('sim-status')).toHaveText('paused');
+  await expect(page.getByTestId('sim-buttons')).toHaveText('1111111');
+  await expect(page.locator('.pcb-image')).toBeVisible();
+  await expect.poll(()=>page.locator('.pcb-image').evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+  async function checkPositionsAndInputs(){
+    const rect=await page.getByTestId('pcb-face').boundingBox();
+    for(const part of [...boardLayout.buttons,...boardLayout.leds]){
+      const target=part.reference.startsWith('SW')?page.getByRole('button',{name:`BTN ${part.index}`,exact:true}):page.getByTestId(`led-${part.index}`);
+      await expect(target).toHaveAttribute('data-reference',part.reference);await expect(target).toHaveAttribute('data-net',part.net);
+      const b=await target.boundingBox();
+      expect(Math.abs(b.x+b.width/2-(rect.x+rect.width*part.x/boardLayout.outline.width))).toBeLessThan(.15);
+      expect(Math.abs(b.y+b.height/2-(rect.y+rect.height*part.y/boardLayout.outline.height))).toBeLessThan(.15);
+    }
+    for(const part of boardLayout.buttons){
+      const button=page.getByRole('button',{name:`BTN ${part.index}`,exact:true});
+      await button.scrollIntoViewIfNeeded();const b=await button.boundingBox();
+      await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
+      await expect(button).toHaveAttribute('aria-pressed','true');
+      await expect(page.getByTestId(`led-${part.index}`)).toHaveAttribute('data-value','1');
+      await page.mouse.up();await expect(page.getByTestId(`led-${part.index}`)).toHaveAttribute('data-value','0');
+    }
+    const screen=await page.getByTestId('pcb-screen').boundingBox();const face=await page.getByTestId('pcb-face').boundingBox();
+    expect(Math.abs(screen.x+screen.width/2-(face.x+face.width*boardLayout.display.x/75))).toBeLessThan(.15);
+    expect(Math.abs(screen.y+screen.height/2-(face.y+face.height*boardLayout.display.y/99))).toBeLessThan(.15);
+  }
+  await checkPositionsAndInputs();
+  await page.getByRole('button',{name:'Zoom in board',exact:true}).click();
+  await page.getByRole('button',{name:'Zoom in board',exact:true}).click();await checkPositionsAndInputs();
+  await page.getByRole('button',{name:'Fit / Reset zoom',exact:true}).click();await checkPositionsAndInputs();
+  // Real Chromium multi-touch (synthetic pointer events cannot capture a pointer).
+  const a=page.getByRole('button',{name:'BTN 0',exact:true}),b=page.getByRole('button',{name:'BTN 4',exact:true});
+  const [ab,bb]=await Promise.all([a.boundingBox(),b.boundingBox()]);
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:ab.x+ab.width/2,y:ab.y+ab.height/2,id:1},{x:bb.x+bb.width/2,y:bb.y+bb.height/2,id:2}]});
+  await expect(page.getByTestId('sim-buttons')).toHaveText('1101110');
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
+  await expect(page.getByTestId('sim-buttons')).toHaveText('1111111');
+  await page.setViewportSize({width:820,height:1050});
+  await page.getByRole('button',{name:'Fit / Reset zoom',exact:true}).click();await checkPositionsAndInputs();
+  await page.screenshot({path:testInfo.outputPath('pcb-narrow-controls.png'),fullPage:true});
+  await page.setViewportSize({width:700,height:1000});
+  await expect(page.getByRole('separator',{name:'Resize simulator panel'})).toBeHidden();
+  await page.getByRole('button',{name:'Fit / Reset zoom',exact:true}).click();await checkPositionsAndInputs();
+  const drawer=await pane.boundingBox();expect(drawer.x).toBeGreaterThanOrEqual(205);expect(drawer.x+drawer.width).toBeLessThanOrEqual(700);
+  await page.screenshot({path:testInfo.outputPath('pcb-right-drawer.png'),fullPage:true});
+  await page.getByRole('button',{name:'Close simulator panel',exact:true}).click();await expect(pane).toBeHidden();
+  expect((await page.locator('.editor').boundingBox()).width).toBeGreaterThan(drawer.width);
 });
 
 test('advanced OLED SPI: image, color buttons, aspect modes and reset', async ({ page }, testInfo) => {

@@ -23,7 +23,7 @@ The production build contains the main editor. Vite bundles netlistsvg and ELK l
 
 ## Build views
 
-The **Simulator** tab runs the editor's Verilog on an interactive GreyMecha/Army board, with buttons, LEDs, and selectable **Pixel Preview** or **SPI Simulation** for the OLED. It runs entirely in the browser and does not require synthesis or a physical badge. See [simulator usage, supported hardware, and verification](SIMULATOR.md).
+The **Simulator** sidebar action opens a resizable panel to the right of the editor. Its interactive GreyMecha/Army board uses the Greybadge26 PCB outline, artwork and component positions, with an enlarged OLED aligned to the artwork's face and selectable **Pixel Preview** or **SPI Simulation**. It runs entirely in the browser and does not require synthesis or a physical badge. Closing the panel pauses simulation; the terminal and other build views remain below the editor. See [simulator usage, PCB refresh, supported hardware, and verification](SIMULATOR.md).
 
 Each synthesis run produces artifacts as they become available. The **Terminal** tab shows build output. The **Logical Netlist** tab shows the coarse ECP5 synthesis result before final cell mapping. **Mapped ECP5** shows the JSON from `synth_ecp5`; it can be much denser because logic has been lowered into device-specific cells. Both diagrams allow module selection, pan, zoom, fit, and reset. **P&R Export** provides `place.json` and `report.json` from nextpnr as separate downloads. To view them, open the [nextpnr-viewer](https://edacation.github.io/nextpnr-viewer/), choose **Family: ECP5** and **Device: 25K**, then upload `place.json` as the placement file and `report.json` as the report file. Use both files from the same build.
 

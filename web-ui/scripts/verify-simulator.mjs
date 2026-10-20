@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { performance } from 'node:perf_hooks';
 import './verify-simulator-assets.mjs';
+import './verify-simulator-board.mjs';
 
 globalThis.require = createRequire(import.meta.url);
 globalThis.__dirname = new URL('../public/simulator/', import.meta.url).pathname;
