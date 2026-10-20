@@ -1,14 +1,18 @@
 # OV7670 camera on GreyMecha
 
+Prebuilt ISP bitstream and checksum: [ov7670-v0.2.0](https://github.com/Hackin7/GreyMechaArmy_Tests/releases/tag/ov7670-v0.2.0).
+
 Standalone ECP5-25K demo for a **parallel OV7670 breakout without FIFO** and
 GreyMecha's GC9A01 round screen. The FPGA initializes the sensor, captures
 160x120 RGB565, and shows it at native size, centered at `(40,60)` on the
 240x240 panel. The entire image fits inside the visible circle.
 
-Grey toggles a saturating RGB offset correction. This is a demonstration on
-the camera's already processed RGB output, **not raw Bayer black-level
-calibration**. The camera's exposure, gain, white balance and gamma remain
-enabled. There is no recording, external RAM or Python pixel streaming.
+Up/down select RGB Offset, Gamma, Contrast, Saturation or Sobel edges. Grey
+toggles the selected effect; left/right adjust its value. A white label above
+the image shows the selection, value and ON/OFF state. These effects operate
+on the camera's already processed RGB output, **not raw Bayer data**. Sensor
+exposure, gain, white balance and gamma remain enabled. There is no recording,
+external RAM or Python pixel streaming.
 
 ## Wiring
 
@@ -114,21 +118,23 @@ deferred loader avoids that condition. No changes to the loader are needed.
 
 | Control | Action |
 | --- | --- |
-| Grey, D12 | Toggle correction (initially off) |
-| Left, B4 | Offset -4, minimum 0 |
-| Right, B6 | Offset +4, maximum 64 |
-| Reset, C12 | Restart sensor/display and restore offset 16, correction off |
+| Grey, D12 | Toggle the selected effect (initially off; OFF is exact bypass) |
+| Up, A5 / Down, A6 | Select next/previous mode, wrapping around |
+| Left, B4 / Right, B6 | Decrease/increase the selected value, with limits |
+| Reset, C12 | Restart sensor/display; Offset selected, value 16, effect off |
 
 Buttons debounce independently for nominally 20 ms. Holds act once; opposing
 simultaneous left/right presses cancel. Changes become visible between LCD
-frames, so a frame never mixes correction settings.
+frames, so a frame never mixes correction settings. Up/down together cancel;
+adjustment events are ignored when a selection event occurs. Values persist
+per mode until reset. Selecting a mode does not change the ON/OFF state.
 
 | LED bit | Meaning |
 | --- | --- |
 | 0 | Sensor configuration and display initialization complete |
 | 1 | A complete camera frame was accepted within the last nominal second |
 | 2 | Correction enabled |
-| 5:3 | Offset divided by 16 (coarse level 0..4; each button step is still 4) |
+| 5:3 | Mode: 0 Offset, 1 Gamma, 2 Contrast, 3 Saturation, 4 Sobel |
 | 6 | Malformed camera frame seen since reset (sticky) |
 | 7 | Sensor initialization failed, or configured camera has no recent frame |
 
@@ -143,9 +149,58 @@ in simulation/debug; the board LED combines initialization failures.
 ## Pixel and clock behavior
 
 ```text
-OV7670 -> PCLK capture -> three RGB565 buffers -> image-only GC9A01 SPI
-              Grey / left / right -> frame-latched RGB offset correction
+OV7670 -> PCLK capture -> three RGB565 buffers -> ISP -> pixel queue -> GC9A01
+              Buttons -> image-latched mode/value -> border label
 ```
+
+### ISP modes
+
+Only the selected effect runs. Gains use Q8.8 signed fixed-point arithmetic;
+RGB565 expands by bit replication and quantizes by truncation after clamping.
+Identity Gamma/Contrast/Saturation settings and OFF preserve pixels exactly.
+
+| Mode | Range / step | Reset value | Definition |
+| --- | --- | --- | --- |
+| Offset | 0..64 / 4 | 16 | `max(channel - offset, 0)` |
+| Gamma | .5, .625, .75, .875, 1, 1.25, 1.5, 1.75, 2 | 1.5 | `round(255*(channel/255)^(1/gamma))` |
+| Contrast | 0..2 / .125 | 1.25 | Gain around channel midpoint 128 |
+| Saturation | 0..2 / .125 | 1.25 | Gain around pixel luminance |
+| Sobel | .25..4 / .25 | 1 | Grayscale `sensitivity*(abs(Gx)+abs(Gy))/4`, rounded/clamped |
+
+Luminance is `(77R + 150G + 29B + 128) >> 8`. Contrast and saturation add
+128 before arithmetic product shift by eight. Sobel uses standard 3x3
+kernels; its outermost row/column are black. Left/right change Gamma by one
+preset. Fractional values display to three decimal places.
+
+Sobel reads eight neighbors directly from the held, immutable image bank.
+The worker completes within 24 system clocks and queues two results; steady
+SPI consumes one pixel every 32 clocks. A data shortage pauses SCLK low
+between pixels, never duplicates data, and increments `pixel_wait_cycles`.
+Gamma tables are logic ROM; the font and queue use logic/distributed memory.
+The framebuffer still occupies exactly 56 block-RAM blocks. Regenerate gamma
+RTL with `python3 tools/generate_gamma.py`; `--check` verifies freshness.
+
+The label occupies columns 40..199, rows 40..51. It updates only when settings
+change, before that image transfer, and the image window is then restored to
+columns 40..199, rows 60..179. The full-screen black clear happens once.
+When the camera stops, the last image/label remain; pending settings apply
+when another complete camera image becomes available.
+
+The read-only diagnostic snapshot now contains 136 bytes: the previous 116
+bytes are unchanged; bytes 116..119 are `ISP1`, 120 is mode, 121 is enabled,
+122..126 are the five remembered preset indices, 127..128 are the selected
+Q8.8 value, 129 is reserved, 130..133 are pixel wait cycles, and 134..135 are
+reserved. Integers are big-endian; older decoders may still read the prefix.
+
+`tools/measure_device.ps1 -Mode 4 -RequireEnabled -DurationSeconds 600`
+measures Sobel after selecting it and enabling processing on the badge.
+Use `-Mode 0` through `-Mode 4` with 60 seconds for each mode. The host embeds
+the current decoder in RAM, so no badge filesystem update is needed. Mode,
+enable state and values must remain unchanged throughout a measurement;
+unexpected pixel queue waits fail qualification.
+Add `-WaitForModeSeconds 300` to wait for the physical buttons to select and
+enable the requested mode before starting the timed interval. This only reads
+diagnostics; the host does not control buttons or change ISP settings.
 
 The default build targets approximately 30 distinct images/s; it is not a
 hardware-qualified frame-rate guarantee. Select a timing profile explicitly:
@@ -206,11 +261,10 @@ With the correction disabled, sensor bars appeared gray/cyan/yellow/green/
 magenta/blue/red/dark gray. A passive PIO capture confirmed the camera words
 arrive unchanged at the panel connector, identifying a panel red/blue reversal.
 Use `PANEL_SWAP_RB=0` only for a panel verified to accept the unswapped order.
-RAM reads have three clock stages. A registered correction stage fits within
-the streamer's six-clock prefetch. Correction settings commit at image-transfer
-start, and remain constant through that image. RGB565 channels expand through
-bit replication, subtract the shared offset with saturation at zero, then
-quantize back to RGB565. Bypass preserves the original pixel exactly.
+RAM reads have three clock stages. The ISP worker issues tagged reads and
+queues completed results, replacing the legacy fixed-prefetch correction path.
+Settings commit at image-transfer start and remain constant through that image.
+The retained legacy stream/correction modules are tested separately.
 
 ## Verification and hardware acceptance
 
@@ -225,6 +279,11 @@ boundary/rearm behavior and R/B swapping. That test shortens ROM pauses and
 freezes the unused ROM address after initialization to reduce simulation time.
 Python
 tests check launcher teardown, fresh-session behavior and upload errors.
+ISP tests additionally compare 83 image cases against an independent software
+reference, exhaust every gamma input/preset/channel, check the 24-clock worker
+budget, and decode seven complete image transfers plus exact label glyphs.
+They cover deliberate SPI starvation, all new controls, unchanged-label
+suppression, diagnostics and measurement acceptance/rejection.
 
 Hardware checks still require the actual badge and module:
 
@@ -250,9 +309,10 @@ See [VALIDATION.md](VALIDATION.md) for the checks actually run.
 ## USB diagnostics
 
 The read-only diagnostic SPI port uses RP2350 GP8 as clock, GP10 as MISO,
-and GP11 as CS. Each selection snapshots 116 bytes beginning with `CAM2`.
+and GP11 as CS. Each selection snapshots 136 bytes beginning with `CAM2`.
 The original prefix and the `PIN1`/`FPS1` extensions are preserved. Bytes
 96..115 add `COL1` and eight raw RGB565 words from row 0, x=10,30,..150.
+Bytes 116..135 add the `ISP1` extension described above.
 `badge/status.py` decodes the flags, sensor ID, last register/result, NACK
 bitmap, PCLK/VSYNC activity, accepted/displayed frames and line geometry.
 NACK bitmap bits 0, 1 and 2 refer to device address, register address and

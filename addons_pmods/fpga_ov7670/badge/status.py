@@ -13,8 +13,8 @@ def camera_status(verbose=True):
         cs.switch_to_output(value=True)
         cs.value=False
         time.sleep(0.001)
-        received=bytearray(116)
-        for n in range(116):
+        received=bytearray(136)
+        for n in range(136):
             value=0
             for _ in range(8):
                 sck.value=True
@@ -25,6 +25,13 @@ def camera_status(verbose=True):
         assert received[:4]==b'CAM2', 'Camera diagnostic bitstream not running: '+repr(received)
         flags=received[7]
         rates={}
+        if received[116:120]==b'ISP1':
+            rates['isp_mode']=received[120]
+            rates['isp_name']=('Offset','Gamma','Contrast','Saturation','Sobel')[received[120]] if received[120]<5 else 'Invalid'
+            rates['isp_enabled']=bool(received[121])
+            rates['isp_presets']=list(received[122:127])
+            rates['isp_value_q8']=int.from_bytes(received[127:129],'big')
+            rates['pixel_wait_cycles']=int.from_bytes(received[130:134],'big')
         if received[96:100]==b'COL1':
             rates['raw_color_samples']=[hex(int.from_bytes(received[pos:pos+2],'big'))
                 for pos in range(100,116,2)]

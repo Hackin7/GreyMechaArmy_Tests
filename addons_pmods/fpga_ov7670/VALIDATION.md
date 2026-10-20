@@ -1,5 +1,54 @@
 # OV7670 demo validation
 
+## Current ISP qualification - 2026-10-20
+
+The five selectable modes are implemented and loaded on GreyMecha. The user
+confirmed Gamma, Contrast, Saturation and Sobel appearance, on-screen labels,
+Left/Right adjustments, Grey bypass and a stable image without flicker,
+tearing or label corruption during Sobel testing.
+
+| Enabled mode | Seconds | Captured FPS | Displayed FPS | Result |
+| --- | ---: | ---: | ---: | --- |
+| Offset | 60.022 | 31.938 | 31.938 | PASS |
+| Gamma | 60.021 | 31.939 | 31.939 | PASS |
+| Contrast | 60.022 | 31.922 | 31.922 | PASS |
+| Saturation | 60.022 | 31.955 | 31.955 | PASS |
+| Sobel | 60.023 | 31.954 | 31.938 | PASS |
+| Sobel endurance | 600.016 | 31.948 | 31.946 | PASS |
+
+All completed intervals have zero malformed frames, capture drops, replaced
+pending frames, pixel queue waits or recorded issues. The 600-second Sobel
+run retains the same enabled mode, sensitivity and presets throughout.
+Individual captured/displayed totals can differ by one transfer in flight
+at an interval boundary; this is not a dropped frame.
+
+24 RTL test variants and 15 Python tests pass. RTL includes all 256 gamma
+inputs for all presets/channels, 83 independent image-reference cases, the
+24-clock worker bound, asynchronous buffer ownership, and seven complete
+SPI-decoded images with exact labels/windows. Timing passes at 53.527 MHz
+system Fmax against 51.669 MHz and 126.342 MHz PCLK Fmax against 12.5 MHz.
+The design uses exactly 56 block-RAM blocks. Camera capture/pins/sensor timing
+are unchanged; external input setup/hold has not been newly measured.
+
+Candidate: `build/fpga_ov7670.bit`, 712,177 bytes, SHA256
+`f57324fde9f0dc3dd39e2c4a994d464eeb7d391ce1e807d1faea5576e3d7feb1`.
+Verified FPGA SRAM load, SUM32 13737099. Left running in Sobel 1.000 ON.
+The qualified binary is distributed with release `ov7670-v0.2.0`, together
+with its SHA256 checksum. The source changes are committed to `main`.
+Hardware qualification used FPGA SRAM; no persistent badge-file installation
+or flash/NVM changes were made. The previous released bitstream is retained
+locally as `build/fpga_ov7670-rollback.bit`.
+
+Completed logs:
+- `build/measure-isp-offset-60s.log`
+- `build/measure-isp-gamma-60s.log`
+- `build/measure-isp-contrast-60s.log`
+- `build/measure-isp-saturation-60s.log`
+- `build/measure-isp-sobel-60s.log`
+- `build/measure-isp-sobel-600s.log`
+
+The sections below retain the implementation and bring-up history.
+
 ## 30 FPS implementation — 2026-10-19
 
 The new capture/display path is implemented, built, and now running on the
@@ -405,3 +454,133 @@ qualification on the color-corrected candidate. Controls were confirmed
 working by the user earlier; tearing was not separately confirmed.
 The candidate remains running in FPGA SRAM. Persistent installation is
 still blocked by the badge's write-protected filesystem.
+
+## Selectable ISP implementation (camera-isp worktree)
+
+Added mutually exclusive Offset, Gamma, Contrast, Saturation and grayscale
+Sobel processing after capture. Up/down select modes; Grey toggles exact
+bypass; left/right adjust remembered per-mode presets. Reset restores Offset
+16, disabled. Independent 20 ms debounce filters and frame-start commits keep
+settings and label consistent for a complete image. LED bits 5:3 now show mode.
+
+The immutable display bank supplies eight tagged neighbor reads per interior
+Sobel pixel, avoiding additional line/frame block RAM. A two-entry result queue
+and ready/valid SPI shifter replace fixed prefetch timing. Starvation safely
+waits with SCLK low between pixels and is counted. The 160x12 border label uses
+columns 40..199, rows 40..51, with name, value and ON/OFF; only changed labels
+are redrawn and the image address window is restored afterward.
+
+The 116-byte diagnostic prefix is preserved; ISP1 adds 20 bytes for mode,
+enable state, five remembered presets, Q8.8 selected value and pixel wait
+cycles. Measurement now embeds the host decoder in RAM and can require a
+selected/enabled mode; changed settings or unexpected queue waits fail it.
+
+Software validation completed:
+- 83 independent software-reference image cases passed: all point-effect
+  presets, full-frame bypass/identity, flat fields, horizontal/vertical edges,
+  ramps, isolated impulses, Sobel borders and gain/clipping limits.
+- Every requested neighbor address was inside the frame; the worker stayed
+  within 24 clocks and the two-entry queue handled consumer backpressure.
+- All 256 gamma inputs passed for all nine presets and all three channels.
+- Controls passed debounce/bounce/hold, atomic commit, opposing events,
+  selection wraparound, remembered values, bounds and reset tests.
+- SPI shifter passed deliberate startup/between-pixel starvation, exact data,
+  final-bit and rearm checks.
+- The final post-pipeline full-panel test decoded seven complete 19,200-pixel images,
+  exact HUD glyphs/values and address windows, unchanged-label suppression,
+  final R/B transport exchange, and zero queue waits.
+- Triple-buffer asynchronous ownership/overload/malformed-frame regression,
+  all 57,600 RAM words including chunk edges/tail, 1,088-bit atomic diagnostic
+  snapshot and fast-profile SCCB initialization tests passed.
+- 15 Python tests passed (launcher 4, diagnostics 5, measurement 6), including
+  rejecting mode changes, wrong requested mode and queue starvation.
+
+Gamma ROM first required logic-ROM mapping rather than forced distributed
+RAM. The first routed build then found an overlong HUD formatting/glyph path;
+HUD rendering was split into registered stages and arithmetic division was
+removed. The next route isolated a saturation luma-to-gain path; luminance,
+channel deltas and products were split into separate stages. The final 83-case
+reference regression passes with the pipeline and 24-clock budget checks.
+
+GreyMecha was reconnected on COM3. The candidate is loaded into FPGA SRAM;
+hardware frame-rate/endurance and visual-effect qualification are in progress.
+The verified release bitstream remains available for rollback. Hardware
+acceptance requires 60 seconds per enabled mode and ten minutes in Sobel,
+28..33 captured/displayed FPS, zero malformed/drop/wait counters, and visual
+confirmation of effects, label, controls, colors and image stability.
+
+Final timing/build: system 53.527 MHz against 51.669 MHz; PCLK 126.342 MHz
+against 12.5 MHz, 56 DP16KD blocks. Gamma/font/queue add no block RAM.
+Camera input capture, pins and sensor timing are unchanged; no new physical
+setup/hold measurement at the receiving pins has been made.
+Promoted artifacts from `/tmp/greymecha-camera-isp` to this worktree's build/.
+Candidate: 712,177 bytes, SHA256
+`f57324fde9f0dc3dd39e2c4a994d464eeb7d391ce1e807d1faea5576e3d7feb1`.
+Direct programmer reports FPGA_PROGRAM_VERIFIED True and SUM32 13737099.
+Logs: build/isp-build.log, build/program-isp.log.
+Rollback copy: build/fpga_ov7670-rollback.bit, release SHA256
+`608eeae3957d40500844e8352d4ec90ef0555663281d39d1dbb6f19a7e3ec6e2`.
+At this bring-up checkpoint, no release, flash/NVM changes or persistent badge-file installation had been made.
+
+All 24 RTL variants (18 retained, five ISP, expanded diagnostic snapshot) and
+15 Python tests pass. Final pipeline logs: build/isp-final-pipeline-tests.log,
+build/isp-panel.log, build/isp-extra-tests.log, build/isp-diagnostics-tests.log,
+build/isp-legacy-regression.log. User confirmed live image and label work,
+and enabled Offset with Grey. Initial diagnostic snapshots show ISP1 mode 0,
+enabled True, value 4096, 320-byte/120-line geometry and zero error/drop/wait
+counters. No hardware acceptance rate is claimed until a complete timed log.
+
+Hardware qualification, candidate f57324fd:
+- Offset enabled: 60.022 seconds, 1,917 valid captured and displayed images,
+  31.938 FPS each; zero malformed/drop/replacement/pixel-wait counts or issues.
+- Gamma 1.500 enabled: 60.021 seconds, 1,917 captured/displayed images,
+  31.939 FPS each, zero errors/drops/waits/issues. User confirmed visible Gamma
+  effect works. Logs: build/measure-isp-offset-60s.log and
+  build/measure-isp-gamma-60s.log. The initial waiting Offset attempt was
+  interrupted before the completed timed run; it is not a separate pass.
+- Contrast qualification did not start: the 300-second physical-selection
+  wait expired while the badge remained in Gamma ON, value 384. This is a
+  waiting/selection timeout, not an algorithm or frame-rate failure. Log:
+  build/measure-isp-contrast-60s.log; subsequent compact status is in
+  build/status-isp-current.log and shows mode 1, enabled, zero malformed,
+  capture-drop and pixel-wait counters.
+- Remaining hardware acceptance: visual Contrast/Saturation/Sobel checks,
+  Left/Right/bypass adjustment confirmation, 60 seconds each for the three
+  remaining modes, and ten minutes continuously in enabled Sobel. These
+  results must not be inferred from the completed Offset/Gamma runs.
+- Left running in Gamma 1.500 ON. At that checkpoint, source edits remained isolated in branch
+  camera-isp / .worktrees/camera-isp; no new commit, push or release was made.
+
+User subsequently confirmed Gamma Left/Right adjustments, Grey bypass and
+Contrast appearance all work. Diagnostic mode 2, enabled, Q8.8 value 320
+(1.250) is confirmed; Contrast timing qualification resumed.
+
+Contrast 1.250 enabled PASSED: 60.022 seconds, 1,916 captured and displayed
+images, 31.922 FPS each, zero malformed frames, capture drops, pending
+replacements, pixel waits or issues. User confirmed the Contrast effect and
+Gamma Left/Right plus Grey bypass controls. Log:
+build/measure-isp-contrast-60s.log (completed retry after the selection wait).
+
+User confirmed Saturation appearance works at 1.250. Its initial physical
+selection wait had expired; a fresh 60-second measurement started after
+diagnostic mode 3 / enabled / value 320 was verified. No algorithm error
+was indicated by that waiting timeout.
+
+Saturation 1.250 enabled PASSED: 60.022 seconds, 1,918 captured/displayed
+images, 31.955 FPS each; zero malformed frames, capture drops, pending
+replacements, pixel waits or issues. Log: build/measure-isp-saturation-60s.log.
+User confirmed Saturation effect works. Only Sobel visual/rate/endurance
+qualification remains.
+
+User confirmed Sobel grayscale outlines look correct. Its initial mode-selection
+wait expired while awaiting physical input; a fresh measurement started after
+mode 4 / enabled / Q8.8 value 256 was verified. At the start, cumulative valid
+frames exceeded 1,022,000 with zero malformed/drop/replacement/pixel-wait
+counters; this alone is not a timed Sobel qualification. Final 60-second and
+ten-minute runs are in progress with the same candidate and settings.
+
+Sobel 1.000 enabled, 60-second test PASSED: 60.023 seconds, 1,918 captured
+frames (31.954 FPS) and 1,917 displayed images (31.938 FPS), with zero
+malformed frames, drops, pending replacements, pixel waits or issues.
+Log: build/measure-isp-sobel-60s.log. The one-image endpoint difference is
+a transfer in flight, not a dropped frame. The 600-second run is active.

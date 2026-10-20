@@ -94,19 +94,20 @@ module top #(
         .write_bank(write_bank),.write_address(write_address),.write_data(write_data),
         .clk(clk),.read_bank(read_bank),.read_address(read_address),.read_data(read_data));
     wire enabled;
-    wire [6:0] offset;
-    camera_controls #(.DEBOUNCE_CYCLES(CLK_HZ/50)) controls(
-        .clk(clk),.resetn(resetn),.frame_boundary(frame_start),
-        .buttons_n({btn[4],btn[0],btn_grey_n}),.enabled(enabled),.offset(offset));
-    wire [15:0] pixel_index,corrected;
-    reg [15:0] pixel_data;
-    assign read_address=pixel_index[14:0];
-    rgb_offset correction(.pixel(read_data),.enabled(enabled),.offset(offset),.corrected(corrected));
-    always @(posedge clk) pixel_data<=corrected;
+    wire [2:0] isp_mode;
+    wire [39:0] isp_presets;
+    wire [15:0] isp_value;
+    wire [31:0] pixel_wait_cycles;
+    isp_controls #(.DEBOUNCE_CYCLES(CLK_HZ/50)) controls(
+        .clk(clk),.resetn(resetn),.commit(frame_start),
+        .buttons_n({btn[3],btn[1],btn[4],btn[0],btn_grey_n}),
+        .enabled(enabled),.mode(isp_mode),.presets(isp_presets),.value_q8(isp_value));
     wire display_ready, streaming;
-    camera_panel #(.CLK_HZ(CLK_HZ),.SWAP_RB(PANEL_SWAP_RB)) display(
+    isp_panel #(.CLK_HZ(CLK_HZ),.SWAP_RB(PANEL_SWAP_RB)) display(
         .clk(clk),.resetn(resetn),.frame_available(pending_valid && !display_busy),
-        .pixel_index(pixel_index),.pixel_data(pixel_data),.frame_start(frame_start),
+        .read_address(read_address),.read_data(read_data),.frame_start(frame_start),
+        .enabled(enabled),.mode(isp_mode),.presets(isp_presets),.value_q8(isp_value),
+        .pixel_wait_cycles(pixel_wait_cycles),
         .oled_scl(oled_scl),.oled_sda(oled_sda),.oled_dc(oled_dc),
         .oled_cs(oled_cs),.oled_rst(oled_rst),.init_done(display_ready),
         .streaming(streaming),.frame_done(frame_boundary));
@@ -123,7 +124,7 @@ module top #(
     end
     // A stale frame remains visible; loss of new complete frames is explicit.
     assign led={((|config_error) || (configured && !active_camera)),
-                malformed_sync[1],offset[6:4],enabled,active_camera,
+                malformed_sync[1],isp_mode,enabled,active_camera,
                 (configured && display_ready)};
     wire [31:0] pclk_edges,camera_frames;
     wire [9:0] last_lines;
@@ -165,7 +166,10 @@ module top #(
         .clk(clk),.resetn(resetn),.write_enable(write_enable),
         .write_address(write_address),.write_data(write_data),
         .frame_toggle(valid_pclk[0]),.samples(color_samples));
-    camera_debug #(.STATUS_BITS(928)) debug_port(.clk(clk),.resetn(resetn),.sck(debug_sck),
+    wire [159:0] isp_status={32'h49535031,5'd0,isp_mode,7'd0,enabled,
+        isp_presets[7:0],isp_presets[15:8],isp_presets[23:16],isp_presets[31:24],isp_presets[39:32],
+        isp_value,8'd0,pixel_wait_cycles,16'd0};
+    camera_debug #(.STATUS_BITS(1088)) debug_port(.clk(clk),.resetn(resetn),.sck(debug_sck),
         .cs_n(debug_cs_n),.status({debug_status,32'h50494e31,4'd0,pin_levels,
-        4'd0,pin_changed,pin_counts,rate_status,32'h434f4c31,color_samples}),.miso(debug_miso));
+        4'd0,pin_changed,pin_counts,rate_status,32'h434f4c31,color_samples,isp_status}),.miso(debug_miso));
 endmodule

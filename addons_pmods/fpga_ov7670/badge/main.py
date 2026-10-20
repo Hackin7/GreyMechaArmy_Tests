@@ -45,7 +45,7 @@ def app(hw_state=None, path=BITSTREAM_PATH):
     release_resources(hw_state)
     handle = hardware.fpga.upload_bitstream(path)
     try:
-        print("OV7670 FPGA demo loaded. Grey: correction; left/right: offset.")
+        print("OV7670 ISP loaded. Up/down: mode; Grey: bypass; left/right: value.")
     finally:
         if handle is not None:
             handle.deinit()

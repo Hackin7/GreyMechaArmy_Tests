@@ -29,7 +29,7 @@ class StatusTests(unittest.TestCase):
             finally: self.assertTrue(all(pin.closed for pin in handles))
 
     def snapshot(self):
-        data=bytearray(116)
+        data=bytearray(136)
         data[:4]=b'CAM2';data[4]=0x76;data[5]=0x73;data[7]=0xfd
         data[28:32]=((120<<22)|320).to_bytes(4,'big')
         return data
@@ -54,7 +54,16 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(self.decode(data)['raw_color_samples'],[hex(word) for word in words])
 
     def test_rejects_wrong_bitstream(self):
-        with self.assertRaises(AssertionError): self.decode(bytearray(116))
+        with self.assertRaises(AssertionError): self.decode(bytearray(136))
+
+    def test_isp_extension(self):
+        data=self.snapshot();data[116:120]=b'ISP1';data[120]=4;data[121]=1
+        data[122:127]=bytes((4,6,10,10,3));data[127:129]=(256).to_bytes(2,'big')
+        data[130:134]=(123).to_bytes(4,'big')
+        result=self.decode(data)
+        self.assertEqual((result['isp_name'],result['isp_mode'],result['isp_enabled']),('Sobel',4,True))
+        self.assertEqual(result['isp_presets'],[4,6,10,10,3])
+        self.assertEqual((result['isp_value_q8'],result['pixel_wait_cycles']),(256,123))
 
 
 if __name__=='__main__': unittest.main()
