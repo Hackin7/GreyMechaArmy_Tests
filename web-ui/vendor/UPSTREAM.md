@@ -4,7 +4,7 @@
 
 - Upstream: https://github.com/sehugg/8bitworkshop
 - Pinned commit: `09d99f2c3028e27b397df8471baec29975ec154b`
-- Source subset: `src/common/hdl/{hdltypes,hdlruntime,vxmlparser}.ts`, `src/common/{util,workertypes}.ts`.
+- Source subset: `src/common/hdl/{hdltypes,hdlruntime,vxmlparser}.ts`, `src/common/{util,workertypes,waveform,waveformcore}.ts`.
 - Browser compiler: `src/worker/wasm/verilator_bin.{js,wasm}`. The executable reports `Verilator 4.205 devel rev UNKNOWN.REV (mod)`; do not describe it as current upstream Verilator.
 - Original 8bitworkshop code is copyright Steven E. Hugg and contributors, GPL-3.0. Full license: [8bitworkshop/LICENSE](8bitworkshop/LICENSE), also served as `/simulator/COPYING`.
 - Verilator is copyright Wilson Snyder and contributors, licensed LGPL-3.0 or Artistic-2.0. LGPL text is served as `/simulator/VERILATOR-LICENSE`. The upstream fork source is https://github.com/8bitworkshop/verilator; the 4.205 source reference used for licensing is `6c3efcd5d869ba772e4ed1365727e155fd9210da`.
@@ -17,6 +17,10 @@ The compiler bytes are pinned from 8bitworkshop, not rebuilt during website buil
 2. `vxmlparser.ts`: pass readmem's radix and optional start/end to the runtime. The pinned compiler omits the radix from XML, so the GreyMecha adapter resolves `$readmemh` versus `$readmemb` from compiler source locations. The board adapter supplies a strict memory loader with whitespace, comments and address support.
 
 `emu.ts` and `hdl/hdlhost.ts` are GreyMecha shims exposing only the error/host interfaces required by this subset. No 8bitworkshop IDE, emulators, unrelated toolchains, or frontend are bundled. The original UMD compiler loader is retained byte-for-byte, with a generated ESM copy that appends only `export default verilator_bin`.
+
+The waveform viewer extends the unmodified pinned `WaveformCore` with a Svelte UI and timestamp-aware digital/bus drawing in `src/lib/simulator/waveformView.js`. Upstream's equally spaced sample drawing, editable inputs, and 32-bit trace storage are replaced by GreyMecha's bounded, read-only settled-event capture. Both waveform source files are included in the asset hash manifest and refresh workflow. No jQuery, IDE toolbar, or upstream platform event loop is bundled.
+
+`src/lib/simulator/packedRuntime.js` subclasses the pinned JS runtime to emit scalar 33–64-bit constants, assignments, arithmetic, shifts and change detection using exact BigInt values. This avoids upstream's decimal Number rounding and 32-bit bitwise truncation in wide waveform signals. The vendor source stays unmodified; a 64-bit counter and native comparisons are included in simulator verification.
 
 The manifest records both upstream bytes and patched delivery hashes. `verify-simulator-assets.mjs` verifies delivery hashes and the generated loader. Source/assets have explicit Git attributes so checkout line-ending conversion does not invalidate those hashes.
 

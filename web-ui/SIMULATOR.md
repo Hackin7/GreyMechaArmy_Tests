@@ -25,9 +25,22 @@ Switching modes recompiles and restarts the simulation. Both render a 240×240 f
 - Two-state digital simulation with deterministic zero initialization plus explicit RTL initial values. It does not reproduce metastability, analog effects, physical routing delays, or full X/Z behavior. Only zero-based unpacked arrays are supported. Direct `$readmemh`/`$readmemb` calls support comments, whitespace-separated values, `@` addresses, and explicit ranges; unknown memory digits become zero. Macro-obscured memory calls that cannot be resolved from compiler locations are rejected.
 - Speed depends on the design and computer. The UI reports actual cycles, simulated time, frames, and measured cycles/second. It does not claim real-time operation. OLED updates are limited to 30 per second; all underlying pin/pixel events are processed.
 
+## Waveforms
+
+Expand **Waveforms** below the board to start capturing. It starts collapsed and does no recording until opened. Drag its top divider, or focus the divider and use Up/Down or Home/End, to resize it. The board controls remain usable above the viewer.
+
+- Button and LED buses are selected by default. **Signals** searches retained hierarchical registers, wires, clocks, resets, and OLED signals; choose up to 32. Memories, arrays, and compiler temporaries are omitted. Optimization can remove a signal entirely.
+- **Pause/Resume** and **Step Cycle** use the existing simulation controls. **Clear Capture** resets only the trace, leaving the design running from its current state. Selection changes also begin a fresh baseline.
+- **Fit History**, **+ / −**, the position slider, pan buttons, and **Follow Latest** navigate simulated time. Click or drag the plot to place the shared cursor; Hex/Decimal changes bus values. Focus the canvas and use Left/Right (or the ‹/› buttons) to inspect adjacent recorded events, including multiple input changes at the same timestamp.
+- The bounded capture holds the latest 8,192 change records with a complete baseline at the oldest retained time. A notice reports discarded history. Adding a fast clock consumes this window quickly; omit clocks when inspecting slower button or LED changes.
+- Capture runs after settled simulator events, independently of UI refreshes. Oscillator and PLL edges keep their actual simulated intervals. UI messages contain incremental batches and are limited to approximately 30 per second while running; pause/step flush immediately.
+- Closing Waveforms stops recording and discards its history. Reopening starts fresh. Restart, recompilation, and OLED mode changes clear history. Source changes stop the simulation and invalidate the trace. Input changes while paused retain their order at the same simulated time.
+
+Waveforms show settled two-state values, not physical propagation delays, glitches, or metastability. Packed values are transported as hexadecimal strings so capture never truncates at 32 bits. A GreyMecha runtime adapter emits exact BigInt operations for scalar 33–64-bit constants and arithmetic rather than upstream's lossy JavaScript Number literals; backend constructs beyond its supported digital model can still fail compilation. Signed signals display two's-complement decimal values when requested. No trigger engine, protocol decoding, VCD import/export, or editable stimulus is included.
+
 ## Run and test the feature branch
 
-Work is isolated on `feature/greymecha-fpga-simulator` in a separate worktree. `main`, its Pages deployment, and the `working-webui` tag are not changed by this branch.
+Waveform work is isolated on `feature/greymecha-simulator-waveforms` in the existing simulator worktree. It remains local for review; `main`, its Pages deployment, and the `working-webui` tag are not changed by this branch.
 
 From its `web-ui` directory:
 

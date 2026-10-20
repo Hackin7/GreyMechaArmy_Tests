@@ -1,9 +1,10 @@
 import { runYosys } from '@yowasp/yosys';
 import { VerilogXMLParser } from '../../../vendor/8bitworkshop/hdl/vxmlparser';
-import { HDLModuleJS } from '../../../vendor/8bitworkshop/hdl/hdlruntime';
 import { primitiveDeclarations, primitiveModels, pixelPreviewModel } from './primitives.js';
 import { Framebuffer, GC9A01 } from './display.js';
 import { loadMemory } from './memory.js';
+import { TraceCapture, signalCatalog } from './trace.js';
+import { PackedRuntime } from './packedRuntime.js';
 
 const encoder = new TextEncoder(), decoder = new TextDecoder();
 const asText = value => typeof value === 'string' ? value : decoder.decode(value);
@@ -169,7 +170,7 @@ export function compileModel(prepared, createCompiler, wasmModule, onLog = () =>
   for (const dtype of Object.values(unit.dtypes)) {
     if (dtype.subtype && dtype.low && dtype.high && Math.min(dtype.low.cvalue,dtype.high.cvalue)!==0) throw new Error('Only zero-based unpacked arrays are supported by this simulation backend.');
   }
-  const runtime = new HDLModuleJS(unit.modules.TOP, unit.modules['@CONST-POOL@']);
+  const runtime = new PackedRuntime(unit.modules.TOP, unit.modules['@CONST-POOL@']);
   runtime.getFileData = name => {
     if (!(name in prepared.files)) throw new Error(`Missing simulation memory file ${name}.`);
     return prepared.files[name];
@@ -182,6 +183,7 @@ export class Simulation {
   constructor(runtime, options) {
     this.runtime = runtime; this.options = options;
     this.display = options.mode === 'spi' ? new GC9A01() : new Framebuffer();
+    this.trace = new TraceCapture(signalCatalog(runtime));
     this.restart();
   }
   restart() {
@@ -194,10 +196,12 @@ export class Simulation {
     Object.assign(this.runtime.state, { gm_osc: 0, gm_pll: 0, gm_ext: 0, gm_lock: 0, buttons: 127, pmod_resetn: 1 });
     this.runtime.basefuncs.$time = () => this.timePs / 1000;
     this.runtime.eval(); this.readDisplay();
+    if (this.trace.enabled) this.trace.configure({ enabled: true, keys: this.trace.signals.map(signal => signal.key), generation: this.trace.generation + 1 }, this.runtime.state, this.timePs);
   }
   setInputs(buttons = 127, pmodResetn = 1) {
     Object.assign(this.runtime.state, { buttons: buttons & 127, pmod_resetn: pmodResetn ? 1 : 0 });
     this.runtime.eval(); this.readDisplay();
+    if (this.trace.enabled) this.trace.sample(this.runtime.state, this.timePs);
   }
   edge() {
     const time = Math.min(...this.clocks.map(clock => clock.next));
@@ -211,6 +215,7 @@ export class Simulation {
     }
     this.runtime.state.gm_lock = this.oscRises >= 16 ? 1 : 0;
     this.runtime.eval(); this.readDisplay();
+    if (this.trace.enabled) this.trace.sample(this.runtime.state, this.timePs);
   }
   readDisplay() {
     const state = this.runtime.state;

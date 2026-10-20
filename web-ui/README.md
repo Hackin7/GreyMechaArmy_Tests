@@ -29,6 +29,8 @@ Each synthesis run produces artifacts as they become available. The **Terminal**
 
 If the source changes after synthesis, the views are marked **Outdated** and the old bitstream cannot be uploaded or programmed; synthesize again to refresh them.
 
+Expand **Waveforms** below the simulated board to record button/LED buses and selected internal signals. The viewer supports zoom, a shared cursor, hexadecimal/decimal values, and a searchable signal picker. Capture is bounded to the latest 8,192 changes and uses simulated time; closing it stops recording. See [waveform controls and limits](SIMULATOR.md#waveforms).
+
 ## Source files and OLED example
 
 Use the sidebar to create a blank `.v` file, upload local `.v`, `.vh`, or `.mem` files, and remove added files. `top.v` and `pinout.lpf` remain present. Duplicate filenames are skipped so existing edits are preserved. Source file changes mark the previous build outdated.

@@ -80,6 +80,18 @@
       "path": "vendor/verilator-Makefile.local",
       "upstreamSha256": "1087661122aab32faa064d51b8f3a938c9ed24787f3e34df265ec976fb80b33c",
       "sha256": "1087661122aab32faa064d51b8f3a938c9ed24787f3e34df265ec976fb80b33c"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/waveform.ts",
+      "path": "vendor/8bitworkshop/waveform.ts",
+      "upstreamSha256": "0a9aa2c5b4fd230e2aba3317303eab6782f3b90231d50e4e6d27629fc1dacbe3",
+      "sha256": "0a9aa2c5b4fd230e2aba3317303eab6782f3b90231d50e4e6d27629fc1dacbe3"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/sehugg/8bitworkshop/09d99f2c3028e27b397df8471baec29975ec154b/src/common/waveformcore.ts",
+      "path": "vendor/8bitworkshop/waveformcore.ts",
+      "upstreamSha256": "829f968ab4c134988874572c1af0ffe58dc147cbd02e4d42f50e8218923e8393",
+      "sha256": "829f968ab4c134988874572c1af0ffe58dc147cbd02e4d42f50e8218923e8393"
     }
   ]
 }
