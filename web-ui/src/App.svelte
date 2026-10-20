@@ -561,8 +561,9 @@
     button:disabled { opacity: .45; cursor: not-allowed; }
     .run-all-btn { background: #e33e5a; color: white; }
     .synth-btn { background: #007acc; color: white; }
-    .simulator-btn { background: #36585e; color: white; }
-    .simulator-btn.active { box-shadow: inset 0 0 0 1px #9cdec1; }
+    .simulator-btn { background: #3b566a; color: white; }
+    .simulator-btn.active { background: #37373d; box-shadow: inset 0 0 0 1px #007acc; }
+    .simulator-btn:focus-visible { outline: 2px solid #4fc1ff; outline-offset: 2px; }
     .upload-btn { background: #28a745; color: white; }
     .reboot-btn { background: #6f42c1; color: white; }
     .download-btn { background: #d97d0d; color: white; }
@@ -574,11 +575,13 @@
     .outdated { margin: 0 0 10px; padding: 8px; color: #ffd28a; background: #493b23; border-radius: 4px; font-size: 12px; }
     .main { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
     .workbench { display:flex; flex:1; min-width:0; min-height:0; position:relative; }
-    .simulator-pane { display:flex; flex-direction:column; flex-shrink:0; min-width:280px; max-width:calc(100% - 260px); min-height:0; background:#10161f; }
+    .simulator-pane { display:flex; flex-direction:column; flex-shrink:0; min-width:280px; max-width:calc(100% - 260px); min-height:0; background:#1e1e1e; }
     .simulator-pane.closed { display:none; }
-    .simulator-heading { display:flex; align-items:center; justify-content:space-between; height:36px; flex-shrink:0; padding:0 10px 0 15px; background:#18212c; border-bottom:1px solid #2e3b4a; }
-    .simulator-heading h2 { margin:0; font-size:12px; color:#b7c9d9; }
-    .simulator-heading button { padding:2px 8px; font-size:20px; color:#b7c9d9; background:transparent; }
+    .simulator-heading { display:flex; align-items:center; justify-content:space-between; height:36px; flex-shrink:0; padding:0 10px 0 14px; background:#252526; border-bottom:1px solid #333; }
+    .simulator-heading h2 { margin:0; font-size:12px; color:#bbb; }
+    .simulator-heading button { padding:2px 8px; font-size:20px; color:#bbb; background:transparent; }
+    .simulator-heading button:hover { background:#3b3b3b; color:#fff; }
+    .simulator-heading button:focus-visible { outline:2px solid #4fc1ff; outline-offset:1px; }
     .simulator-content { flex:1; min-height:0; }
     .simulator-resize { flex:0 0 8px; cursor:col-resize; touch-action:none; background:#252526; border-left:1px solid #333; border-right:1px solid #333; position:relative; }
     .simulator-resize::after { content:''; position:absolute; height:36px; width:2px; top:50%; left:50%; transform:translate(-50%,-50%); background:#666; }

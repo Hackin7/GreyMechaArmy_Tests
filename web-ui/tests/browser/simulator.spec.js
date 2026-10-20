@@ -50,7 +50,11 @@ async function pixel(page, x = 120, y = 120) {
 test('production worker: buttons, keyboard, pause, stepping, stale source, errors and cancellation', async ({ page }, testInfo) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('./');
-  await openSimulator(page);await compile(page);await pause(page);
+  await openSimulator(page);
+  await page.screenshot({path:testInfo.outputPath('simulator-idle-disabled.png'),fullPage:true});
+  await compile(page);
+  await page.screenshot({path:testInfo.outputPath('simulator-running.png'),fullPage:true});
+  await pause(page);
   await expect(page.getByTestId('sim-cycles')).not.toHaveText('0');
   await editTop(page, "module top(input [6:0] btn,input [7:0] pmod_j1,output [7:0] led); assign led={pmod_j1[0],~btn}; endmodule");
   await openSimulator(page); await compile(page); await pause(page);
@@ -82,6 +86,7 @@ test('production worker: buttons, keyboard, pause, stepping, stale source, error
   await expect(page.getByTestId('sim-status')).toHaveText('outdated');
   await page.getByRole('button', { name: 'Compile & Run', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('failed');
+  await page.screenshot({path:testInfo.outputPath('simulator-error.png'),fullPage:true});
   await editTop(page, "module top(input [4:0] btn,output [7:0] led); assign led={3'b0,~btn}; endmodule");
   await page.getByRole('button', { name: 'Compile & Run', exact: true }).click();
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
@@ -119,6 +124,7 @@ test('PCB overlays remain aligned and interactive through zoom, fit and a narrow
   expect(paneRect.x).toBeGreaterThanOrEqual(editorRect.x+editorRect.width);
   const divider=page.getByRole('separator',{name:'Resize simulator panel'});
   await divider.focus();await divider.press('ArrowLeft');
+  await page.screenshot({path:testInfo.outputPath('simulator-focused.png'),fullPage:true});
   expect((await pane.boundingBox()).width).toBeGreaterThan(paneRect.width);
   await divider.press('ArrowRight');
   const handle=await divider.boundingBox();
