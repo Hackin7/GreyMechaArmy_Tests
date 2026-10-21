@@ -7,6 +7,7 @@ import { build } from 'esbuild';
 import { performance } from 'node:perf_hooks';
 import './verify-simulator-assets.mjs';
 import './verify-simulator-board.mjs';
+import './verify-waveforms.mjs';
 
 globalThis.require = createRequire(import.meta.url);
 globalThis.__dirname = new URL('../public/simulator/', import.meta.url).pathname;
@@ -43,6 +44,36 @@ basic.setInputs(126); assert.equal(basic.snapshot(false).led, 11);
 basic.restart(); assert.equal(basic.cycles, 0);
 output('Counter, button input, and restart passed.');
 
+const traced = await compile({ 'top.v': basicSource });
+traced.trace.configure({ enabled: true, keys: ['buttons', 'led', 'gm_ext'], generation: 1 }, traced.runtime.state, traced.timePs);
+traced.advance(10);
+assert.equal(traced.snapshot(false).led, 10);
+traced.setInputs(126); assert.equal(traced.snapshot(false).led, 11);
+const sameTime = traced.trace.snapshot().records;
+assert.equal(sameTime.at(-1).timePs, sameTime.at(-2).timePs);
+assert.ok(sameTime.at(-1).sequence > sameTime.at(-2).sequence);
+traced.restart(); assert.equal(traced.trace.length, 1); assert.equal(traced.trace.generation, 2);
+assert.equal(traced.trace.snapshot().records[0].timePs, 0);
+const clocks = await compile(oledSimple);
+clocks.trace.configure({ enabled: true, keys: ['gm_osc', 'gm_pll'], generation: 1 }, clocks.runtime.state, 0);
+clocks.advance(12);
+const clockRecords = clocks.trace.snapshot().records;
+assert.ok(clockRecords.length > 12);
+assert.equal(new Set(clockRecords.map(record => record.timePs)).size, clockRecords.length, 'simultaneous clock edges must settle as one event');
+const intervals = clockRecords.slice(1).map((record, i) => Math.round(record.timePs - clockRecords[i].timePs));
+assert.ok(new Set(intervals).size > 1, 'different clock periods must retain unequal event intervals');
+const wideSource = `module top(input clk_ext, output [7:0] led);
+reg [63:0] counter=64'hfedcba9876543200;
+always @(posedge clk_ext) counter<=counter+1;
+assign led=counter[7:0]^counter[63:56]; endmodule`;
+const wide = await compile({ 'top.v': wideSource });
+const wideSignal = wide.trace.catalog.find(signal => signal.width === 64 && signal.label.includes('counter'));
+assert.ok(wideSignal, 'retained wide internal register must be selectable');
+wide.trace.configure({ enabled: true, keys: [wideSignal.key], generation: 1 }, wide.runtime.state, 0);
+wide.advance(3);
+assert.equal(wide.trace.snapshot().records.at(-1).values[0], 'fedcba9876543203');
+output('Waveform capture preserves behavior, native-tested counter outputs, simultaneous/unequal clocks, restart, and a 64-bit internal register.');
+
 // Compare the browser runtime with native Icarus on identical clock/input edges.
 const source = `module top(input clk_ext,input [6:0] btn,output [7:0] led);
 reg [2:0] q=0; reg [7:0] rom[0:3];
@@ -52,7 +83,13 @@ always @(posedge clk_ext or negedge btn[6])
 assign led=rom[btn[3:2]] ^ {5'b0,q}; endmodule`;
 const nativeSim = await compile({ 'top.v': source, 'native.mem': '12\n34\n56\n78\n' });
 const stimuli = [127,126,125,123,111,95,63,127,124,112,100,126,125,127];
-const actual = stimuli.map(value => { nativeSim.setInputs(value); nativeSim.advance(1); return nativeSim.snapshot(false).led; });
+nativeSim.trace.configure({ enabled: true, keys: ['led'], generation: 1 }, nativeSim.runtime.state, 0);
+const actual = stimuli.map(value => {
+  nativeSim.setInputs(value); nativeSim.advance(1);
+  const captured = Number.parseInt(nativeSim.trace.snapshot().records.at(-1).values[0], 16);
+  assert.equal(captured, nativeSim.snapshot(false).led);
+  return captured;
+});
 await writeFile('.sim-test/native.v', source);
 await writeFile('.sim-test/native.mem', '12\n34\n56\n78\n');
 await writeFile('.sim-test/native_tb.v', `module tb;reg clk_ext=0;reg [6:0] btn=127;wire [7:0] led; top dut(clk_ext,btn,led);
@@ -64,6 +101,13 @@ function native(tool, args) {
     process.platform === 'win32' ? ['--exec', tool, ...args.map(linuxPath)] : args,
     { cwd: nativeDir, encoding: 'utf8', timeout: 60000 });
 }
+await writeFile('.sim-test/wide.v', wideSource);
+await writeFile('.sim-test/wide_tb.v', `module tb; reg clk_ext=0; wire [7:0] led; top dut(clk_ext,led);
+initial begin repeat(3) begin #5 clk_ext=1; #1 $display("WIDE %016h", dut.counter); #4 clk_ext=0; end $finish; end endmodule`);
+native('iverilog', ['-g2005', '-o', path.join(nativeDir, 'wide.vvp'), path.join(nativeDir, 'wide_tb.v'), path.join(nativeDir, 'wide.v')]);
+const wideExpected = [...native('vvp', [path.join(nativeDir, 'wide.vvp')]).matchAll(/WIDE\s+([0-9a-f]+)/g)].map(match => match[1]);
+assert.deepEqual(wide.trace.snapshot().records.slice(1).map(record => record.values[0]), wideExpected);
+output('64-bit internal waveform values match native Icarus without Number rounding.');
 native('iverilog', ['-g2005', '-o', path.join(nativeDir,'reference.vvp'), path.join(nativeDir,'native_tb.v'), path.join(nativeDir,'native.v')]);
 const expected = [...native('vvp', [path.join(nativeDir,'reference.vvp')]).matchAll(/TRACE\s+(\d+)/g)].map(match => Number(match[1]));
 assert.deepEqual(actual, expected);

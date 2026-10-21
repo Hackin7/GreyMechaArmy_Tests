@@ -18,6 +18,7 @@
     "sync:simulator-board": "node scripts/sync-simulator-board.mjs",
     "verify:simulator-board": "node scripts/verify-simulator-board.mjs",
     "verify:simulator": "node scripts/verify-simulator.mjs",
+    "verify:waveforms": "node scripts/verify-waveforms.mjs",
     "test:simulator:browser": "playwright test"
   },
   "devDependencies": {

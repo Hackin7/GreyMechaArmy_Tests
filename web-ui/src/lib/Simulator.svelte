@@ -1,6 +1,8 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import boardLayout from './simulator/boardLayout.json';
+  import Waveforms from './Waveforms.svelte';
+  import { mergeTrace } from './simulator/trace.js';
   export let files = {};
   export let sourceRevision = 0;
   export let isSynthesizing = false;
@@ -17,6 +19,7 @@
   let info, frame, canvas, panel, zoom = 1, buttons = 127, pmodResetn = 1;
   let logs = '', error = '', previousActive = false;
   let boardViewport, fitted = true;
+  let waveformsOpen = false, trace, signals = [], selectedSignals = [], traceGeneration = 0;
   const heldKeys = new Set(), heldPointers = new Set();
   $: ready = Boolean(worker && info && compiledRevision === sourceRevision && ['running', 'paused'].includes(status));
   $: if (worker && compiledRevision !== sourceRevision) stop('outdated');
@@ -30,9 +33,15 @@
   function command(type, data = {}) {
     worker?.postMessage({ type, simulationId, sourceRevision: compiledRevision, ...data });
   }
+  function configureCapture(keys = selectedSignals) {
+    selectedSignals = keys; traceGeneration++; trace = undefined;
+    command('TRACE_CONFIG', { enabled: waveformsOpen && active, keys, generation: traceGeneration });
+  }
+  function toggleWaveforms(open) { waveformsOpen = open; configureCapture(); }
+  function restart() { traceGeneration++; trace = undefined; command('RESTART', { traceGeneration }); releaseAll(); }
   function start() {
     if (isSynthesizing) return;
-    stop(); error = ''; logs = ''; info = undefined; frame = undefined;
+    stop(); error = ''; logs = ''; info = undefined; frame = undefined; signals = [];
     canvas?.getContext('2d').clearRect(0, 0, 240, 240);
     compiledRevision = sourceRevision; simulationId++;
     status = 'compiling'; message = 'Loading browser simulation tools…';
@@ -47,7 +56,11 @@
         case 'LOG': logs = (logs + data.message + '\n').slice(-12000); break;
         case 'READY':
           clearTimeout(watchdog); info = data.info; status = 'paused'; message = 'Compiled.';
+          signals = data.signals;
+          selectedSignals = selectedSignals.filter(key => signals.some(signal => signal.key === key));
+          if (!selectedSignals.length) selectedSignals = ['buttons', 'led'].filter(key => signals.some(signal => signal.key === key));
           command('INPUT', { buttons, pmodResetn });
+          configureCapture();
           if (active && !isSynthesizing) command('RUN');
           break;
         case 'RUNNING':
@@ -55,6 +68,7 @@
           break;
         case 'PAUSED': status = 'paused'; break;
         case 'FRAME': frame = { ...data, pixels: data.pixels ?? frame?.pixels }; break;
+        case 'TRACE': if (data.trace.generation === traceGeneration) trace = mergeTrace(trace, data.trace); break;
         case 'ERROR': error = data.error; stop('error'); break;
       }
     };
@@ -69,11 +83,13 @@
       if (building && status === 'compiling') stop(); else pause();
       releaseAll();
     }
+    if (visible !== previousActive && worker && info && waveformsOpen) configureCapture();
     previousActive = visible;
   }
   function stop(nextStatus = 'stopped') {
     clearTimeout(watchdog); worker?.terminate(); worker = undefined; buttons = 127; pmodResetn = 1;
     heldKeys.clear(); heldPointers.clear();
+    traceGeneration++; trace = undefined;
     status = nextStatus;
   }
   function changeMode() { if (worker || info) start(); }
@@ -125,14 +141,14 @@
     <button class="compile-btn" on:click={start} disabled={isSynthesizing || status === 'compiling'}>Compile &amp; Run</button>
     <button on:click={() => status === 'running' ? pause() : command('RUN')} disabled={!ready || isSynthesizing}>{status === 'running' ? 'Pause' : 'Resume'}</button>
     <button on:click={() => command('STEP')} disabled={!ready || status === 'running' || isSynthesizing}>Step Cycle</button>
-    <button on:click={() => { command('RESTART'); releaseAll(); }} disabled={!ready || isSynthesizing}>Restart</button>
+    <button on:click={restart} disabled={!ready || isSynthesizing}>Restart</button>
     <button on:click={() => stop()} disabled={!worker}>Stop</button>
     <span class="state" class:running={status === 'running'} data-testid="sim-status" role="status">{status}</span>
   </div>
   {#if error}<pre class="error" role="alert">{error}</pre>{/if}
   {#if status === 'compiling'}<p class="progress" role="status">{message}</p>{/if}
   {#if status === 'outdated'}<p class="notice">Source changed. Compile again to simulate the current design.</p>{/if}
-  <div class="workspace">
+  <div class="workspace" class:waveforms-open={waveformsOpen}>
     <div class="board-scroll" bind:this={boardViewport}>
       <div class="board" data-testid="pcb-board" style={`width:${boardWidth * zoom}px;height:${boardHeight * zoom}px`}>
         <div class="board-face" data-testid="pcb-face" style={`width:${boardWidth}px;height:${boardHeight}px;transform:scale(${zoom})`}>
@@ -187,6 +203,8 @@
       <p><a href={`${assetBase}NOTICE.md`} target="_blank" rel="noreferrer">Simulator source and licenses</a></p>
     </aside>
   </div>
+  <Waveforms expanded={waveformsOpen} {trace} catalog={signals} selectedKeys={selectedSignals} {ready} outdated={status === 'outdated'}
+    onToggle={toggleWaveforms} onSelection={configureCapture} onClear={() => configureCapture()} />
 </section>
 
 <style>
@@ -203,7 +221,7 @@
   select,input{max-width:180px;border:1px solid #555;background:#1e1e1e}
   button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #4fc1ff;outline-offset:2px}
   .state{font:12px monospace;color:#bbb;margin-left:auto}.state.running{color:#4fc1ff}
-  .workspace{display:grid;flex:1;min-height:0;grid-template-columns:minmax(0,1fr) 245px;grid-template-rows:minmax(0,1fr);gap:12px;padding:12px;overflow:auto}
+  .workspace{display:grid;flex:1;min-height:320px;grid-template-columns:minmax(0,1fr) 245px;grid-template-rows:minmax(0,1fr);gap:12px;padding:12px;overflow:auto}
   .board-scroll{height:100%;min-height:300px;overflow:auto;padding:16px;box-sizing:border-box;border:1px solid #333;border-radius:4px;background:#252526}
   .board{position:relative;margin:auto;filter:drop-shadow(0 5px 7px #0005)}
   .board-face{transform-origin:top left;position:relative}
@@ -230,4 +248,5 @@
   .notice,.progress{margin:12px 14px;font-size:12px}.notice{padding:8px;color:#ffd28a;background:#493b23;border-radius:4px}.progress{color:#9cdcfe}
   .pin-legend{margin-top:12px}.pin-legend ul{padding-left:15px;font:11px/1.8 monospace}
   @container(max-width:700px){.workspace{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:start}.details{max-width:650px;overflow:visible}.board-scroll{height:640px;max-height:70vh}}
+  @container(max-width:700px){.workspace.waveforms-open .board-scroll{height:360px;max-height:45vh}}
 </style>

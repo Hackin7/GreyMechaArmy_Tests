@@ -2,7 +2,7 @@ name: GreyMecha simulator checks
 
 on:
   push:
-    branches: [feature/greymecha-fpga-simulator]
+    branches: [feature/greymecha-fpga-simulator, feature/greymecha-simulator-waveforms]
   pull_request:
     paths: ['web-ui/**', '.github/workflows/simulator.yml']
   workflow_dispatch:

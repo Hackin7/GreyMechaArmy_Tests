@@ -9,7 +9,7 @@ const sources = [
     `https://raw.githubusercontent.com/sehugg/8bitworkshop/${engine}/src/common/hdl/${name}`,
     `vendor/8bitworkshop/hdl/${name}`
   ]),
-  ...['util.ts', 'workertypes.ts'].map(name => [
+  ...['util.ts', 'workertypes.ts', 'waveform.ts', 'waveformcore.ts'].map(name => [
     `https://raw.githubusercontent.com/sehugg/8bitworkshop/${engine}/src/common/${name}`,
     `vendor/8bitworkshop/${name}`
   ]),
